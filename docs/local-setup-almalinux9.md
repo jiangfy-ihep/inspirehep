@@ -191,7 +191,8 @@ repository and should never be committed to directly.
 | Remote | URL | Role |
 |---|---|---|
 | `upstream` | `git@github.com:inspirehep/inspirehep.git` | official repo (pull only) |
-| `origin` | `git@github.com:jiangfy-ihep/inspirehep.git` | personal fork (push here) |
+| `origin` | `git@github.com:jiangfy-ihep/inspirehep.git` | GitHub fork (primary backup) |
+| `origin-gitlab` | `git@code.ihep.ac.cn:jiangfy/inspirehep.git` | IHEP GitLab (secondary backup) |
 
 **Run this whenever upstream publishes new commits:**
 
@@ -203,19 +204,25 @@ export https_proxy=http://192.168.219.196:10810
 git checkout master
 git pull upstream master
 
-# 2. Keep your fork's master in sync
+# 2. Push master to both backups
 git push origin master
+git push origin-gitlab master
 
 # 3. Rebase your local adaptations on top of the new master
 git checkout local
 git rebase master
 
-# 4. Back up the local branch to your fork
+# 4. Back up the local branch to both remotes
 git push origin local --force-with-lease
+git push origin-gitlab local --force-with-lease
 ```
 
 If `rebase` reports a conflict on `ui/src/setupProxy.js`, re-apply the
 `localhost:8000` target and run `git rebase --continue`.
+
+> `origin-gitlab` is on the intranet — no proxy required for those pushes,
+> but the proxy env vars set above do no harm (intranet addresses are in
+> `no_proxy`).
 
 ---
 
