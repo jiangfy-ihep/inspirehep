@@ -180,6 +180,45 @@ docker compose -f docker-compose.services.yml -f docker-compose.override.yml dow
 
 ---
 
+### Syncing with upstream
+
+Local adaptations live on the `local` branch. `master` is a clean mirror of the
+official [inspirehep/inspirehep](https://github.com/inspirehep/inspirehep)
+repository and should never be committed to directly.
+
+**Remote layout:**
+
+| Remote | URL | Role |
+|---|---|---|
+| `upstream` | `git@github.com:inspirehep/inspirehep.git` | official repo (pull only) |
+| `origin` | `git@github.com:jiangfy-ihep/inspirehep.git` | personal fork (push here) |
+
+**Run this whenever upstream publishes new commits:**
+
+```bash
+export http_proxy=http://192.168.219.196:10810
+export https_proxy=http://192.168.219.196:10810
+
+# 1. Pull new upstream commits into master
+git checkout master
+git pull upstream master
+
+# 2. Keep your fork's master in sync
+git push origin master
+
+# 3. Rebase your local adaptations on top of the new master
+git checkout local
+git rebase master
+
+# 4. Back up the local branch to your fork
+git push origin local --force-with-lease
+```
+
+If `rebase` reports a conflict on `ui/src/setupProxy.js`, re-apply the
+`localhost:8000` target and run `git rebase --continue`.
+
+---
+
 ## Prerequisites
 
 The following must already be installed before starting:
