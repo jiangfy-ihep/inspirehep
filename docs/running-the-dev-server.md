@@ -36,9 +36,10 @@ cd ~/projects/inspirehep
 ./scripts/dev.sh
 ```
 
-This creates a tmux session named `inspirehep` with three windows:
+This creates a tmux session named `inspirehep` with four windows:
 - `backend` — gunicorn + celery worker
 - `ui` — React dev server
+- `backoffice` — Django runserver on :8001
 - `shell` — free shell at project root
 
 | tmux shortcut | Action |
@@ -76,6 +77,8 @@ Access from other machines on the same intranet (replace IP if your server addre
 |---|---|
 | UI | http://192.168.219.191:3000 |
 | Backend API | http://192.168.219.191:8000/api/literature/ |
+| Backoffice API | http://192.168.219.191:8001/api/ |
+| Backoffice admin | http://192.168.219.191:8001/admin/ |
 | MinIO console | http://192.168.219.191:9001 |
 | Admin login | admin@inspirehep.net / 123456 |
 | MinIO login | inspirehep / inspirehep |
