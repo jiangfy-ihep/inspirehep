@@ -24,7 +24,7 @@ tmux send-keys -t "$SESSION:ui" "cd '$ROOT/ui' && HOST=0.0.0.0 NODE_OPTIONS=--op
 
 # Third window: backoffice (Django)
 tmux new-window -t "$SESSION" -n "backoffice"
-tmux send-keys -t "$SESSION:backoffice" "cd '$ROOT/backoffice' && poetry run python manage.py runserver 0.0.0.0:8001" Enter
+tmux send-keys -t "$SESSION:backoffice" "cd '$ROOT/backoffice' && set -a && source .env && set +a && poetry run python manage.py runserver 0.0.0.0:8001" Enter
 
 # Fourth window: free shell at project root (for git, CLI commands, etc.)
 tmux new-window -t "$SESSION" -n "shell"
