@@ -161,9 +161,10 @@ force-push it. Resolve application conflicts in line with upstream. In
 particular, keep upstream's deletion of `ui/src/setupProxy.js` and its Vite
 configuration; upstream migrated away from CRA. The optional
 `INSPIRE_API_PROXY_TARGET` override supports local development while preserving
-upstream's `http://hep-web:8000` default for Docker. Keep upstream ignore rules
-when resolving `.gitignore` conflicts, including `CLAUDE.md`, alongside local
-`.envrc` exclusions. Do not assume additional remotes or hard-code proxy settings.
+upstream's `http://hep-web:8000` default for Docker. For `.gitignore` conflicts,
+merge the rules from both `dev` and upstream, preserving all exclusions and
+removing duplicates. This includes `CLAUDE.md` and the local `.envrc` rule.
+Do not assume additional remotes or hard-code proxy settings.
 
 The repository default branch is `master`. Create focused feature, fix,
 refactor, and chore branches from it unless the repository migrates to `main`
