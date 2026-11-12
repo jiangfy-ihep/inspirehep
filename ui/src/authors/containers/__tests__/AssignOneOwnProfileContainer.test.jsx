@@ -1,4 +1,3 @@
-import React from 'react';
 import { fireEvent, waitFor } from '@testing-library/react';
 
 import { getStore, mockActionCreator } from '../../../fixtures/store';
@@ -16,20 +15,22 @@ import {
 } from '../../../actions/authors';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('react-router-dom', () => {
-  const actual = jest.requireActual('react-router-dom');
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
   return { ...actual, useParams: jest.fn().mockReturnValue({ id: 123 }) };
 });
 
-jest.mock('../../components/AssignOwnProfileAction', () => {
-  const actual = jest.requireActual('../../components/AssignOwnProfileAction');
+vi.mock('../../components/AssignOwnProfileAction', async () => {
+  const actual = await vi.importActual(
+    '../../components/AssignOwnProfileAction'
+  );
   return {
     __esModule: true,
     default: jest.fn((props) => <actual.default {...props} />),
   };
 });
 
-jest.mock('../../../actions/authors');
+vi.mock('../../../actions/authors');
 mockActionCreator(assignOwnPapers);
 mockActionCreator(unassignOwnPapers);
 mockActionCreator(setPublicationsClaimedSelection);

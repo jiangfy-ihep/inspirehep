@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import RcFooter from 'rc-footer';
 import 'rc-footer/assets/index.css';
 import { Row, Col } from 'antd';
@@ -13,15 +13,17 @@ import {
   FAQ_URL,
   HELP_BLOG_URL,
   BLOG_URL,
-  HOLDINGPEN_URL,
-  AUTHORLIST_TOOL_URL,
   INVENIO_URL,
   REPORT_METADATA_URL,
   CONTACT_URL,
   INSPIRE_BLUESKY_ACCOUNT,
 } from '../../constants';
 import LinkWithTargetBlank from '../../components/LinkWithTargetBlank';
-import { BACKOFFICE, BIBLIOGRAPHY_GENERATOR } from '../../routes';
+import {
+  AUTHORLIST_TOOL,
+  BACKOFFICE,
+  BIBLIOGRAPHY_GENERATOR,
+} from '../../routes';
 
 interface Column {
   title: string;
@@ -85,12 +87,6 @@ const COLUMNS = [
     title: 'Tools',
     items: [
       {
-        title: 'Holdingpen',
-        onlyCatalogers: true,
-        url: HOLDINGPEN_URL,
-        openExternal: true,
-      },
-      {
         title: 'Backoffice',
         onlyCatalogers: true,
         url: BACKOFFICE,
@@ -99,7 +95,7 @@ const COLUMNS = [
       {
         title: 'Author list',
         onlyCatalogers: true,
-        url: AUTHORLIST_TOOL_URL,
+        url: AUTHORLIST_TOOL,
         openExternal: true,
       },
       {

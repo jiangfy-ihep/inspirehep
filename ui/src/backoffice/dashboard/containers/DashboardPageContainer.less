@@ -1,18 +1,22 @@
 .__DashboardPageContainer__ {
   width: 100%;
 
+  .ant-select {
+    min-width: 110px;
+  }
+
   .inner-container {
     display: flex;
     flex-direction: column;
     justify-content: center;
 
-    .search-container {
-      margin: 50px auto;
-      padding: 15px;
-      max-width: 1300px;
+    .content-grid {
       width: 100%;
-      display: flex;
+      max-width: 1300px;
+      margin: 0 auto;
+    }
 
+    .search-container {
       .ant-input {
         height: 3rem;
         border-top-right-radius: 0;
@@ -28,15 +32,14 @@
     }
 
     .cards-container {
-      margin: 20px auto 50px auto;
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      max-width: 1300px;
+      margin: 20px 0 50px;
+
+      .workflow-card-col {
+        display: flex;
+      }
 
       .ant-card {
-        margin: 20px 10px;
-        width: 300px;
+        width: 100%;
         border-width: 1px;
         transition: ease 0.25s;
 
@@ -81,6 +84,24 @@
     }
   }
 
+  .new-publisher-harvests {
+    &:hover {
+      box-shadow: 0px 0px 10px 0px #95a5a6;
+    }
+    .ant-card-head {
+      color: #95a5a6;
+    }
+  }
+
+  .publisher-updates {
+    &:hover {
+      box-shadow: 0px 0px 10px 0px #16a085;
+    }
+    .ant-card-head {
+      color: #16a085;
+    }
+  }
+
   .new-literature-submissions {
     &:hover {
       box-shadow: 0px 0px 10px 0px #e67e22;
@@ -96,6 +117,15 @@
     }
     .ant-card-head {
       color: #8e44ad;
+    }
+  }
+
+  .manual-merge {
+    &:hover {
+      box-shadow: 0px 0px 10px 0px #e3399c;
+    }
+    .ant-card-head {
+      color: #e3399c;
     }
   }
 }
@@ -144,11 +174,7 @@
 .bg-error {
   background-color: #e74c3c;
 }
-.bg-error-weak {
-  background-color: #e74c3c;
-  color: #fff;
-  opacity: 0.3;
-}
+
 .bg-completed {
   background-color: #16a085;
 }
@@ -177,7 +203,6 @@
 .font-white {
   color: white !important;
 }
-
 
 .ant-tabs {
   max-width: 1300px;

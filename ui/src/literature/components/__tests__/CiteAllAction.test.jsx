@@ -1,13 +1,13 @@
-import React from 'react';
 import MockAdapter from 'axios-mock-adapter';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import CiteAllAction from '../CiteAllAction';
 import { MAX_CITEABLE_RECORDS } from '../../constants';
 import http from '../../../common/http';
 import { downloadTextAsFile } from '../../../common/utils';
 
-jest.mock('../../../common/utils');
+vi.mock('../../../common/utils');
 
 const mockHttp = new MockAdapter(http.httpClient);
 
@@ -40,6 +40,7 @@ describe('CiteAllAction', () => {
   });
 
   it('shows loading state during citation process', async () => {
+    const user = userEvent.setup();
     mockHttp
       .onGet(
         `/literature?sort=mostcited&q=query&page=1&size=${MAX_CITEABLE_RECORDS}`
@@ -59,12 +60,10 @@ describe('CiteAllAction', () => {
     );
 
     const dropdownTrigger = container.querySelector('.ant-dropdown-trigger');
-    fireEvent.mouseOver(dropdownTrigger);
+    await user.hover(dropdownTrigger);
 
-    await waitFor(() => {
-      const bibTexOption = screen.getByText('BibTeX');
-      fireEvent.click(bibTexOption);
-    });
+    const bibTexOption = await screen.findByText('BibTeX');
+    await user.click(bibTexOption);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /cite all/i })).toHaveClass(
@@ -74,6 +73,7 @@ describe('CiteAllAction', () => {
   });
 
   it('calls downloadTextAsFile with correct data when LaTeX EU option is clicked', async () => {
+    const user = userEvent.setup();
     mockHttp
       .onGet(
         `/literature?sort=mostcited&q=query&page=1&size=${MAX_CITEABLE_RECORDS}`
@@ -88,12 +88,10 @@ describe('CiteAllAction', () => {
     );
 
     const dropdownTrigger = container.querySelector('.ant-dropdown-trigger');
-    fireEvent.mouseOver(dropdownTrigger);
+    await user.hover(dropdownTrigger);
 
-    await waitFor(() => {
-      const latexEuOption = screen.getByText('LaTeX (EU)');
-      fireEvent.click(latexEuOption);
-    });
+    const latexEuOption = await screen.findByText('LaTeX (EU)');
+    await user.click(latexEuOption);
 
     await waitFor(() => {
       expect(downloadTextAsFile).toHaveBeenCalledWith(
@@ -105,6 +103,7 @@ describe('CiteAllAction', () => {
   });
 
   it('calls downloadTextAsFile with correct data omitting page and size when option is clicked', async () => {
+    const user = userEvent.setup();
     mockHttp
       .onGet(
         `/literature?sort=mostrecent&q=query&page=1&size=${MAX_CITEABLE_RECORDS}`
@@ -119,12 +118,10 @@ describe('CiteAllAction', () => {
     );
 
     const dropdownTrigger = container.querySelector('.ant-dropdown-trigger');
-    fireEvent.mouseOver(dropdownTrigger);
+    await user.hover(dropdownTrigger);
 
-    await waitFor(() => {
-      const latexEuOption = screen.getByText('LaTeX (EU)');
-      fireEvent.click(latexEuOption);
-    });
+    const latexEuOption = await screen.findByText('LaTeX (EU)');
+    await user.click(latexEuOption);
 
     await waitFor(() => {
       expect(downloadTextAsFile).toHaveBeenCalledWith(
@@ -136,7 +133,8 @@ describe('CiteAllAction', () => {
   });
 
   it('shows tooltip when disabled due to too many results', async () => {
-    const { container } = render(
+    const user = userEvent.setup();
+    render(
       <CiteAllAction
         numberOfResults={MAX_CITEABLE_RECORDS + 1}
         query={{ q: 'ac>2000' }}
@@ -146,14 +144,7 @@ describe('CiteAllAction', () => {
     const citeButton = screen.getByRole('button', { name: /cite all/i });
 
     expect(citeButton).toBeDisabled();
-
-    const tooltipWrapper = container.querySelector('.ant-tooltip');
-
-    if (tooltipWrapper) {
-      fireEvent.mouseEnter(tooltipWrapper);
-    } else {
-      fireEvent.mouseEnter(citeButton);
-    }
+    await user.hover(citeButton);
 
     await waitFor(() => {
       expect(

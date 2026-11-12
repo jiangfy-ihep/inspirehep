@@ -1,4 +1,3 @@
-import React from 'react';
 import { Alert } from 'antd';
 
 import LinkWithTargetBlank from '../../common/components/LinkWithTargetBlank';
@@ -8,7 +7,7 @@ function HiddenCollectionAlert() {
     <div className="mb2">
       <Alert
         type="warning"
-        message={
+        title={
           <span>
             This record is not part of the INSPIRE Literature collection.{' '}
             <LinkWithTargetBlank

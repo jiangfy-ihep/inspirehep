@@ -4,7 +4,8 @@
 # inspirehep is free software; you can redistribute it and/or modify it under
 # the terms of the MIT License; see LICENSE file for more details.
 
-import mock
+from unittest import mock
+
 import orjson
 from flask import session
 from helpers.utils import create_user
@@ -54,6 +55,15 @@ def test_login_redirects_to_oauthclient_login(inspire_app):
     expected_status_code = 302
     assert expected_status_code == response_status_code
     assert response_location_header == expected_redirect_url
+
+
+def test_local_login_returns_404_when_disabled(inspire_app):
+    user = create_user(role="superuser")
+    with inspire_app.test_client() as client:
+        response = client.post(
+            "/accounts/login", json={"email": user.email, "password": "123456"}
+        )
+    assert response.status_code == 404
 
 
 def test_login_success_redirects_to_next_url(inspire_app):

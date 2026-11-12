@@ -1,10 +1,8 @@
-import React from 'react';
 import { Row, Col, Card, Space } from 'antd';
 import useAxios from 'axios-hooks';
-// @ts-ignore
-import SanitizedHTML from 'react-sanitized-html';
-
 import Icon, { XOutlined } from '@ant-design/icons';
+import SanitizedHTML from '../../common/components/SanitizedHTML';
+
 import Loading from '../../common/components/Loading';
 import ExternalLink from '../../common/components/ExternalLink';
 import ContentBox from '../../common/components/ContentBox';
@@ -14,7 +12,7 @@ import {
   INSPIRE_TWITTER_ACCOUNT,
 } from '../../common/constants';
 import LinkWithTargetBlank from '../../common/components/LinkWithTargetBlank';
-import { ReactComponent as blueskyFilledLogo } from '../../common/assets/bluesky-filled.svg';
+import blueskyFilledLogo from '../../common/assets/bluesky-filled.svg?react';
 
 interface Post {
   id: string;
@@ -70,7 +68,7 @@ const NewsAndUpdates = () => {
               <Loading />
             ) : data ? (
               data.map((post: Post) => (
-                <div data-test-id="news-post" key={post.id}>
+                <div data-testid="news-post" key={post.id}>
                   {renderBlogPost(post)}
                 </div>
               ))

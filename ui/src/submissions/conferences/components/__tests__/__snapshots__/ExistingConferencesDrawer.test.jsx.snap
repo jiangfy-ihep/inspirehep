@@ -1,21 +1,15 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ExistingConferencesDrawer renders drawer with number of conferences 1`] = `
+exports[`ExistingConferencesDrawer > renders drawer with number of conferences 1`] = `
 <body>
   <div />
   <div>
     <div
-      class="ant-drawer ant-drawer-right search-drawer ant-drawer-open"
+      class="ant-drawer ant-drawer-right search-drawer css-dev-only-do-not-override-oc1rc0 css-var-root ant-drawer-open"
       tabindex="-1"
     >
       <div
         class="ant-drawer-mask"
-      />
-      <div
-        aria-hidden="true"
-        data-sentinel="start"
-        style="width: 0px; height: 0px; overflow: hidden; outline: none; position: absolute;"
-        tabindex="0"
       />
       <div
         class="ant-drawer-content-wrapper"
@@ -23,36 +17,26 @@ exports[`ExistingConferencesDrawer renders drawer with number of conferences 1`]
       >
         <div
           aria-modal="true"
-          class="ant-drawer-content"
+          class="ant-drawer-section"
           role="dialog"
         >
           <div
-            class="ant-drawer-wrapper-body"
+            class="ant-drawer-body"
           >
+            <p>
+              <strong>
+                5
+              </strong>
+               
+              conferences
+               found in these dates:
+            </p>
             <div
-              class="ant-drawer-body"
-            >
-              <p>
-                <strong>
-                  5
-                </strong>
-                 
-                conferences
-                 found in these dates:
-              </p>
-              <div
-                data-testid="search-results"
-              />
-            </div>
+              data-testid="search-results"
+            />
           </div>
         </div>
       </div>
-      <div
-        aria-hidden="true"
-        data-sentinel="end"
-        style="width: 0px; height: 0px; overflow: hidden; outline: none; position: absolute;"
-        tabindex="0"
-      />
     </div>
   </div>
 </body>

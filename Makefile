@@ -19,7 +19,7 @@ start-inspirehep:
 
 start-airflow:
 	echo -e "\033[0;32m Starting Airflow. \033[0m"	
-	docker compose up -d airflow-init airflow-worker airflow-api-server airflow-dag-processor airflow-triggerer airflow-scheduler
+	docker compose up -d airflow-init airflow-worker airflow-apiserver airflow-dag-processor airflow-triggerer airflow-scheduler
 	echo -e "\033[0;32m Airflow Started. \033[0m"
 
 start-backoffice:
@@ -29,13 +29,22 @@ start-backoffice:
 	echo -e "\033[0;32m Backoffice Started. \033[0m"
 
 start-cypress:
+	docker compose run --rm --entrypoint yarn cypress install
 	docker compose up -d --force-recreate cache db mq s3 es
 	docker compose up -d --force-recreate hep-worker hep-web record-editor hep-ui ui
+	docker compose up -d --force-recreate backoffice-webserver backoffice-worker
 	sleep 5
 	docker compose exec hep-web ./scripts/setup
 	docker compose exec hep-web inspirehep importer demo-records
+	docker compose exec backoffice-webserver python manage.py create_groups
+	docker compose exec backoffice-webserver python manage.py loaddata backoffice/users/fixtures/users.json
+	docker compose exec backoffice-webserver python manage.py loaddata backoffice/users/fixtures/tokens.json
+	docker compose exec backoffice-webserver python manage.py loaddata backoffice/authors/fixtures/workflows.json
+	docker compose exec backoffice-webserver python manage.py loaddata backoffice/hep/fixtures/workflows.json
+	docker compose exec backoffice-webserver python manage.py loaddata backoffice/hep/fixtures/decisions.json
+	docker compose exec backoffice-webserver python manage.py opensearch document index --force
 	sleep 5
-	bash -c "docker compose run --rm cypress cypress run --browser firefox --headless --env inspirehep_url=http://host.docker.internal:8080 | tee >(sed 's/\x1b\[[0-9;]*m//g' > cypress.log)"
+	bash -c "docker compose run --rm cypress cypress run --browser firefox --headless --env inspirehep_url=http://host.docker.internal:8080,backoffice_url=http://host.docker.internal:8001 | tee >(sed 's/\x1b\[[0-9;]*m//g' > cypress.log)"
 	echo -e "\033[0;32m Cypress tests finished. \033[0m"
 
 setup-backoffice: airflow-setup django-setup
@@ -47,14 +56,15 @@ django-setup:
 	docker compose exec backoffice-webserver python manage.py loaddata backoffice/authors/fixtures/workflows.json
 	docker compose exec backoffice-webserver python manage.py loaddata backoffice/hep/fixtures/workflows.json
 	docker compose exec backoffice-webserver python manage.py loaddata backoffice/hep/fixtures/decisions.json
+	docker compose exec backoffice-webserver python manage.py opensearch document index --force
 	echo "\033[1;32memail: admin@admin.com / password: admin \033[0m"
 	echo "Backoffice initialized"
 	sed -i '' '/^AIRFLOW_TOKEN=/d' backoffice/.envs/local/.django
 
 airflow-setup:
-	docker compose exec airflow-api-server /entrypoint airflow connections import ./scripts/configs/connections.json
-	docker compose exec airflow-api-server /entrypoint airflow variables import ./scripts/configs/variables.json
-	docker compose exec airflow-api-server /entrypoint airflow pools import ./scripts/configs/pools.json
+	docker compose exec airflow-apiserver /entrypoint airflow connections import ./scripts/configs/connections.json
+	docker compose exec airflow-apiserver /entrypoint airflow variables import ./scripts/configs/variables.json
+	docker compose exec airflow-apiserver /entrypoint airflow pools import ./scripts/configs/pools.json
 	echo "\033[31mCHANGE inspire_token in Admin->Variables\033[0m"
 	echo "Workflows initialized"
 
@@ -78,4 +88,5 @@ load-records:
 	docker compose exec hep-web inspirehep importer demo-records
 
 services:
-	docker compose up -d cache db mq es db-airflow db-backoffice s3 create_buckets
+	docker compose up -d cache db mq es db-airflow db-backoffice s3
+	docker compose run --rm create_buckets

@@ -46,7 +46,7 @@ class TestAuthorWorkflowViewSet(BaseTransactionTestCase):
         airflow_utils.trigger_airflow_dag(
             WORKFLOW_DAGS[self.workflow.workflow_type].initialize,
             self.workflow.id,
-            self.workflow.data,
+            data=self.workflow.data,
         )
 
     def tearDown(self):
@@ -79,6 +79,28 @@ class TestAuthorWorkflowViewSet(BaseTransactionTestCase):
         self.assertIn("id", response.json())
 
     @pytest.mark.vcr
+    def test_create_author_removes_null_characters(self):
+        self.api_client.force_authenticate(user=self.curator)
+
+        data = {
+            "workflow_type": AuthorWorkflowType.AUTHOR_CREATE,
+            "status": "running",
+            "data": {
+                "name": {
+                    "value": "John\x00, Snow",
+                },
+                "_collections": ["Authors"],
+                "$schema": "https://inspirehep.net/schemas/records/authors.json",
+            },
+        }
+
+        response = self.api_client.post(self.endpoint, format="json", data=data)
+
+        self.assertEqual(response.status_code, 201)
+        workflow = AuthorWorkflow.objects.get(id=response.json()["id"])
+        self.assertEqual(workflow.data["name"], {"value": "John, Snow"})
+
+    @pytest.mark.vcr
     @patch("backoffice.common.airflow_utils.trigger_airflow_dag")
     def test_create_returns_503_if_airflow_fails(self, mock_trigger_airflow_dag):
         self.api_client.force_authenticate(user=self.curator)
@@ -100,7 +122,7 @@ class TestAuthorWorkflowViewSet(BaseTransactionTestCase):
         response = self.api_client.post(url, format="json", data=data)
 
         assert response.status_code == 503
-        assert response.json() == {"error": "Error triggering Airflow DAG"}
+        assert "Error triggering Airflow DAG run with id" in response.json()["error"]
 
     @pytest.mark.vcr
     def test_create_returns_409_if_orcid_exists(self):
@@ -418,19 +440,17 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
             id=uuid.UUID(int=2),
         )
 
-    def test_list_curator(self):
+    def test_list_not_allowed_curator(self):
         self.api_client.force_authenticate(user=self.curator)
         response = self.api_client.get(self.endpoint, format="json")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 405)
 
-    def test_list_admin(self):
+    def test_list_not_allowed_admin(self):
         self.api_client.force_authenticate(user=self.admin)
         response = self.api_client.get(self.endpoint, format="json")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 405)
 
     def test_list_anonymous(self):
         self.api_client.force_authenticate(user=self.user)

@@ -1,10 +1,47 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Authors renders initial state 1`] = `
+exports[`Authors > renders initial state 1`] = `
 <DocumentFragment>
   <div
     class="__Authors__"
     data-testid="authors"
-  />
+  >
+    <div
+      class="ant-row ant-row-center mt3 css-dev-only-do-not-override-oc1rc0 css-var-root"
+      data-testid="authors-search-page-container"
+      style=""
+      type="flex"
+    >
+      <div
+        class="ant-col ant-col-xs-24 css-dev-only-do-not-override-oc1rc0 css-var-root"
+        style=""
+      >
+        <div
+          class="ant-row css-dev-only-do-not-override-oc1rc0 css-var-root"
+        >
+          <div
+            class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+          >
+            <span
+              data-testid="number-of-results"
+            >
+              0 results
+            </span>
+          </div>
+        </div>
+        <div
+          class="ant-row css-dev-only-do-not-override-oc1rc0 css-var-root"
+        >
+          <div
+            class="ant-col ant-col-24 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          >
+            <div
+              data-testid="search-results"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </DocumentFragment>
 `;

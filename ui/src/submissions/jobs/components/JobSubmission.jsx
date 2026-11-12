@@ -1,4 +1,3 @@
-import React from 'react';
 import PropTypes from 'prop-types';
 import { Row, Col, Alert } from 'antd';
 import { Formik } from 'formik';
@@ -27,7 +26,7 @@ function JobSubmission({
       {error && (
         <Row className="mb3">
           <Col span={24}>
-            <Alert message={error.message} type="error" showIcon closable />
+            <Alert title={error.message} type="error" showIcon closable />
           </Col>
         </Row>
       )}

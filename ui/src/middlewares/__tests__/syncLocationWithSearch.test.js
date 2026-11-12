@@ -1,4 +1,4 @@
-import { LOCATION_CHANGE } from 'connected-react-router';
+import { LOCATION_CHANGE } from 'redux-first-history';
 import { fromJS } from 'immutable';
 
 import middleware from '../syncLocationWithSearch';
@@ -12,10 +12,11 @@ import {
   fetchAggregationsAndSearchQueryReset,
 } from '../../actions/search';
 
-jest.mock('../../actions/search');
+vi.mock('../../actions/search');
 mockActionCreator(searchQueryUpdate);
 mockActionCreator(newSearch);
 mockActionCreator(searchQueryReset);
+mockActionCreator(fetchAggregationsAndSearchQueryReset);
 
 describe('syncLocationWithSearch middleware', () => {
   describe('on LOCATION_CHANGE returns next(original action) and', () => {
@@ -84,7 +85,7 @@ describe('syncLocationWithSearch middleware', () => {
 
       expect(resultAction).toEqual(action);
       expect(mockDispatch).toHaveBeenCalledWith(
-        fetchAggregationsAndSearchQueryReset(namespace)
+        fetchAggregationsAndSearchQueryReset(namespace, true)
       );
     });
 
@@ -120,14 +121,14 @@ describe('syncLocationWithSearch middleware', () => {
       expect(mockDispatch).toHaveBeenCalledWith(searchQueryReset(namespace));
     });
 
-    it('dispatches searchQueryUpdate when isFirstRendering even if namespace query equals to location query', () => {
+    it('dispatches searchQueryUpdate on the first ever LOCATION_CHANGE (router.location still null) even if namespace query equals to location query', () => {
       const namespace = LITERATURE_NS;
       const location = {
         pathname: LITERATURE,
         search: '?size=10&q=dude',
         query: { size: 10, q: 'dude' },
       };
-      const router = { location };
+      const router = { location: null };
       const search = fromJS({
         namespaces: {
           [namespace]: {
@@ -144,7 +145,7 @@ describe('syncLocationWithSearch middleware', () => {
 
       const action = {
         type: LOCATION_CHANGE,
-        payload: { location, isFirstRendering: true },
+        payload: { location },
       };
       const resultAction = testMiddleware(action);
 
@@ -190,6 +191,7 @@ describe('syncLocationWithSearch middleware', () => {
         namespaces: {
           [namespace]: {
             query: { size: 10, q: 'dude' },
+            initialAggregations: {},
           },
         },
       });
@@ -268,7 +270,7 @@ describe('syncLocationWithSearch middleware', () => {
       expect(mockDispatch).not.toHaveBeenCalled();
     });
 
-    it('does not dispatch SEARCH_QUERY_UPDATE if pathame is search page but location query is sync with search namespace query', () => {
+    it('does not dispatch SEARCH_QUERY_UPDATE if pathame is search page but location query is sync with search namespace query and initialAggregations is empty', () => {
       const namespace = LITERATURE_NS;
       const location = {
         pathname: LITERATURE,
@@ -280,6 +282,7 @@ describe('syncLocationWithSearch middleware', () => {
         namespaces: {
           [namespace]: {
             query: { size: 10, q: 'guy', 'ui-param': 'also-ignored' },
+            initialAggregations: {},
           },
         },
       });
@@ -292,7 +295,92 @@ describe('syncLocationWithSearch middleware', () => {
 
       const action = {
         type: LOCATION_CHANGE,
-        payload: { location },
+        payload: { location, action: 'POP' },
+      };
+      const resultAction = testMiddleware(action);
+
+      expect(resultAction).toEqual(action);
+      expect(mockDispatch).not.toHaveBeenCalledWith(
+        searchQueryUpdate(namespace, location.query, true)
+      );
+      expect(mockDispatch).toHaveBeenCalledWith(
+        fetchAggregationsAndSearchQueryReset(namespace, false)
+      );
+    });
+
+    it('does not dispatch anything if pathame is search page but location query is sync with search namespace query and initialAggregations is not empty', () => {
+      const namespace = LITERATURE_NS;
+      const location = {
+        pathname: LITERATURE,
+        search: '?size=10&q=guy&ui-param=ignored',
+        query: { size: 10, q: 'guy', 'ui-param': 'ignored' },
+      };
+      const router = { location };
+      const search = fromJS({
+        namespaces: {
+          [namespace]: {
+            query: { size: 10, q: 'guy', 'ui-param': 'also-ignored' },
+            initialAggregations: fromJS({
+              agg1: {
+                buckets: [
+                  {
+                    key: 'foo',
+                    doc_count: 1,
+                  },
+                ],
+                meta: {
+                  title: '[Range] Aggregation 1',
+                  order: 1,
+                  type: 'range',
+                },
+              },
+            }),
+          },
+        },
+      });
+      const getState = () => ({ search, router });
+      const mockNextFuncThatMirrors = (action) => action;
+      const mockDispatch = jest.fn();
+      const testMiddleware = middleware({ getState, dispatch: mockDispatch })(
+        mockNextFuncThatMirrors
+      );
+
+      const action = {
+        type: LOCATION_CHANGE,
+        payload: { location, action: 'POP' },
+      };
+      const resultAction = testMiddleware(action);
+
+      expect(resultAction).toEqual(action);
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
+
+    it('does not dispatch anything if pathame is search page but location query is sync with search namespace query and initialAggregations is empty but action is not POP', () => {
+      const namespace = LITERATURE_NS;
+      const location = {
+        pathname: LITERATURE,
+        search: '?size=10&q=guy&ui-param=ignored',
+        query: { size: 10, q: 'guy', 'ui-param': 'ignored' },
+      };
+      const router = { location };
+      const search = fromJS({
+        namespaces: {
+          [namespace]: {
+            query: { size: 10, q: 'guy', 'ui-param': 'also-ignored' },
+            initialAggregations: {},
+          },
+        },
+      });
+      const getState = () => ({ search, router });
+      const mockNextFuncThatMirrors = (action) => action;
+      const mockDispatch = jest.fn();
+      const testMiddleware = middleware({ getState, dispatch: mockDispatch })(
+        mockNextFuncThatMirrors
+      );
+
+      const action = {
+        type: LOCATION_CHANGE,
+        payload: { location, action: 'PUSH' },
       };
       const resultAction = testMiddleware(action);
 

@@ -1,4 +1,4 @@
-import { connect } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import { Checkbox } from 'antd';
 
 import { setLiteratureSelection } from '../../actions/literature';
@@ -13,4 +13,10 @@ const dispatchToProps = (dispatch, { recordId }) => ({
   },
 });
 
-export default connect(stateToProps, dispatchToProps)(Checkbox);
+const mergeProps = (stateProps, dispatchProps, { recordId, ...ownProps }) => ({
+  ...ownProps,
+  ...stateProps,
+  ...dispatchProps,
+});
+
+export default connect(stateToProps, dispatchToProps, mergeProps)(Checkbox);

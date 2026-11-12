@@ -1,4 +1,3 @@
-import React from 'react';
 import { Row, Col, Radio } from 'antd';
 import { Map } from 'immutable';
 
@@ -6,16 +5,8 @@ import Author from '../../common/components/Author';
 import ResultItem from '../../common/components/ResultItem';
 import { castPropToNumber, getRecordIdFromRef } from '../../common/utils';
 
-const AuthorResult = ({
-  item,
-  page,
-}: {
-  item: Map<string, string>;
-  page: string;
-}) => {
-  const getAuthorRecordIdFromRef = (
-    item: Map<string, string>
-  ): number | undefined => {
+const AuthorResult = ({ item }: { item: Map<string, string> }) => {
+  const getAuthorRecordIdFromRef = (): number | undefined => {
     // @ts-ignore
     const recordRef = item.get('record')?.toJS().$ref;
     return recordRef
@@ -23,22 +14,20 @@ const AuthorResult = ({
       : undefined;
   };
 
-  const isRadioButtonDisabled = (item: Map<string, string>): boolean =>
-    !getAuthorRecordIdFromRef(item);
+  const isRadioButtonDisabled = (): boolean => !getAuthorRecordIdFromRef();
 
   return (
-    <Row>
-      <Col flex="0 1 1px">
+    <Row className="pb2">
+      <Col flex="0 1 1px" className="flex items-center pr2">
         <Radio
-          value={getAuthorRecordIdFromRef(item)}
-          disabled={isRadioButtonDisabled(item)}
-          data-test-id={`literature-drawer-radio-${getAuthorRecordIdFromRef(item)}`}
-          data-testid={`literature-drawer-radio-${getAuthorRecordIdFromRef(item)}`}
+          value={getAuthorRecordIdFromRef()}
+          disabled={isRadioButtonDisabled()}
+          data-testid={`literature-drawer-radio-${getAuthorRecordIdFromRef()}`}
         />
       </Col>
-      <Col flex="1 1 1px" className="pb2">
+      <Col flex="1 1 1px">
         <ResultItem>
-          <Author author={item} page={page} />
+          <Author author={item} />
         </ResultItem>
       </Col>
     </Row>

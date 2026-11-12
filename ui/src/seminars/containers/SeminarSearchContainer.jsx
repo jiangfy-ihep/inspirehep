@@ -1,7 +1,7 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Row, Col, Alert } from 'antd';
-import { connect } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 
 import AggregationFiltersContainer from '../../common/containers/AggregationFiltersContainer';
 import PaginationContainer from '../../common/containers/PaginationContainer';
@@ -27,7 +27,7 @@ function SeminarSearch({
   loadingAggregations,
   selectedTimezone,
   namespace,
-  enableDateFilter,
+  enableDateFilter = false,
   embedded,
   isSuperUserLoggedIn,
   results,
@@ -38,7 +38,7 @@ function SeminarSearch({
         {enableDateFilter && (
           <SeminarStartDateFilterContainer
             namespace={namespace}
-            switchTitle="Upcoming seminars"
+            collection="seminars"
           />
         )}
         <LoadingOrChildren loading={loadingAggregations}>
@@ -89,7 +89,7 @@ function SeminarSearch({
                 {timezoneDifferentThanLocal ? (
                   <Alert
                     type="error"
-                    message={<SeminarTimezone timezone={timezone} />}
+                    title={<SeminarTimezone timezone={timezone} />}
                     className="di"
                   />
                 ) : (

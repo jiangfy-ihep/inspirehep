@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import PropTypes from 'prop-types';
 import Immutable from 'immutable';
 import { Col, Row, Checkbox } from 'antd';
@@ -136,7 +136,7 @@ class CheckboxAggregation extends Component {
     const bucketKey = bucket.get('key');
     const bucketDisplay = this.renderDisplayName(bucketKey);
     return (
-      <Row className="mb2" type="flex" justify="space-between" key={bucketKey}>
+      <Row className="mb2 flex-nowrap" justify="space-between" key={bucketKey}>
         <Col>
           <Checkbox
             checked={selectionMap.get(bucketKey)}
@@ -144,7 +144,7 @@ class CheckboxAggregation extends Component {
               this.onSelectionChange(bucketKey, event.target.checked);
             }}
           >
-            <span data-test-id={`checkbox-aggregation-option-${bucketDisplay}`}>
+            <span data-testid={`checkbox-aggregation-option-${bucketDisplay}`}>
               {bucketDisplay}
               {bucketHelp &&
                 CheckboxAggregation.renderBucketHelpTooltip(

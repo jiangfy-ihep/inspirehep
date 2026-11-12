@@ -1,4 +1,3 @@
-import React from 'react';
 import { Row, Card, Button, Input } from 'antd';
 import { Field, Form, Formik } from 'formik';
 import DocumentHead from '../../../common/components/DocumentHead';
@@ -9,17 +8,15 @@ type LocalLoginPageProps = {
 };
 
 const LocalLoginPage = ({ onLoginFormSubmit }: LocalLoginPageProps) => {
-  function renderFormInput({
-    form,
+  const renderFormInput = ({
+    _form,
     field,
     ...rest
   }: {
-    form: any;
-    field: JSX.Element;
+    _form: any;
+    field: React.JSX.Element;
     rest: any;
-  }) {
-    return <Input {...field} {...rest} />;
-  }
+  }) => <Input {...field} {...rest} />;
 
   function renderLoginForm(formik: any) {
     return (
@@ -29,7 +26,6 @@ const LocalLoginPage = ({ onLoginFormSubmit }: LocalLoginPageProps) => {
             name="email"
             type="email"
             placeholder="Email"
-            data-test-id="email"
             data-testid="email"
             component={renderFormInput}
           />
@@ -39,7 +35,6 @@ const LocalLoginPage = ({ onLoginFormSubmit }: LocalLoginPageProps) => {
             name="password"
             type="password"
             placeholder="Password"
-            data-test-id="password"
             data-testid="password"
             component={renderFormInput}
           />
@@ -48,7 +43,6 @@ const LocalLoginPage = ({ onLoginFormSubmit }: LocalLoginPageProps) => {
           className="w-100"
           type="primary"
           htmlType="submit"
-          data-test-id="login"
           data-testid="login"
           disabled={!(formik.isValid && formik.dirty)}
         >
@@ -62,7 +56,7 @@ const LocalLoginPage = ({ onLoginFormSubmit }: LocalLoginPageProps) => {
     <>
       <DocumentHead title="Login" />
       <Row className="h-100" justify="center" align="middle">
-        <Card bodyStyle={{ textAlign: 'center' }}>
+        <Card styles={{ body: { textAlign: 'center' } }}>
           <h1 className="b mb4 f5">
             Please log in with your Backoffice account
           </h1>

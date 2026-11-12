@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Alert } from 'antd';
 
@@ -11,7 +11,7 @@ class ErrorAlert extends Component {
       <Alert
         type="warning"
         showIcon
-        message={message}
+        title={message}
         description={
           <span>
             Please try again later or <GoBackLinkContainer />

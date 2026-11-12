@@ -1,4 +1,3 @@
-import React from 'react';
 import { fireEvent, waitFor } from '@testing-library/react';
 
 import { getStore, mockActionCreator } from '../../../fixtures/store';
@@ -7,7 +6,7 @@ import { ASSIGN_AUTHOR_NS } from '../../../search/constants';
 import { searchQueryUpdate } from '../../../actions/search';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('../../../actions/search');
+vi.mock('../../../actions/search');
 mockActionCreator(searchQueryUpdate);
 
 describe('EmbeddedSearchBoxContainer', () => {
@@ -27,10 +26,10 @@ describe('EmbeddedSearchBoxContainer', () => {
       { store }
     );
 
-    fireEvent.change(getByRole('textbox'), {
+    fireEvent.change(getByRole('searchbox'), {
       target: { value: 'test' },
     });
-    fireEvent.keyDown(getByRole('textbox'), {
+    fireEvent.keyDown(getByRole('searchbox'), {
       key: 'Enter',
       code: 'Enter',
     });

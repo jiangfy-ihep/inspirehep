@@ -1,12 +1,12 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ToolAction renders 1`] = `
+exports[`ToolAction > renders 1`] = `
 <DocumentFragment>
   <span
     class="__UserAction__"
   >
     <button
-      class="ant-btn ant-btn-default ant-dropdown-trigger"
+      class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-default ant-btn-color-default ant-btn-variant-outlined ant-dropdown-trigger"
       type="button"
     >
       <span
@@ -46,13 +46,13 @@ exports[`ToolAction renders 1`] = `
 </DocumentFragment>
 `;
 
-exports[`ToolAction renders disabled 1`] = `
+exports[`ToolAction > renders disabled 1`] = `
 <DocumentFragment>
   <span
     class="__UserAction__"
   >
     <button
-      class="ant-btn ant-btn-default ant-dropdown-trigger"
+      class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-default ant-btn-color-default ant-btn-variant-outlined ant-dropdown-trigger"
       type="button"
     >
       <span

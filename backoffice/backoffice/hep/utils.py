@@ -2,21 +2,48 @@ from backoffice.hep.api.serializers import (
     HepChangeStatusSerializer,
     HepDecisionSerializer,
 )
-from django.db import transaction
 from django.shortcuts import get_object_or_404
 import logging
 
 from backoffice.hep.models import HepWorkflow
 
-from backoffice.hep.constants import HepResolutions, HepStatusChoices
+from backoffice.hep.constants import (
+    HepResolutions,
+    HepStatusChoices,
+    HepWorkflowType,
+)
+from backoffice.hep.models import HepDecision
 from backoffice.common.constants import WORKFLOW_DAGS
 from backoffice.common import airflow_utils
+from inspire_utils.record import get_value
 
+from backoffice.management.utils import get_opensearch_client
+
+
+from django.conf import settings
+
+opensearch_client = get_opensearch_client()
 
 logger = logging.getLogger(__name__)
 
 
-def add_hep_decision(workflow_id, user, action, value=None):
+def get_restored_hep_workflow_type(workflow):
+    """Return the workflow type to restore based on current type and source data."""
+    method = get_value(workflow.source_data, "acquisition_source.method", "")
+
+    if method == "submitter":
+        return HepWorkflowType.HEP_SUBMISSION
+
+    if workflow.workflow_type in (
+        HepWorkflowType.HEP_PUBLISHER_CREATE,
+        HepWorkflowType.HEP_PUBLISHER_UPDATE,
+    ):
+        return HepWorkflowType.HEP_PUBLISHER_CREATE
+
+    return HepWorkflowType.HEP_CREATE
+
+
+def add_hep_decision_batch(workflow_id, user, action, value=None):
     data = {"workflow": workflow_id, "user": user, "action": action}
 
     if value is not None:
@@ -28,24 +55,46 @@ def add_hep_decision(workflow_id, user, action, value=None):
     return serializer.data
 
 
-@transaction.atomic
+def add_hep_decision(workflow_id, user, action, value=None):
+    existing = HepDecision.objects.filter(
+        workflow_id=workflow_id, action=action
+    ).first()
+    if existing:
+        logger.info(
+            "Decision already exists for workflow %s with action %s, skipping",
+            workflow_id,
+            action,
+        )
+        return HepDecisionSerializer(existing).data
+
+    data = {"workflow": workflow_id, "user": user, "action": action}
+
+    if value is not None:
+        data["value"] = value
+
+    serializer = HepDecisionSerializer(data=data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return serializer.data
+
+
 def resolve_workflow(id, data, user):
     logger.info(
         "Restarting HEP DAG Run %s after choice: %s",
         id,
         data["action"],
     )
-    workflow = get_object_or_404(HepWorkflow, pk=id)
+
     add_hep_decision(
         id,
         user,
         data["action"],
         data.get("value"),
     )
-
+    workflow = get_object_or_404(HepWorkflow, pk=id)
     task_to_restart = HepResolutions[data["action"]].label
     if task_to_restart:
-        airflow_utils.clear_airflow_dag_tasks(
+        _, status = airflow_utils.clear_airflow_dag_tasks(
             WORKFLOW_DAGS[workflow.workflow_type].initialize,
             id,
             tasks=[task_to_restart],
@@ -64,3 +113,50 @@ def complete_workflow(id, data):
     workflow = get_object_or_404(HepWorkflow, pk=id)
     airflow_utils.mark_airflow_dag_run_as_success(workflow, note=note)
     return workflow
+
+
+def is_another_hep_submission_running(workflow):
+    """Check whether a matching HEP submission has not completed."""
+
+    index_name = settings.OPENSEARCH_INDEX_NAMES.get(settings.HEP_DOCUMENTS)
+    arxiv_eprints_values = [
+        value
+        for value in get_value(workflow, "data.arxiv_eprints.value", []) or []
+        if value
+    ]
+    dois_values = get_value(workflow, "data.dois.value", [])
+
+    if not arxiv_eprints_values and not dois_values:
+        logger.info("No arXiv eprints or DOIs in workflow, skipping matching.")
+        return False
+
+    should_clauses = []
+    if arxiv_eprints_values:
+        should_clauses.append(
+            {"terms": {"data.arxiv_eprints.value": arxiv_eprints_values}}
+        )
+    if dois_values:
+        should_clauses.append({"terms": {"data.dois.value": dois_values}})
+
+    query = {
+        "query": {
+            "bool": {
+                "must": [{"term": {"data.acquisition_source.method": "submitter"}}],
+                "must_not": [{"match": {"status": HepStatusChoices.COMPLETED}}],
+                "should": should_clauses,
+                "minimum_should_match": 1,
+            }
+        }
+    }
+    try:
+        response = opensearch_client.search(index=index_name, body=query)
+    except Exception as e:
+        logger.error(
+            "Ignoring check for active submission running. "
+            "OpenSearch failed with error: %s",
+            str(e),
+        )
+        return False
+    number_workflows_running = response.get("hits", {}).get("total", {}).get("value", 0)
+    logger.info("Found %s matching active HEP submissions", number_workflows_running)
+    return number_workflows_running > 0

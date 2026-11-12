@@ -5,7 +5,8 @@
 # the terms of the MIT License; see LICENSE file for more details.
 
 
-import mock
+from unittest.mock import patch
+
 import pytest
 import requests
 from flask import current_app
@@ -15,7 +16,6 @@ from helpers.utils import (
 )
 from inspirehep.snow.api import InspireSnow
 from inspirehep.snow.errors import CreateTicketException
-from mock import patch
 
 
 @pytest.mark.vcr(
@@ -245,7 +245,7 @@ def test_edit_inspire_ticket(inspire_app):
     before_record_request=filter_out_authentication,
     before_record_response=filter_out_user_data_and_cookie_headers(),
 )
-@mock.patch("inspirehep.snow.api.requests.put")
+@patch("inspirehep.snow.api.requests.put")
 @pytest.mark.usefixtures("_mocked_inspire_snow", "_teardown_cache")
 def test_create_ticket_raises_create_ticket_exception(
     mocked_update_ticket_with_inspire_recid,

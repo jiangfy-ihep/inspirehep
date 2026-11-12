@@ -1,12 +1,12 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ActionsDropdownOrAction renders with multiple values 1`] = `
+exports[`ActionsDropdownOrAction > renders with multiple values 1`] = `
 <DocumentFragment>
   <span
     class="__UserAction__"
   >
     <button
-      class="ant-btn ant-btn-default ant-dropdown-trigger"
+      class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-default ant-btn-color-default ant-btn-variant-outlined ant-dropdown-trigger"
       type="button"
     >
       <span>
@@ -17,7 +17,7 @@ exports[`ActionsDropdownOrAction renders with multiple values 1`] = `
 </DocumentFragment>
 `;
 
-exports[`ActionsDropdownOrAction renders with single value 1`] = `
+exports[`ActionsDropdownOrAction > renders with single value 1`] = `
 <DocumentFragment>
   <span
     class="__UserAction__"

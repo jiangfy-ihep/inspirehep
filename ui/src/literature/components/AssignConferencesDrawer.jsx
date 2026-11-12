@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
 
 import { Set } from 'immutable';
@@ -43,7 +43,7 @@ function AssignDrawer({ visible, onDrawerClose, onAssign, selectedPapers }) {
 
   return (
     <Drawer
-      className="search-drawer"
+      rootClassName="search-drawer"
       placement="right"
       onClose={onDrawerClose}
       open={visible}
@@ -54,7 +54,6 @@ function AssignDrawer({ visible, onDrawerClose, onAssign, selectedPapers }) {
       <EmbeddedSearchBoxContainer namespace={ASSIGN_CONFERENCE_NS} />
       <NumberOfResultsContainer namespace={ASSIGN_CONFERENCE_NS} />
       <Radio.Group
-        data-test-id="conference-radio-group"
         data-testid="conference-radio-group"
         className="w-100"
         onChange={onSelectedConferenceChange}
@@ -67,7 +66,6 @@ function AssignDrawer({ visible, onDrawerClose, onAssign, selectedPapers }) {
       <Row className="mt2" justify="end">
         <Col>
           <Button
-            data-test-id="assign-conference-button"
             data-testid="assign-conference-button"
             disabled={selectedConferenceId == null}
             icon={<SelectOutlined />}

@@ -1,9 +1,9 @@
-import React from 'react';
-import { connect, RootStateOrAny } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import { Row, Col, Tabs } from 'antd';
 import { Map, List } from 'immutable';
 import classNames from 'classnames';
 import { FilePdfOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { RootState } from '../../../types';
 
 import './DetailPage.less';
 import {
@@ -137,7 +137,7 @@ function DetailPage({
         />
       ),
       key: '1',
-      children: <ReferenceListContainer recordId={controlNumber} />,
+      children: <ReferenceListContainer recordId={controlNumber.toString()} />,
     },
     {
       label: (
@@ -174,13 +174,10 @@ function DetailPage({
   return (
     <>
       {authors && (
-        <AssignLiteratureItemDrawerContainer
-          itemLiteratureId={controlNumber}
-          page="Literature detail"
-        />
+        <AssignLiteratureItemDrawerContainer itemLiteratureId={controlNumber} />
       )}
       <CurateReferenceDrawerContainer
-        recordId={controlNumber}
+        recordId={controlNumber.toString()}
         namespace={CURATE_REFERENCE_NS}
         recordUuid={uuid}
         revisionId={revisionId}
@@ -288,16 +285,12 @@ function DetailPage({
                     enableAuthorsShowAll
                     collaborations={collaborations}
                     collaborationsWithSuffix={collaborationsWithSuffix}
-                    page="Literature detail"
                   />
                 </div>
                 <LiteratureDate date={date} />
                 <div className="mt3">
                   <NumberOfPages numberOfPages={numberOfPages} />
-                  <SupervisorList
-                    supervisors={supervisors}
-                    page="Literature detail"
-                  />
+                  <SupervisorList supervisors={supervisors} />
                   <ThesisInfo thesisInfo={thesisInfo} />
                   {linkedBooks && (
                     <ParentRecordInfo parentRecord={linkedBooks} />
@@ -380,7 +373,7 @@ function DetailPage({
   );
 }
 
-const mapStateToProps = (state: RootStateOrAny) => ({
+const mapStateToProps = (state: RootState) => ({
   record: state.literature.get('data'),
   authors: state.literature.get('authors'),
   supervisors: state.literature.get('supervisors'),
@@ -406,9 +399,9 @@ const DetailPageContainer = connect(mapStateToProps)(DetailPage);
 export default withRouteActionsDispatcher(DetailPageContainer, {
   routeParamSelector: ({ id }) => id,
   routeActions: (id) => [
-    fetchLiterature(id),
-    fetchLiteratureReferences(id, { page: '1' }),
-    fetchLiteratureAuthors(id),
+    fetchLiterature(id!),
+    fetchLiteratureReferences(id!, { page: '1' }),
+    fetchLiteratureAuthors(id!),
     fetchCitationsByYear({ q: `recid:${id}` }),
     newSearch(LITERATURE_SEMINARS_NS),
     searchBaseQueriesUpdate(LITERATURE_SEMINARS_NS, {

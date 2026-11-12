@@ -1,5 +1,5 @@
 /* eslint-disable camelcase */
-import React, { Component, Fragment } from 'react';
+import { Component, Fragment } from 'react';
 import PropTypes from 'prop-types';
 import { Map } from 'immutable';
 import { List, Row, Col, Tooltip } from 'antd';
@@ -20,6 +20,7 @@ import {
 } from '../../common/components/InlineList';
 import IconText from '../../common/components/IconText';
 import LinkLikeButton from '../../common/components/LinkLikeButton/LinkLikeButton';
+import EventTracker from '../../common/components/EventTracker';
 
 class ReferenceItem extends Component {
   static renderLabel(reference) {
@@ -33,7 +34,7 @@ class ReferenceItem extends Component {
     const title = reference.getIn(['titles', 0]);
     if (recordId && title && !unlinked) {
       return (
-        <div data-test-id="reference-title">
+        <div data-testid="reference-title">
           <Link
             className={classNames('f5', unlinked ? 'unlinked' : '')}
             to={`${LITERATURE}/${recordId}`}
@@ -48,7 +49,7 @@ class ReferenceItem extends Component {
       return (
         <div
           className={classNames('f5', unlinked ? 'unlinked' : '')}
-          data-test-id="reference-title"
+          data-testid="reference-title"
         >
           <LiteratureTitle title={title} unlinked={unlinked} />
         </div>
@@ -89,7 +90,7 @@ class ReferenceItem extends Component {
 
     return (
       <div
-        data-test-id="reference-item"
+        data-testid="reference-item"
         id={reference_index && `reference-${reference_index}`}
       >
         <List.Item>
@@ -113,7 +114,6 @@ class ReferenceItem extends Component {
                       authors={authors}
                       collaborations={collaborations}
                       collaborationsWithSuffix={collaborationsWithSuffix}
-                      page="Literature detail"
                       unlinked={unlinked}
                     />
                     <InlineUL
@@ -146,21 +146,27 @@ class ReferenceItem extends Component {
                 >
                   <div
                     className="flex items-center justify-center"
-                    data-test-id="edit-reference"
+                    data-testid="edit-reference"
                   >
-                    <LinkLikeButton
-                      onClick={() => {
-                        setScrollElement(`reference-${reference_index}`);
-                        onEditReferenceClick(reference_index);
-                      }}
-                      disabled={!loggedIn}
+                    <EventTracker
+                      eventCategory="Literature detail"
+                      eventAction="Edit reference"
+                      eventId={`edit-reference-${reference_index}`}
                     >
-                      <IconText
-                        text="edit"
-                        icon={<EditOutlined />}
-                        className="flex items-center justify-center pr2"
-                      />
-                    </LinkLikeButton>
+                      <LinkLikeButton
+                        onClick={() => {
+                          setScrollElement(`reference-${reference_index}`);
+                          onEditReferenceClick(reference_index);
+                        }}
+                        disabled={!loggedIn}
+                      >
+                        <IconText
+                          text="edit"
+                          icon={<EditOutlined />}
+                          className="flex items-center justify-center pr2"
+                        />
+                      </LinkLikeButton>
+                    </EventTracker>
                   </div>
                 </Tooltip>
               </Col>

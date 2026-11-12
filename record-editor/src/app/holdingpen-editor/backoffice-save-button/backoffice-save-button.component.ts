@@ -161,6 +161,9 @@ export class BackofficeSaveButtonComponent
       return { restart_current_task: true };
     }
     if (this.workflowObject.status === 'approval_merge') {
+      if (this.fullWorkflowObject && this.fullWorkflowObject.workflow_type === 'HEP_MANUAL_MERGE') {
+        return { action: 'manual_merge_approve' };
+      }
       return { action: 'merge_approve' };
     }
     return undefined;
@@ -175,15 +178,10 @@ export class BackofficeSaveButtonComponent
       .resolveWorkflowObjectFromCallbackUrl(this.callbackUrl, payload)
       .do(() => this.domUtilsService.unregisterBeforeUnloadPrompt())
       .subscribe(
-        (body) => {
-          if (this.hasConflicts()) {
-            this.toastrService.clear(this.savingInfoToast.toastId);
-            this.toastrService.success(body.message, 'Success');
-          } else {
-            const origin = window.location.origin;
-            const redirectUrl = `${origin}/backoffice/literature/${this.workflowObject.id}`;
-            window.location.href = redirectUrl;
-          }
+        () => {
+          const origin = window.location.origin;
+          const redirectUrl = `${origin}/backoffice/literature/${this.workflowObject.id}`;
+          window.location.href = redirectUrl;
         },
         (error: ApiError<WorkflowSaveErrorBody>) => {
           if (
@@ -210,7 +208,9 @@ export class BackofficeSaveButtonComponent
         () => {
           this.toastrService.clear(this.savingInfoToast.toastId);
           this.toastrService.success(`Workflow object is saved`, 'Success');
-          if (this.callbackUrl) {
+          const hasUnresolvedConflicts =
+            this.workflowObject.status === 'approval_merge' && this.hasConflicts();
+          if (this.callbackUrl && !hasUnresolvedConflicts) {
             this.resolveFromCallbackUrl();
           }
         },

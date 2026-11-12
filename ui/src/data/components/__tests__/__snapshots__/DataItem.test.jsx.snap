@@ -1,15 +1,15 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`DataItem renders with \`0\` citation count 1`] = `
+exports[`DataItem > renders with \`0\` citation count 1`] = `
 <DocumentFragment>
   <div
-    data-test-id="data-result-item"
+    data-testid="data-result-item"
   >
     <div
       class="__ContentBox__ h-100"
     >
       <div
-        class="ant-card ant-card-bordered h-100"
+        class="ant-card ant-card-bordered h-100 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
           class="ant-card-body"
@@ -19,7 +19,7 @@ exports[`DataItem renders with \`0\` citation count 1`] = `
           >
             <div>
               <div
-                data-test-id="data-result-item-inner"
+                data-testid="data-result-item-inner"
               >
                 <div
                   class="flex flex-nowrap"
@@ -29,24 +29,20 @@ exports[`DataItem renders with \`0\` citation count 1`] = `
                   >
                     <a
                       class="result-item-title"
-                      data-test-id="data-result-title-link"
+                      data-testid="data-result-title-link"
                       href="/data/1234"
                     >
                       <span
-                        data-test-id="literature-detail-title"
+                        data-testid="literature-detail-title"
                       >
-                        <span
-                          class="__Latex__"
-                        >
+                        <span>
                           Test title
                         </span>
                         <span>
                           <span>
                              : 
                           </span>
-                          <span
-                            class="__Latex__"
-                          >
+                          <span>
                             voluptate eiusmod fugiat
                           </span>
                         </span>
@@ -96,10 +92,10 @@ exports[`DataItem renders with \`0\` citation count 1`] = `
             </div>
           </div>
           <div
-            class="ant-row ant-row-space-between actions ph2"
+            class="ant-row ant-row-space-between actions ph2 css-dev-only-do-not-override-oc1rc0 css-var-root"
           >
             <div
-              class="ant-col"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
             >
               <span
                 class="__UserAction__"
@@ -185,7 +181,7 @@ exports[`DataItem renders with \`0\` citation count 1`] = `
               </span>
             </div>
             <div
-              class="ant-col"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
             >
               <span
                 class="__UserAction__"
@@ -239,16 +235,16 @@ exports[`DataItem renders with \`0\` citation count 1`] = `
 </DocumentFragment>
 `;
 
-exports[`DataItem renders with all props set 1`] = `
+exports[`DataItem > renders with all props set 1`] = `
 <DocumentFragment>
   <div
-    data-test-id="data-result-item"
+    data-testid="data-result-item"
   >
     <div
       class="__ContentBox__ h-100"
     >
       <div
-        class="ant-card ant-card-bordered h-100"
+        class="ant-card ant-card-bordered h-100 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
           class="ant-card-body"
@@ -258,7 +254,7 @@ exports[`DataItem renders with all props set 1`] = `
           >
             <div>
               <div
-                data-test-id="data-result-item-inner"
+                data-testid="data-result-item-inner"
               >
                 <div
                   class="flex flex-nowrap"
@@ -268,24 +264,20 @@ exports[`DataItem renders with all props set 1`] = `
                   >
                     <a
                       class="result-item-title"
-                      data-test-id="data-result-title-link"
+                      data-testid="data-result-title-link"
                       href="/data/1234"
                     >
                       <span
-                        data-test-id="literature-detail-title"
+                        data-testid="literature-detail-title"
                       >
-                        <span
-                          class="__Latex__"
-                        >
+                        <span>
                           Test title
                         </span>
                         <span>
                           <span>
                              : 
                           </span>
-                          <span
-                            class="__Latex__"
-                          >
+                          <span>
                             voluptate eiusmod fugiat
                           </span>
                         </span>
@@ -335,10 +327,10 @@ exports[`DataItem renders with all props set 1`] = `
             </div>
           </div>
           <div
-            class="ant-row ant-row-space-between actions ph2"
+            class="ant-row ant-row-space-between actions ph2 css-dev-only-do-not-override-oc1rc0 css-var-root"
           >
             <div
-              class="ant-col"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
             >
               <span
                 class="__UserAction__"
@@ -426,7 +418,7 @@ exports[`DataItem renders with all props set 1`] = `
                 class="__UserAction__"
               >
                 <button
-                  class="ant-btn ant-btn-default ant-dropdown-trigger"
+                  class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-default ant-btn-color-default ant-btn-variant-outlined ant-dropdown-trigger"
                   type="button"
                 >
                   <span
@@ -465,7 +457,7 @@ exports[`DataItem renders with all props set 1`] = `
               </span>
             </div>
             <div
-              class="ant-col"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
             >
               <span
                 class="__UserAction__"
@@ -519,16 +511,16 @@ exports[`DataItem renders with all props set 1`] = `
 </DocumentFragment>
 `;
 
-exports[`DataItem renders with only needed props 1`] = `
+exports[`DataItem > renders with only needed props 1`] = `
 <DocumentFragment>
   <div
-    data-test-id="data-result-item"
+    data-testid="data-result-item"
   >
     <div
       class="__ContentBox__ h-100"
     >
       <div
-        class="ant-card ant-card-bordered h-100"
+        class="ant-card ant-card-bordered h-100 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
           class="ant-card-body"
@@ -538,7 +530,7 @@ exports[`DataItem renders with only needed props 1`] = `
           >
             <div>
               <div
-                data-test-id="data-result-item-inner"
+                data-testid="data-result-item-inner"
               >
                 <div
                   class="flex flex-nowrap"
@@ -548,24 +540,20 @@ exports[`DataItem renders with only needed props 1`] = `
                   >
                     <a
                       class="result-item-title"
-                      data-test-id="data-result-title-link"
+                      data-testid="data-result-title-link"
                       href="/data/1234"
                     >
                       <span
-                        data-test-id="literature-detail-title"
+                        data-testid="literature-detail-title"
                       >
-                        <span
-                          class="__Latex__"
-                        >
+                        <span>
                           Test title
                         </span>
                         <span>
                           <span>
                              : 
                           </span>
-                          <span
-                            class="__Latex__"
-                          >
+                          <span>
                             voluptate eiusmod fugiat
                           </span>
                         </span>
@@ -580,13 +568,13 @@ exports[`DataItem renders with only needed props 1`] = `
             </div>
           </div>
           <div
-            class="ant-row ant-row-space-between actions ph2"
+            class="ant-row ant-row-space-between actions ph2 css-dev-only-do-not-override-oc1rc0 css-var-root"
           >
             <div
-              class="ant-col"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
             />
             <div
-              class="ant-col"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
             />
           </div>
         </div>

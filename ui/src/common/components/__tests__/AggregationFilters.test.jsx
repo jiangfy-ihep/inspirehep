@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
 import { fromJS } from 'immutable';
 
@@ -11,6 +10,7 @@ describe('AggregationFilters', () => {
         buckets: [
           {
             key: 'foo',
+            key_as_string: '2012',
             doc_count: 1,
           },
         ],
@@ -61,6 +61,7 @@ describe('AggregationFilters', () => {
           {
             key: 'foo',
             doc_count: 1,
+            key_as_string: '2012',
           },
         ],
         meta: {
@@ -89,6 +90,7 @@ describe('AggregationFilters', () => {
         buckets: [
           {
             key: 'foo',
+            key_as_string: '2012',
             doc_count: 1,
           },
         ],
@@ -119,6 +121,7 @@ describe('AggregationFilters', () => {
           {
             key: 'foo',
             doc_count: 1,
+            key_as_string: '2012',
           },
         ],
         meta: {
@@ -145,7 +148,7 @@ describe('AggregationFilters', () => {
   it('does not render aggregations with empty buckets', () => {
     const aggregations = fromJS({
       agg1: {
-        buckets: [{}],
+        buckets: [],
         meta: {
           title: 'Aggregation 1',
           order: 1,
@@ -293,7 +296,7 @@ describe('AggregationFilters', () => {
     );
 
     const fooCheckbox = container
-      .querySelector('[data-test-id="checkbox-aggregation-option-foo"]')
+      .querySelector('[data-testid="checkbox-aggregation-option-foo"]')
       .closest('label')
       .querySelector('input');
     fireEvent.click(fooCheckbox);
@@ -301,7 +304,7 @@ describe('AggregationFilters', () => {
     expect(onAggregationChange).toHaveBeenCalledWith('agg', ['foo']);
 
     const barCheckbox = container
-      .querySelector('[data-test-id="checkbox-aggregation-option-bar"]')
+      .querySelector('[data-testid="checkbox-aggregation-option-bar"]')
       .closest('label')
       .querySelector('input');
     fireEvent.click(barCheckbox);

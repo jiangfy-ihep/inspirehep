@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { List, setIn } from 'immutable';
 import { Col, Row, Tree } from 'antd';
@@ -7,6 +7,7 @@ import UnclickableTag from './UnclickableTag';
 import AggregationBox from './AggregationBox';
 import { forceArray } from '../utils';
 import FormattedNumber from './FormattedNumber';
+import './TreeAggregation.less';
 
 function renderTitle(name, docCount) {
   return (
@@ -49,7 +50,13 @@ function buildTreeData(buckets, splitTreeBy) {
   return tree.children;
 }
 
-function TreeAggregation({ onChange, buckets, name, selections, splitTreeBy }) {
+function TreeAggregation({
+  onChange,
+  buckets,
+  name,
+  selections = [],
+  splitTreeBy,
+}) {
   const [selectedKeys] = useState(forceArray(selections));
 
   const tree = useMemo(
@@ -58,7 +65,7 @@ function TreeAggregation({ onChange, buckets, name, selections, splitTreeBy }) {
   );
 
   return (
-    <AggregationBox name={name}>
+    <AggregationBox name={name} className="__TreeAggregation__">
       <Tree
         blockNode
         checkable
@@ -82,10 +89,6 @@ TreeAggregation.propTypes = {
     PropTypes.string,
   ]),
   splitTreeBy: PropTypes.string.isRequired,
-};
-
-TreeAggregation.defaultProps = {
-  selections: [],
 };
 
 export default TreeAggregation;

@@ -5,7 +5,7 @@ from itertools import chain
 from tempfile import TemporaryDirectory
 
 import requests
-from airflow.exceptions import AirflowFailException
+from airflow.sdk.exceptions import AirflowException, AirflowFailException
 from hooks.backoffice.workflow_management_hook import (
     HEP,
     WorkflowManagementHook,
@@ -19,6 +19,7 @@ from idutils import is_arxiv_post_2007
 from include.utils import opensearch
 from include.utils.constants import (
     DECISION_AUTO_REJECT,
+    DECISION_FUZZY_MATCH,
     DECISION_HEP_REJECT,
     LITERATURE_PID_TYPE,
     STATUS_COMPLETED,
@@ -209,22 +210,84 @@ def read_wf_record_source(record_uuid, source):
     if not source:
         return
 
-    source = get_source_for_root(source)
+    workflow_sources = get_all_wf_record_sources(record_uuid, source)
+
+    return workflow_sources[0] if workflow_sources else None
+
+
+def get_all_wf_record_sources(record_uuid, source=None):
+    """Retrieve all records from the ``WorkflowRecordSource`` table with the given uuid.
+    Args:
+        record_uuid(uuid): the uuid of the record
+    Return:
+        (list): list of records with the given uuid
+    """
     inspire_http_hook = InspireHttpHook()
+
+    payload = {"record_uuid": str(record_uuid)}
+    if source:
+        payload["source"] = get_source_for_root(source.lower())
 
     try:
         response = inspire_http_hook.call_api(
             endpoint="api/literature/workflows_record_sources",
-            json={"record_uuid": str(record_uuid), "source": source.lower()},
+            json=payload,
         )
-    except RetryError as e:
-        if "404:Not Found" in str(e.last_attempt.exception()):
+    except AirflowException as e:
+        if "404:NOT FOUND" in str(e):
             return []
+        raise
 
     if response.status_code == 200:
-        return response.json()["workflow_sources"][0]
+        return response.json().get("workflow_sources", [])
 
     return []
+
+
+def delete_wf_record_source(record_uuid, source):
+    """Delete a record from the ``WorkflowRecordSource`` table.
+    Args:
+        record_uuid(uuid): the uuid of the record
+        source(string): the acquisition source value of the record
+    Return:
+        None
+    """
+    inspire_http_hook = InspireHttpHook()
+
+    try:
+        inspire_http_hook.call_api(
+            endpoint="api/literature/workflows_record_sources",
+            method="DELETE",
+            json={
+                "record_uuid": str(record_uuid),
+                "source": get_source_for_root(source.lower()),
+            },
+        )
+    except AirflowException as e:
+        if "404:NOT FOUND" in str(e):
+            logger.warning(
+                f"Record source with uuid {record_uuid} and source {source} not found"
+                f" for deletion."
+            )
+            return
+        raise
+
+
+def add_wf_record_source(record_uuid, source, json):
+    """Add a record to the ``WorkflowRecordSource`` table.
+    Args:
+        record_uuid(uuid): the uuid of the record
+        source(string): the acquisition source value of the record
+        json(dict): the record metadata to be stored in the table
+    Return:
+        None
+    """
+    inspire_http_hook = InspireHttpHook()
+    inspire_http_hook.call_api(
+        endpoint="api/literature/workflows_record_sources",
+        method="POST",
+        json={"record_uuid": str(record_uuid), "source": source, "json": json},
+    )
 
 
 def store_record_inspirehep_api(workflow, is_update):
@@ -293,9 +356,23 @@ def has_previously_rejected_wf_in_backoffice_w_same_source(workflow_data):
     return False
 
 
-def get_record_url(metadata, inspire_http_hook):
-    base_url = inspire_http_hook.get_url()
+def get_record_control_number(workflow_data):
+    metadata = workflow_data.get("data")
+    exact_matches = (workflow_data.get("matches") or {}).get("exact") or []
+    fuzzy_match_decision = get_decision(
+        workflow_data.get("decisions"), DECISION_FUZZY_MATCH
+    )
     recid = metadata.get("control_number")
+    if not recid and exact_matches:
+        recid = exact_matches[0]
+    if not recid and fuzzy_match_decision:
+        recid = fuzzy_match_decision.get("value")
+    return recid
+
+
+def get_record_url(workflow_data, inspire_http_hook):
+    base_url = inspire_http_hook.get_url()
+    recid = get_record_control_number(workflow_data)
     return os.path.join(base_url, "record", str(recid))
 
 
@@ -506,14 +583,15 @@ def get_curation_ticket_subject(data):
 
 
 def get_reply_curation_context(
-    metadata,
+    workflow_data,
     inspire_http_hook,
 ):
+    metadata = workflow_data["data"]
     email = metadata["acquisition_source"].get("email", "")
     return {
         "user_name": email,
         "title": LiteratureReader(metadata).title,
-        "record_url": get_record_url(metadata, inspire_http_hook),
+        "record_url": get_record_url(workflow_data, inspire_http_hook),
     }
 
 

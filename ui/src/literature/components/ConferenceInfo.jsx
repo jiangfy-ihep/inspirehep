@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Map, List } from 'immutable';
 import { Link } from 'react-router-dom';
@@ -29,7 +29,7 @@ class ConferenceInfo extends Component {
     return (
       <span>
         <Link
-          data-test-id="literature-conference-link"
+          data-testid="literature-conference-link"
           to={`/conferences/${controlNumber}`}
         >
           {acronyms.size > 0 ? this.renderAcronyms() : title}

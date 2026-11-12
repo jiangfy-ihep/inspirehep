@@ -1,5 +1,5 @@
-import React from 'react';
 import { fromJS } from 'immutable';
+import userEvent from '@testing-library/user-event';
 
 import { initialState } from '../../../reducers/authors';
 import { getStore, mockActionCreator } from '../../../fixtures/store';
@@ -11,32 +11,34 @@ import {
 } from '../../../actions/authors';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('../../../actions/authors');
+vi.mock('../../../actions/authors');
 mockActionCreator(setPublicationSelection);
 mockActionCreator(setPublicationsClaimedSelection);
 mockActionCreator(setPublicationsUnclaimedSelection);
 
 describe('PublicationSelectContainer', () => {
-  it('dispatches setPublicationSelection and setPublicationsClaimedSelection on change', () => {
+  it('dispatches setPublicationSelection and setPublicationsClaimedSelection on change', async () => {
+    const user = userEvent.setup();
     const store = getStore();
     const { getByRole } = renderWithProviders(
       <PublicationSelectContainer recordId={1} claimed isOwnProfile />,
       { store }
     );
-    getByRole('checkbox').click();
+    await user.click(getByRole('checkbox'));
     const expectedActions = [
       setPublicationSelection([1], true),
       setPublicationsClaimedSelection([1], true),
     ];
     expect(store.getActions()).toEqual(expectedActions);
   });
-  it('dispatches setPublicationSelection on change for unclaimed record', () => {
+  it('dispatches setPublicationSelection on change for unclaimed record', async () => {
+    const user = userEvent.setup();
     const store = getStore();
     const { getByRole } = renderWithProviders(
       <PublicationSelectContainer recordId={1} claimed={false} isOwnProfile />,
       { store }
     );
-    getByRole('checkbox').click();
+    await user.click(getByRole('checkbox'));
     const expectedActions = [
       setPublicationSelection([1], true),
       setPublicationsUnclaimedSelection([1], true),

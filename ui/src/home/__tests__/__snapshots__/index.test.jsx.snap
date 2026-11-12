@@ -1,19 +1,19 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Home renders home page 1`] = `
+exports[`Home > renders home page 1`] = `
 <DocumentFragment>
   <div
-    class="ant-row ant-row-center ant-row-middle __Home__"
+    class="ant-row ant-row-center ant-row-middle __Home__ css-dev-only-do-not-override-oc1rc0 css-var-root"
     data-testid="home"
   >
     <div
-      class="ant-col ant-col-24"
+      class="ant-col ant-col-24 css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
-        class="ant-row ant-row-center pv4 ph2"
+        class="ant-row ant-row-center pv4 ph2 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
-          class="ant-col"
+          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <h2
             class="tc f2 sm-f4"
@@ -28,56 +28,44 @@ exports[`Home renders home page 1`] = `
           <div
             class="mt5"
           >
-            <span
-              class="__SearchBox__ ant-input-group"
+            <div
+              class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
               data-testid="searchbox"
+              style="align-items: center;"
             >
               <span
                 class="ant-input-group-addon"
               >
                 <div
-                  class="ant-select ant-select-single ant-select-show-arrow"
+                  class="ant-select ant-select-outlined ant-select-compact-item ant-select-compact-first-item css-var-root ant-select-css-var css-dev-only-do-not-override-oc1rc0 ant-select-single ant-select-show-arrow"
                   data-testid="select-box"
-                  placement="bottomLeft"
+                  style="height: 40px;"
                 >
                   <div
-                    class="ant-select-selector"
+                    class="ant-select-content ant-select-content-has-value"
                   >
-                    <span
-                      class="ant-select-selection-search"
-                    >
-                      <input
-                        aria-activedescendant="rc_select_TEST_OR_SSR_list_0"
-                        aria-autocomplete="list"
-                        aria-controls="rc_select_TEST_OR_SSR_list"
-                        aria-haspopup="listbox"
-                        aria-owns="rc_select_TEST_OR_SSR_list"
-                        autocomplete="off"
-                        class="ant-select-selection-search-input"
-                        id="rc_select_TEST_OR_SSR"
-                        readonly=""
-                        role="combobox"
-                        style="opacity: 0;"
-                        value=""
-                      />
+                    <span>
+                      literature
                     </span>
-                    <span
-                      class="ant-select-selection-item"
-                    >
-                      <span>
-                        literature
-                      </span>
-                    </span>
+                    <input
+                      aria-autocomplete="list"
+                      aria-expanded="false"
+                      aria-haspopup="listbox"
+                      autocomplete="new-password"
+                      class="ant-select-input"
+                      id="test-id"
+                      readonly=""
+                      role="combobox"
+                      type="text"
+                      value=""
+                    />
                   </div>
-                  <span
-                    aria-hidden="true"
-                    class="ant-select-arrow"
-                    style="user-select: none;"
-                    unselectable="on"
+                  <div
+                    class="ant-select-suffix"
                   >
                     <span
                       aria-label="down"
-                      class="anticon anticon-down ant-select-suffix"
+                      class="anticon anticon-down"
                       role="img"
                     >
                       <svg
@@ -94,83 +82,73 @@ exports[`Home renders home page 1`] = `
                         />
                       </svg>
                     </span>
-                  </span>
+                  </div>
                 </div>
               </span>
+              <span
+                aria-live="polite"
+                style="width: 0px; height: 0px; position: absolute; overflow: hidden; opacity: 0;"
+              />
               <div
-                class="ant-select ant-select-auto-complete autocomplete ant-select-single ant-select-customize-input ant-select-show-search"
-                placement="bottomLeft"
+                class="ant-select ant-select-outlined ant-select-compact-item ant-select-compact-last-item autocomplete ant-select-auto-complete autocomplete ant-select-customize css-var-root ant-select-css-var css-dev-only-do-not-override-oc1rc0 ant-select-focused ant-select-single ant-select-customize-input ant-select-show-search"
+                style="width: 100%;"
               >
                 <div
-                  class="ant-select-selector"
+                  class="ant-select-content"
                 >
-                  <span
-                    class="ant-select-selection-search"
+                  <div
+                    class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-input-search css-var-root ant-input-search-large ant-input-search-with-button ant-select-input css-dev-only-do-not-override-oc1rc0"
+                    data-testid="search-box-input"
                   >
-                    <span
-                      class="ant-input-group-wrapper ant-input-search ant-input-search-large ant-input-search-with-button ant-select-selection-search-input ant-input-group-wrapper-lg"
+                    <input
+                      aria-autocomplete="list"
+                      aria-expanded="false"
+                      aria-haspopup="listbox"
+                      autocomplete="new-password"
+                      class="ant-input ant-input-lg css-dev-only-do-not-override-oc1rc0 ant-input-outlined css-var-root ant-input-css-var ant-input-compact-item"
+                      id="test-id"
+                      role="combobox"
+                      type="search"
+                      value=""
+                    />
+                    <button
+                      class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-default ant-btn-color-primary ant-btn-variant-solid ant-btn-lg ant-btn-compact-item ant-btn-compact-last-item ant-input-search-btn"
+                      type="button"
                     >
                       <span
-                        class="ant-input-wrapper ant-input-group"
+                        class="ant-btn-icon"
                       >
-                        <input
-                          aria-activedescendant="rc_select_TEST_OR_SSR_list_0"
-                          aria-autocomplete="list"
-                          aria-controls="rc_select_TEST_OR_SSR_list"
-                          aria-haspopup="listbox"
-                          aria-owns="rc_select_TEST_OR_SSR_list"
-                          autocomplete="off"
-                          class="ant-input ant-input-lg"
-                          data-test-id="search-box-input"
-                          data-testid="search-box-input"
-                          id="rc_select_TEST_OR_SSR"
-                          role="combobox"
-                          type="text"
-                          value=""
-                        />
                         <span
-                          class="ant-input-group-addon"
+                          aria-label="search"
+                          class="anticon anticon-search"
+                          role="img"
                         >
-                          <button
-                            class="ant-btn ant-btn-primary ant-btn-lg ant-input-search-button"
-                            type="button"
+                          <svg
+                            aria-hidden="true"
+                            data-icon="search"
+                            fill="currentColor"
+                            focusable="false"
+                            height="1em"
+                            viewBox="64 64 896 896"
+                            width="1em"
                           >
-                            <span
-                              aria-label="search"
-                              class="anticon anticon-search"
-                              role="img"
-                            >
-                              <svg
-                                aria-hidden="true"
-                                data-icon="search"
-                                fill="currentColor"
-                                focusable="false"
-                                height="1em"
-                                viewBox="64 64 896 896"
-                                width="1em"
-                              >
-                                <path
-                                  d="M909.6 854.5L649.9 594.8C690.2 542.7 712 479 712 412c0-80.2-31.3-155.4-87.9-212.1-56.6-56.7-132-87.9-212.1-87.9s-155.5 31.3-212.1 87.9C143.2 256.5 112 331.8 112 412c0 80.1 31.3 155.5 87.9 212.1C256.5 680.8 331.8 712 412 712c67 0 130.6-21.8 182.7-62l259.7 259.6a8.2 8.2 0 0011.6 0l43.6-43.5a8.2 8.2 0 000-11.6zM570.4 570.4C528 612.7 471.8 636 412 636s-116-23.3-158.4-65.6C211.3 528 188 471.8 188 412s23.3-116.1 65.6-158.4C296 211.3 352.2 188 412 188s116.1 23.2 158.4 65.6S636 352.2 636 412s-23.3 116.1-65.6 158.4z"
-                                />
-                              </svg>
-                            </span>
-                          </button>
+                            <path
+                              d="M909.6 854.5L649.9 594.8C690.2 542.7 712 479 712 412c0-80.2-31.3-155.4-87.9-212.1-56.6-56.7-132-87.9-212.1-87.9s-155.5 31.3-212.1 87.9C143.2 256.5 112 331.8 112 412c0 80.1 31.3 155.5 87.9 212.1C256.5 680.8 331.8 712 412 712c67 0 130.6-21.8 182.7-62l259.7 259.6a8.2 8.2 0 0011.6 0l43.6-43.5a8.2 8.2 0 000-11.6zM570.4 570.4C528 612.7 471.8 636 412 636s-116-23.3-158.4-65.6C211.3 528 188 471.8 188 412s23.3-116.1 65.6-158.4C296 211.3 352.2 188 412 188s116.1 23.2 158.4 65.6S636 352.2 636 412s-23.3 116.1-65.6 158.4z"
+                            />
+                          </svg>
                         </span>
                       </span>
-                    </span>
-                  </span>
-                  <span
-                    class="ant-select-selection-placeholder"
-                  />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </span>
+            </div>
             <div
               class="tc f5 mt4"
-              data-test-id="scroll-button"
+              data-testid="scroll-button"
             >
               <button
-                class="ant-btn ant-btn-text __LinkLikeButton__ blue middle"
+                class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-text ant-btn-color-default ant-btn-variant-text __LinkLikeButton__ blue middle"
                 type="button"
               >
                 <span>
@@ -182,10 +160,10 @@ exports[`Home renders home page 1`] = `
         </div>
       </div>
       <div
-        class="ant-row ant-row-center pv4 ph2 bg-white"
+        class="ant-row ant-row-center pv4 ph2 bg-white css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
-          class="ant-col"
+          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <div>
             <h3
@@ -194,10 +172,10 @@ exports[`Home renders home page 1`] = `
               Brought to you by
             </h3>
             <div
-              class="ant-row ant-row-center ant-row-middle"
+              class="ant-row ant-row-center ant-row-middle css-dev-only-do-not-override-oc1rc0 css-var-root"
             >
               <div
-                class="ant-col ma3"
+                class="ant-col ma3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <a
                   href="https://home.cern"
@@ -206,12 +184,12 @@ exports[`Home renders home page 1`] = `
                   <img
                     alt="CERN"
                     height="40"
-                    src="collab-logo-CERN.png"
+                    src="/src/home/components/CollaborationLogos/logos/collab-logo-CERN.png"
                   />
                 </a>
               </div>
               <div
-                class="ant-col ma3"
+                class="ant-col ma3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <a
                   href="https://desy.de"
@@ -220,12 +198,12 @@ exports[`Home renders home page 1`] = `
                   <img
                     alt="DESY"
                     height="40"
-                    src="collab-logo-DESY.png"
+                    src="/src/home/components/CollaborationLogos/logos/collab-logo-DESY.png"
                   />
                 </a>
               </div>
               <div
-                class="ant-col ma3"
+                class="ant-col ma3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <a
                   href="https://fnal.gov"
@@ -234,12 +212,12 @@ exports[`Home renders home page 1`] = `
                   <img
                     alt="Fermilab"
                     height="40"
-                    src="collab-logo-Fermilab.png"
+                    src="/src/home/components/CollaborationLogos/logos/collab-logo-Fermilab.png"
                   />
                 </a>
               </div>
               <div
-                class="ant-col ma3"
+                class="ant-col ma3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <a
                   href="http://english.ihep.cas.cn/"
@@ -248,12 +226,12 @@ exports[`Home renders home page 1`] = `
                   <img
                     alt="IHEP"
                     height="40"
-                    src="collab-logo-IHEP.png"
+                    src="/src/home/components/CollaborationLogos/logos/collab-logo-IHEP.png"
                   />
                 </a>
               </div>
               <div
-                class="ant-col ma3"
+                class="ant-col ma3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <a
                   href="https://in2p3.cnrs.fr"
@@ -262,12 +240,12 @@ exports[`Home renders home page 1`] = `
                   <img
                     alt="IN2P3"
                     height="40"
-                    src="collab-logo-IN2P3.png"
+                    src="/src/home/components/CollaborationLogos/logos/collab-logo-IN2P3.png"
                   />
                 </a>
               </div>
               <div
-                class="ant-col ma3"
+                class="ant-col ma3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <a
                   href="https://slac.stanford.edu"
@@ -276,12 +254,12 @@ exports[`Home renders home page 1`] = `
                   <img
                     alt="SLAC"
                     height="40"
-                    src="collab-logo-SLAC.png"
+                    src="/src/home/components/CollaborationLogos/logos/collab-logo-SLAC.png"
                   />
                 </a>
               </div>
               <div
-                class="ant-col ma3"
+                class="ant-col ma3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <a
                   href="https://www.tib.eu/en/"
@@ -290,7 +268,7 @@ exports[`Home renders home page 1`] = `
                   <img
                     alt="TIB"
                     height="40"
-                    src="collab-logo-TIB.png"
+                    src="/src/home/components/CollaborationLogos/logos/collab-logo-TIB.png"
                   />
                 </a>
               </div>
@@ -299,10 +277,10 @@ exports[`Home renders home page 1`] = `
         </div>
       </div>
       <div
-        class="ant-row ant-row-center pv4 ph2"
+        class="ant-row ant-row-center pv4 ph2 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
-          class="ant-col"
+          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <h2
             class="tc f2 sm-f4"
@@ -313,16 +291,16 @@ exports[`Home renders home page 1`] = `
             class="mt5"
           >
             <div
-              class="ant-row ant-row-center __NewsAndUpdates__"
+              class="ant-row ant-row-center __NewsAndUpdates__ css-dev-only-do-not-override-oc1rc0 css-var-root"
             >
               <div
-                class="ant-col"
+                class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <div
                   class="__ContentBox__ h-100 container"
                 >
                   <div
-                    class="ant-card ant-card-bordered h-100"
+                    class="ant-card ant-card-bordered h-100 css-dev-only-do-not-override-oc1rc0 css-var-root"
                   >
                     <div
                       class="ant-card-body"
@@ -332,42 +310,56 @@ exports[`Home renders home page 1`] = `
                       >
                         <div>
                           <div
-                            class="ant-row ant-row-center ant-row-middle w-100"
+                            class="ant-row ant-row-center ant-row-middle w-100 css-dev-only-do-not-override-oc1rc0 css-var-root"
                             type="flex"
                           >
                             <div
-                              class="ant-col"
+                              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
                             >
                               <div
                                 class="tc pa4"
-                                data-test-id="loading"
                                 data-testid="loading-spinner"
                               >
                                 <div
                                   aria-busy="true"
                                   aria-live="polite"
-                                  class="ant-spin ant-spin-spinning ant-spin-show-text"
+                                  class="ant-spin ant-spin-spinning css-dev-only-do-not-override-oc1rc0 css-var-root"
                                 >
-                                  <span
-                                    class="ant-spin-dot ant-spin-dot-spin"
-                                  >
-                                    <i
-                                      class="ant-spin-dot-item"
-                                    />
-                                    <i
-                                      class="ant-spin-dot-item"
-                                    />
-                                    <i
-                                      class="ant-spin-dot-item"
-                                    />
-                                    <i
-                                      class="ant-spin-dot-item"
-                                    />
-                                  </span>
                                   <div
-                                    class="ant-spin-text"
+                                    class="ant-spin-section"
                                   >
-                                    Loading ...
+                                    <span
+                                      class="ant-spin-dot-holder"
+                                    >
+                                      <span
+                                        class="ant-spin-dot ant-spin-dot-spin"
+                                      >
+                                        <i
+                                          class="ant-spin-dot-item"
+                                        />
+                                        <i
+                                          class="ant-spin-dot-item"
+                                        />
+                                        <i
+                                          class="ant-spin-dot-item"
+                                        />
+                                        <i
+                                          class="ant-spin-dot-item"
+                                        />
+                                      </span>
+                                    </span>
+                                    <div
+                                      class="ant-spin-description"
+                                    >
+                                      Loading ...
+                                    </div>
+                                  </div>
+                                  <div
+                                    class="ant-spin-container"
+                                  >
+                                    <div
+                                      class="pa4"
+                                    />
                                   </div>
                                 </div>
                               </div>
@@ -376,13 +368,13 @@ exports[`Home renders home page 1`] = `
                         </div>
                       </div>
                       <div
-                        class="ant-row ant-row-space-between actions ph2"
+                        class="ant-row ant-row-space-between actions ph2 css-dev-only-do-not-override-oc1rc0 css-var-root"
                       >
                         <div
-                          class="ant-col"
+                          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
                         />
                         <div
-                          class="ant-col"
+                          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
                         />
                       </div>
                     </div>
@@ -391,10 +383,10 @@ exports[`Home renders home page 1`] = `
               </div>
             </div>
             <div
-              class="ant-row ant-row-center"
+              class="ant-row ant-row-center css-dev-only-do-not-override-oc1rc0 css-var-root"
             >
               <div
-                class="ant-col"
+                class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <a
                   class="db tc f5 mt4"
@@ -407,23 +399,21 @@ exports[`Home renders home page 1`] = `
               </div>
             </div>
             <div
-              class="ant-row ant-row-center"
+              class="ant-row ant-row-center css-dev-only-do-not-override-oc1rc0 css-var-root"
             >
               <div
-                class="ant-col mt5"
+                class="ant-col mt5 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <div
-                  class="ant-space ant-space-horizontal ant-space-align-center"
+                  class="ant-space css-dev-only-do-not-override-oc1rc0 ant-space-horizontal ant-space-align-center ant-space-gap-row-middle ant-space-gap-col-middle css-var-root"
                 >
                   <div
                     class="ant-space-item"
-                    style="margin-right: 16px;"
                   >
                     Follow us on
                   </div>
                   <div
                     class="ant-space-item"
-                    style="margin-right: 16px;"
                   >
                     <a
                       href="https://bsky.app/profile/inspirehep.net"
@@ -441,15 +431,12 @@ exports[`Home renders home page 1`] = `
                           focusable="false"
                           height="1em"
                           width="1em"
-                        >
-                          bluesky-filled.svg
-                        </svg>
+                        />
                       </span>
                     </a>
                   </div>
                   <div
                     class="ant-space-item"
-                    style="margin-right: 16px;"
                   >
                     •
                   </div>
@@ -490,13 +477,13 @@ exports[`Home renders home page 1`] = `
         </div>
       </div>
       <div
-        data-test-id="how-to-search"
+        data-testid="how-to-search"
       >
         <div
-          class="ant-row ant-row-center pv4 ph2 bg-white"
+          class="ant-row ant-row-center pv4 ph2 bg-white css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <div
-            class="ant-col"
+            class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
           >
             <h2
               class="tc f2 sm-f4"
@@ -516,10 +503,11 @@ exports[`Home renders home page 1`] = `
                   class="mb3 tc"
                 >
                   <div
-                    class="ant-radio-group ant-radio-group-outline"
+                    class="ant-radio-group ant-radio-group-outline css-dev-only-do-not-override-oc1rc0 css-var-root ant-radio-css-var"
+                    role="radiogroup"
                   >
                     <label
-                      class="ant-radio-button-wrapper ant-radio-button-wrapper-checked"
+                      class="ant-radio-button-wrapper ant-radio-button-wrapper-checked css-dev-only-do-not-override-oc1rc0 css-var-root ant-radio-css-var"
                     >
                       <span
                         class="ant-radio-button ant-radio-button-checked"
@@ -527,33 +515,33 @@ exports[`Home renders home page 1`] = `
                         <input
                           checked=""
                           class="ant-radio-button-input"
+                          name="test-id"
                           type="radio"
                           value="spires"
                         />
-                        <span
-                          class="ant-radio-button-inner"
-                        />
                       </span>
-                      <span>
+                      <span
+                        class="ant-radio-button-label"
+                      >
                         SPIRES
                       </span>
                     </label>
                     <label
-                      class="ant-radio-button-wrapper"
+                      class="ant-radio-button-wrapper css-dev-only-do-not-override-oc1rc0 css-var-root ant-radio-css-var"
                     >
                       <span
                         class="ant-radio-button"
                       >
                         <input
                           class="ant-radio-button-input"
+                          name="test-id"
                           type="radio"
                           value="freetext"
                         />
-                        <span
-                          class="ant-radio-button-inner"
-                        />
                       </span>
-                      <span>
+                      <span
+                        class="ant-radio-button-label"
+                      >
                         free text
                       </span>
                     </label>
@@ -561,16 +549,18 @@ exports[`Home renders home page 1`] = `
                 </div>
                 <div>
                   <div
-                    class="ant-table-wrapper"
+                    class="css-var-root ant-table-css-var ant-table-wrapper css-dev-only-do-not-override-oc1rc0"
                   >
                     <div
-                      class="ant-spin-nested-loading"
+                      aria-busy="false"
+                      aria-live="polite"
+                      class="ant-spin css-dev-only-do-not-override-oc1rc0 css-var-root"
                     >
                       <div
                         class="ant-spin-container"
                       >
                         <div
-                          class="ant-table ant-table-small ant-table-bordered"
+                          class="ant-table ant-table-small ant-table-bordered css-var-root ant-table-css-var css-dev-only-do-not-override-oc1rc0"
                           data-testid="spires-examples"
                         >
                           <div
@@ -582,23 +572,25 @@ exports[`Home renders home page 1`] = `
                               <table
                                 style="table-layout: auto;"
                               >
-                                <colgroup />
                                 <thead
                                   class="ant-table-thead"
                                 >
                                   <tr>
                                     <th
                                       class="ant-table-cell"
+                                      scope="col"
                                     >
                                       Search by
                                     </th>
                                     <th
                                       class="ant-table-cell"
+                                      scope="col"
                                     >
                                       Use operators
                                     </th>
                                     <th
                                       class="ant-table-cell"
+                                      scope="col"
                                     >
                                       Example
                                     </th>
@@ -740,8 +732,10 @@ exports[`Home renders home page 1`] = `
                   class="tc"
                 >
                   <a
-                    class="ant-btn ant-btn-primary mt3"
+                    aria-disabled="false"
+                    class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid mt3"
                     href="https://help.inspirehep.net/knowledge-base/inspire-paper-search"
+                    tabindex="0"
                     target="_blank"
                   >
                     <span>
@@ -755,10 +749,10 @@ exports[`Home renders home page 1`] = `
         </div>
       </div>
       <div
-        class="ant-row ant-row-center pv4 ph2"
+        class="ant-row ant-row-center pv4 ph2 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
-          class="ant-col"
+          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <h2
             class="tc f2 sm-f4"
@@ -774,13 +768,13 @@ exports[`Home renders home page 1`] = `
             class="mt5"
           >
             <div
-              class="ant-row ant-row-center"
+              class="ant-row ant-row-center css-dev-only-do-not-override-oc1rc0 css-var-root"
             >
               <div
-                class="ant-col pa3"
+                class="ant-col pa3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <div
-                  class="ant-card ant-card-bordered"
+                  class="ant-card ant-card-bordered css-dev-only-do-not-override-oc1rc0 css-var-root"
                 >
                   <div
                     class="ant-card-head"
@@ -814,22 +808,24 @@ exports[`Home renders home page 1`] = `
                       style="width: 100%;"
                     >
                       <span>
-                        <a
-                          class="ant-btn ant-btn-primary"
-                          href="/submissions/literature"
+                        <button
+                          class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"
+                          type="button"
                         >
-                          Submit
-                        </a>
+                          <span>
+                            Submit
+                          </span>
+                        </button>
                       </span>
                     </li>
                   </ul>
                 </div>
               </div>
               <div
-                class="ant-col pa3"
+                class="ant-col pa3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <div
-                  class="ant-card ant-card-bordered"
+                  class="ant-card ant-card-bordered css-dev-only-do-not-override-oc1rc0 css-var-root"
                 >
                   <div
                     class="ant-card-head"
@@ -863,22 +859,24 @@ exports[`Home renders home page 1`] = `
                       style="width: 100%;"
                     >
                       <span>
-                        <a
-                          class="ant-btn ant-btn-primary"
-                          href="/submissions/authors"
+                        <button
+                          class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"
+                          type="button"
                         >
-                          Submit
-                        </a>
+                          <span>
+                            Submit
+                          </span>
+                        </button>
                       </span>
                     </li>
                   </ul>
                 </div>
               </div>
               <div
-                class="ant-col pa3"
+                class="ant-col pa3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <div
-                  class="ant-card ant-card-bordered"
+                  class="ant-card ant-card-bordered css-dev-only-do-not-override-oc1rc0 css-var-root"
                 >
                   <div
                     class="ant-card-head"
@@ -912,22 +910,24 @@ exports[`Home renders home page 1`] = `
                       style="width: 100%;"
                     >
                       <span>
-                        <a
-                          class="ant-btn ant-btn-primary"
-                          href="/submissions/jobs"
+                        <button
+                          class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"
+                          type="button"
                         >
-                          Submit
-                        </a>
+                          <span>
+                            Submit
+                          </span>
+                        </button>
                       </span>
                     </li>
                   </ul>
                 </div>
               </div>
               <div
-                class="ant-col pa3"
+                class="ant-col pa3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <div
-                  class="ant-card ant-card-bordered"
+                  class="ant-card ant-card-bordered css-dev-only-do-not-override-oc1rc0 css-var-root"
                 >
                   <div
                     class="ant-card-head"
@@ -961,22 +961,24 @@ exports[`Home renders home page 1`] = `
                       style="width: 100%;"
                     >
                       <span>
-                        <a
-                          class="ant-btn ant-btn-primary"
-                          href="/submissions/seminars"
+                        <button
+                          class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"
+                          type="button"
                         >
-                          Submit
-                        </a>
+                          <span>
+                            Submit
+                          </span>
+                        </button>
                       </span>
                     </li>
                   </ul>
                 </div>
               </div>
               <div
-                class="ant-col pa3"
+                class="ant-col pa3 css-dev-only-do-not-override-oc1rc0 css-var-root"
               >
                 <div
-                  class="ant-card ant-card-bordered"
+                  class="ant-card ant-card-bordered css-dev-only-do-not-override-oc1rc0 css-var-root"
                 >
                   <div
                     class="ant-card-head"
@@ -1010,12 +1012,14 @@ exports[`Home renders home page 1`] = `
                       style="width: 100%;"
                     >
                       <span>
-                        <a
-                          class="ant-btn ant-btn-primary"
-                          href="/submissions/conferences"
+                        <button
+                          class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"
+                          type="button"
                         >
-                          Submit
-                        </a>
+                          <span>
+                            Submit
+                          </span>
+                        </button>
                       </span>
                     </li>
                   </ul>

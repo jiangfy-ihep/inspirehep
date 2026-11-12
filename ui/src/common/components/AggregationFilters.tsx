@@ -1,4 +1,3 @@
-import React from 'react';
 import { Map } from 'immutable';
 import { Row, Col } from 'antd';
 import className from 'classnames';
@@ -19,23 +18,25 @@ const AggregationFilters = ({
   numberOfResults,
   query,
   onAggregationChange,
-  inline,
-  displayWhenNoResults,
+  inline = false,
+  displayWhenNoResults = false,
   initialAggregations,
-  embedded,
+  embedded = false,
   page,
   namespace,
+  narrow = false,
 }: {
   aggregations: Map<string, any>;
   numberOfResults: number;
   query: string;
   onAggregationChange: Function;
-  inline: boolean;
-  displayWhenNoResults: boolean;
+  inline?: boolean;
+  displayWhenNoResults?: boolean;
   initialAggregations: Map<string, any>;
-  embedded: boolean;
+  embedded?: boolean;
   page: number;
   namespace: string;
+  narrow?: boolean;
 }) => {
   function compareAggregationEntries(
     [, aggregation1]: Map<string, any>[],
@@ -46,7 +47,8 @@ const AggregationFilters = ({
     return (order1 as number) - (order2 as number);
   }
   const rowClassName = className('bg-white', {
-    ph3: !inline,
+    ph2: !inline && narrow,
+    ph3: !inline && !narrow,
     pt3: !inline && !embedded,
     pv3: inline,
   });
@@ -98,12 +100,6 @@ const AggregationFilters = ({
       </Row>
     )
   );
-};
-
-AggregationFilters.defaultProps = {
-  inline: false,
-  displayWhenNoResults: false,
-  embedded: false,
 };
 
 export default AggregationFilters;

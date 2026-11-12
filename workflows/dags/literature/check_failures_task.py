@@ -1,30 +1,45 @@
 import logging
 
-from airflow.exceptions import AirflowException
-from airflow.sdk import task
+from airflow.sdk import Variable, task
+from airflow.sdk.exceptions import AirflowException
 from include.utils.s3 import S3JsonStore
 
 logger = logging.getLogger(__name__)
 
 
 @task
-def check_failures(failed_record_key, s3_conn="s3_conn"):
+def check_failures(
+    failed_record_key,
+    s3_conn="s3_conn",
+    bucket_name=None,
+    bucket_name_variable=None,
+):
     """Check if there are any failed records and raise an exception if there are.
 
     Args:
         failed_record_key: The S3 object key for the JSON containing failed records.
         s3_conn: The Airflow connection ID used to connect to S3.
-    Raises: AirflowException: If there are any failed records.
+        bucket_name: The S3 bucket name to use directly. Takes precedence over
+            bucket_name_variable when both are provided.
+        bucket_name_variable: The Airflow Variable key whose value is the S3 bucket
+            name. Only used when bucket_name is None. If neither is provided, the
+            bucket is resolved from the S3 connection config or the s3_bucket_name
+            Airflow Variable.
+    Raises:
+        AirflowException: If there are any failed records.
     """
-    s3_store = S3JsonStore(aws_conn_id=s3_conn)
+    if bucket_name is None and bucket_name_variable:
+        bucket_name = Variable.get(bucket_name_variable)
+    s3_store = S3JsonStore(aws_conn_id=s3_conn, bucket_name=bucket_name)
 
-    failed_records = []
+    if failed_record_key is None:
+        logger.info("No failed record key provided, no records to check.")
+        return
 
     record_data = s3_store.read_object(failed_record_key)
-    for _, item in record_data.items():
-        failed_records.extend(item)
+    failures = {key: items for key, items in record_data.items() if items}
 
-    if len(failed_records) > 0:
-        raise AirflowException(f"The following records failed: {failed_records}")
+    if failures:
+        raise AirflowException(f"Failures detected: {failures}")
 
     logger.info("No failed records")

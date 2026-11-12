@@ -1,5 +1,7 @@
-import React from 'react';
+import { FilePdfOutlined } from '@ant-design/icons';
+import { List } from 'immutable';
 import ContentBox from '../../../common/components/ContentBox';
+import UrlsAction from '../../../literature/components/UrlsAction';
 import Abstract from '../../../literature/components/Abstract';
 import ArxivEprintList from '../../../literature/components/ArxivEprintList';
 import DOIList from '../../../literature/components/DOIList';
@@ -9,13 +11,18 @@ import ReportNumberList from '../../../literature/components/ReportNumberList';
 import CollaborationList from '../../../common/components/CollaborationList';
 import LiteratureTitle from '../../../common/components/LiteratureTitle';
 import UnclickableTag from '../../../common/components/UnclickableTag';
+import { createPdfLinksFromArxivEprints } from '../../utils/utils';
+import { SEPARATOR_SEMICOLON } from '../../../common/components/InlineList';
 
-const LiteratureMainInfo = ({ data, isLiteratureUpdate }) => {
+const LiteratureMainInfo = ({ data, isLiteratureUpdate, page }) => {
   const authors = data?.get('authors');
   const title = data?.getIn(['titles', 0]);
   const abstract = data?.getIn(['abstracts', 0]);
   const license = data?.getIn(['license', 0]);
   const arxivEprints = data?.get('arxiv_eprints');
+  const pdfLinks = arxivEprints
+    ? createPdfLinksFromArxivEprints(arxivEprints)
+    : List([]);
   const dois = data?.get('dois');
   const publicationInfo = data?.get('publication_info');
   const reportNumbers = data?.get('report_numbers');
@@ -42,8 +49,10 @@ const LiteratureMainInfo = ({ data, isLiteratureUpdate }) => {
             <AuthorList
               limit={10}
               authors={authors}
-              page="literature backofice"
               unlinked
+              enableShowAll
+              alwaysShowNumberOfAuthors
+              separator={SEPARATOR_SEMICOLON}
             />
           </div>
         )}
@@ -95,6 +104,18 @@ const LiteratureMainInfo = ({ data, isLiteratureUpdate }) => {
         )}
         {acceleratorExperiment && (
           <div className="mb2">Experiment: {acceleratorExperiment}</div>
+        )}
+        {pdfLinks.size > 0 && (
+          <div style={{ paddingLeft: '-15px' }}>
+            <UrlsAction
+              urls={pdfLinks}
+              icon={<FilePdfOutlined />}
+              text="pdf"
+              trackerEventId="Backoffice pdf download"
+              eventAction="Download"
+              page={page}
+            />
+          </div>
         )}
       </ContentBox>
     </>

@@ -1,70 +1,55 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`PublicationsSelectAll render unchecked if all publications are not part of the selection 1`] = `
+exports[`PublicationsSelectAll > render unchecked if all publications are not part of the selection 1`] = `
 <DocumentFragment>
   <label
-    class="ant-checkbox-wrapper"
+    class="ant-checkbox-wrapper css-var-root ant-checkbox-css-var css-dev-only-do-not-override-oc1rc0"
   >
     <span
-      class="ant-checkbox"
+      class="ant-checkbox ant-wave-target css-dev-only-do-not-override-oc1rc0"
     >
       <input
         class="ant-checkbox-input"
-        data-test-id="select-all-publications"
         data-testid="select-all-publications"
         type="checkbox"
-        value=""
-      />
-      <span
-        class="ant-checkbox-inner"
       />
     </span>
   </label>
 </DocumentFragment>
 `;
 
-exports[`PublicationsSelectAll renders checked if all publications are part of the selection 1`] = `
+exports[`PublicationsSelectAll > renders checked if all publications are part of the selection 1`] = `
 <DocumentFragment>
   <label
-    class="ant-checkbox-wrapper ant-checkbox-wrapper-checked"
+    class="ant-checkbox-wrapper ant-checkbox-wrapper-checked css-var-root ant-checkbox-css-var css-dev-only-do-not-override-oc1rc0"
   >
     <span
-      class="ant-checkbox ant-checkbox-checked"
+      class="ant-checkbox ant-wave-target css-dev-only-do-not-override-oc1rc0 ant-checkbox-checked"
     >
       <input
         checked=""
         class="ant-checkbox-input"
-        data-test-id="select-all-publications"
         data-testid="select-all-publications"
         type="checkbox"
-        value=""
-      />
-      <span
-        class="ant-checkbox-inner"
       />
     </span>
   </label>
 </DocumentFragment>
 `;
 
-exports[`PublicationsSelectAll renders disabled 1`] = `
+exports[`PublicationsSelectAll > renders disabled 1`] = `
 <DocumentFragment>
   <label
-    class="ant-checkbox-wrapper ant-checkbox-wrapper-disabled"
+    class="ant-checkbox-wrapper ant-checkbox-wrapper-disabled css-var-root ant-checkbox-css-var css-dev-only-do-not-override-oc1rc0"
   >
     <span
-      class="ant-checkbox ant-checkbox-disabled"
+      class="ant-checkbox ant-wave-target css-dev-only-do-not-override-oc1rc0 ant-checkbox-disabled"
     >
       <input
         class="ant-checkbox-input"
-        data-test-id="select-all-publications"
         data-testid="select-all-publications"
         disabled=""
         type="checkbox"
-        value=""
-      />
-      <span
-        class="ant-checkbox-inner"
       />
     </span>
   </label>

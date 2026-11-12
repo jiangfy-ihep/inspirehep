@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { List, Set } from 'immutable';
 import { Checkbox } from 'antd';
 
@@ -43,7 +43,6 @@ function PublicationsSelectAll<T>({
     <Checkbox
       disabled={disabled}
       checked={checked}
-      data-test-id="select-all-publications"
       data-testid="select-all-publications"
       onChange={(event) => {
         onChange(

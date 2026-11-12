@@ -1,5 +1,3 @@
-/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */
-import React from 'react';
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { List, Map } from 'immutable';
@@ -32,7 +30,7 @@ function DataItem({ metadata, page }) {
   const literatureLinks = transformLiteratureRecords(literatureRecords);
 
   return (
-    <div data-test-id="data-result-item">
+    <div data-testid="data-result-item">
       <ResultItem
         leftActions={
           <>
@@ -71,11 +69,11 @@ function DataItem({ metadata, page }) {
           )
         }
       >
-        <div data-test-id="data-result-item-inner">
+        <div data-testid="data-result-item-inner">
           <div className="flex flex-nowrap">
             <div className="flex-grow-1">
               <Link
-                data-test-id="data-result-title-link"
+                data-testid="data-result-title-link"
                 className="result-item-title"
                 to={`${DATA}/${recordId}`}
               >

@@ -3,13 +3,14 @@ from io import BytesIO
 from urllib.parse import urlparse
 
 import requests
+from airflow.providers.amazon.aws.utils.connection_wrapper import AwsConnectionWrapper
 from airflow.sdk import Variable
 from airflow.sdk.bases.hook import BaseHook
 from hooks.generic_http_hook import GenericHttpHook
 from include.utils.s3 import S3JsonStore
 
 ARXIV_CONNECTION_ID = "arxiv_connection"
-S3_PUBLISHER_CONNECTION_ID = "s3_elsevier_conn"
+S3_PUBLISHER_CONNECTION_ID = "s3_publisher_conn"
 
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,12 @@ def is_connection_url(url, connection_id):
         connection_id (str): The ID of the connection to use for the check.
     """
     conn = BaseHook.get_connection(connection_id)
-    return (urlparse(conn.host).hostname or conn.host) == urlparse(url).hostname
+    url_hostname = urlparse(url).hostname
+    if conn.conn_type == "aws":
+        conn_wrapper = AwsConnectionWrapper(conn)
+        aws_url = conn_wrapper.endpoint_url
+        return urlparse(aws_url).hostname == url_hostname
+    return (urlparse(conn.host).hostname or conn.host) == url_hostname
 
 
 def _get_upload_object(url):
@@ -41,6 +47,7 @@ def _download_from_url(url):
         timeout=int(Variable.get("DOWNLOAD_FILE_TO_WORKFLOW_TIMEOUT", 300)),
     )
     response.raise_for_status()
+    response.raw.decode_content = True
     return response.raw
 
 
@@ -67,10 +74,12 @@ def load_document_to_s3(workflow_id, document, s3_store):
 
     url = document["url"]
     filename = document["key"]
+    s3_key = f"{workflow_id}/documents/{filename}"
+    full_s3_key_url = f"{s3_store.hook.conn.meta.endpoint_url}/{bucket_name}/{s3_key}"
 
-    if s3_store.hook.check_for_key(f"{workflow_id}/documents/{filename}"):
+    if s3_store.hook.check_for_key(s3_key):
         logger.info("Document already downloaded from %s", url)
-        return
+        return full_s3_key_url
 
     logger.info("Downloading document key:%s url:%s", filename, url)
     upload_object = _get_upload_object(url)
@@ -78,12 +87,11 @@ def load_document_to_s3(workflow_id, document, s3_store):
     if not upload_object:
         return
 
-    s3_key = f"{workflow_id}/documents/{filename}"
     s3_store.hook.load_file_obj(
         upload_object,
         s3_key,
         replace=True,
     )
 
-    logger.info("Document downloaded from %s", url)
-    return f"{s3_store.hook.conn.meta.endpoint_url}/{bucket_name}/{s3_key}"
+    logger.info("Document downloaded from %s into %s", url, full_s3_key_url)
+    return full_s3_key_url

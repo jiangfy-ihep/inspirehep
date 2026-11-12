@@ -1,8 +1,6 @@
-import React from 'react';
 import { Button } from 'antd';
 import { WorkflowDecisions } from '../../../common/constants';
 import { WorkflowActions } from '../../constants';
-import '../../common/components/ActionButtons.less';
 
 export const AuthorActionButtons = ({
   handleResolveAction,
@@ -21,9 +19,10 @@ export const AuthorActionButtons = ({
   const isRejectLoading =
     isResolving && actionDecision === WorkflowDecisions.REJECT;
   return (
-    <div className="w-100 flex flex-column items-center">
+    <div className="w-100 flex items-center flex-wrap" style={{ gap: '4px' }}>
       <Button
-        className="font-white bg-completed w-75 mb2"
+        color="cyan"
+        variant="solid"
         onClick={() => handleResolveAction(WorkflowDecisions.ACCEPT)}
         loading={isAcceptLoading}
         disabled={isResolving && !isAcceptLoading}
@@ -31,7 +30,8 @@ export const AuthorActionButtons = ({
         Accept
       </Button>
       <Button
-        className="font-white bg-halted w-75 mb2"
+        color="orange"
+        variant="solid"
         onClick={() => handleResolveAction(WorkflowDecisions.ACCEPT_CURATE)}
         loading={isAcceptCurateLoading}
         disabled={isResolving && !isAcceptCurateLoading}
@@ -39,7 +39,8 @@ export const AuthorActionButtons = ({
         Accept + Curation
       </Button>
       <Button
-        className="font-white bg-error w-75"
+        color="danger"
+        variant="solid"
         onClick={() => handleResolveAction(WorkflowDecisions.REJECT)}
         loading={isRejectLoading}
         disabled={isResolving && !isRejectLoading}

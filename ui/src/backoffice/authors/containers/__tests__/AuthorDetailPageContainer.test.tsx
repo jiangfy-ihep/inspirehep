@@ -1,8 +1,7 @@
-import React from 'react';
 import { fromJS } from 'immutable';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 
-import { Route } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { BACKOFFICE } from '../../../../common/routes';
 import AuthorDetailPageContainer from '../AuthorDetailPageContainer';
 import { getStore } from '../../../../fixtures/store';
@@ -11,7 +10,7 @@ import { BACKOFFICE_RESTART_ACTION_REQUEST } from '../../../../actions/actionTyp
 import { WorkflowActions, WorkflowStatuses } from '../../../constants';
 import { WorkflowDecisions } from '../../../../common/constants';
 
-describe('AuthorDetailPageContainer', (ids: any = []) => {
+describe('AuthorDetailPageContainer', () => {
   const renderComponent = (ids: any = []) => {
     const store = getStore({
       backoffice: fromJS({
@@ -45,10 +44,12 @@ describe('AuthorDetailPageContainer', (ids: any = []) => {
     });
 
     const renderedComponent = renderWithProviders(
-      <Route
-        path={`${BACKOFFICE}/:id`}
-        component={AuthorDetailPageContainer}
-      />,
+      <Routes>
+        <Route
+          path={`${BACKOFFICE}/:id`}
+          element={<AuthorDetailPageContainer />}
+        />
+      </Routes>,
       {
         store,
         route: `${BACKOFFICE}/e9eb1f50-a2d9-4002-90ba-d6f679b59efb`,

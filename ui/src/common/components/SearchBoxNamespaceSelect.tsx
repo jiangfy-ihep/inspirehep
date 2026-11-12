@@ -1,5 +1,3 @@
-import React from 'react';
-
 import SelectBox from './SelectBox';
 import { SEARCH_BOX_NAMESPACES } from '../../search/constants';
 
@@ -14,10 +12,11 @@ const SearchBoxNamespaceSelect = ({
 }) => (
   <SelectBox
     listHeight={400}
-    popupClassName="header-dropdown"
+    classNames={{ popup: { root: 'header-dropdown' } }}
     onChange={onSearchScopeChange}
     value={searchScopeName}
     options={SCOPE_OPTIONS}
+    style={{ height: '40px' }}
   />
 );
 

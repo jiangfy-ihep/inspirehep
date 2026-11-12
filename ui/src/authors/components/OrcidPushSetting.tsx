@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { Switch, Popconfirm } from 'antd';
 
 import OrcidPushSettingMessageContainer from '../containers/OrcidPushSettingMessageContainer';
@@ -43,7 +43,6 @@ function OrcidPushSetting({
           <Switch
             loading={isUpdating}
             checked={enabled}
-            data-test-id="orcid-switch"
             data-testid="orcid-switch"
           />
         </Popconfirm>

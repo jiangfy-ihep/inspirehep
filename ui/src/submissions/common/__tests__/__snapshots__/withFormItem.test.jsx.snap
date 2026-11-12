@@ -1,19 +1,18 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`withFormItem passes all props correctly to Form.Item and wrapped Input component (with error) 1`] = `
+exports[`withFormItem > passes all props correctly to Form.Item and wrapped Input component (with error) 1`] = `
 <DocumentFragment>
   <div
-    class="ant-form-item ant-form-item-with-help ant-form-item-has-feedback ant-form-item-has-error"
+    class="ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-oc1rc0 ant-form-item-with-help ant-form-item-has-feedback ant-form-item-has-error ant-form-item-horizontal"
   >
     <div
-      class="ant-row ant-form-item-row"
+      class="ant-row ant-form-item-row css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
-        class="ant-col ant-form-item-label ant-col-sm-24 ant-col-md-5"
+        class="ant-col ant-form-item-label ant-col-sm-24 ant-col-md-5 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <label
           class=""
-          title=""
         >
           <span>
             Test Label
@@ -21,7 +20,7 @@ exports[`withFormItem passes all props correctly to Form.Item and wrapped Input 
         </label>
       </div>
       <div
-        class="ant-col ant-form-item-control ant-col-sm-24 ant-col-md-19"
+        class="ant-col ant-form-item-control ant-col-sm-24 ant-col-md-19 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
           class="ant-form-item-control-input"
@@ -29,26 +28,29 @@ exports[`withFormItem passes all props correctly to Form.Item and wrapped Input 
           <div
             class="ant-form-item-control-input-content"
           >
-            <input />
-            <span
-              class="pl2"
+            <div
+              class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
             >
-              Test Suffix
-            </span>
+              <input />
+              <span
+                class="pl2"
+              >
+                Test Suffix
+              </span>
+            </div>
           </div>
         </div>
         <div
-          style="display: flex; flex-wrap: nowrap;"
+          class="ant-form-item-additional"
         >
           <div
-            class="ant-form-item-explain ant-form-item-explain-connected"
-            role="alert"
+            class="ant-form-item-explain css-var-root ant-form-css-var ant-form-item-explain-connected css-dev-only-do-not-override-oc1rc0"
           >
             <div
               class="ant-form-item-explain-error"
             >
               <span
-                data-test-id="test-error"
+                data-testid="test-error"
               >
                 Error
               </span>
@@ -61,20 +63,19 @@ exports[`withFormItem passes all props correctly to Form.Item and wrapped Input 
 </DocumentFragment>
 `;
 
-exports[`withFormItem passes all props correctly to Form.Item and wrapped Input component (without error) 1`] = `
+exports[`withFormItem > passes all props correctly to Form.Item and wrapped Input component (without error) 1`] = `
 <DocumentFragment>
   <div
-    class="ant-form-item"
+    class="ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-oc1rc0 ant-form-item-horizontal"
   >
     <div
-      class="ant-row ant-form-item-row"
+      class="ant-row ant-form-item-row css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
-        class="ant-col ant-form-item-label ant-col-sm-24 ant-col-md-5"
+        class="ant-col ant-form-item-label ant-col-sm-24 ant-col-md-5 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <label
           class=""
-          title=""
         >
           <span>
             Test Label
@@ -82,7 +83,7 @@ exports[`withFormItem passes all props correctly to Form.Item and wrapped Input 
         </label>
       </div>
       <div
-        class="ant-col ant-form-item-control ant-col-sm-24 ant-col-md-19"
+        class="ant-col ant-form-item-control ant-col-sm-24 ant-col-md-19 css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
           class="ant-form-item-control-input"
@@ -90,12 +91,16 @@ exports[`withFormItem passes all props correctly to Form.Item and wrapped Input 
           <div
             class="ant-form-item-control-input-content"
           >
-            <input />
-            <span
-              class="pl2"
+            <div
+              class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
             >
-              Test Suffix
-            </span>
+              <input />
+              <span
+                class="pl2"
+              >
+                Test Suffix
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -104,20 +109,19 @@ exports[`withFormItem passes all props correctly to Form.Item and wrapped Input 
 </DocumentFragment>
 `;
 
-exports[`withFormItem passes props correctly to Form.Item and wrapped Input component (without error and custom layout) 1`] = `
+exports[`withFormItem > passes props correctly to Form.Item and wrapped Input component (without error and custom layout) 1`] = `
 <DocumentFragment>
   <div
-    class="ant-form-item"
+    class="ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-oc1rc0 ant-form-item-horizontal"
   >
     <div
-      class="ant-row ant-form-item-row"
+      class="ant-row ant-form-item-row css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
-        class="ant-col ant-col-3 ant-col-offset-2 ant-form-item-label"
+        class="ant-col ant-col-3 ant-col-offset-2 ant-form-item-label css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <label
           class=""
-          title=""
         >
           <span>
             Test Label
@@ -125,7 +129,7 @@ exports[`withFormItem passes props correctly to Form.Item and wrapped Input comp
         </label>
       </div>
       <div
-        class="ant-col ant-col-10 ant-form-item-control"
+        class="ant-col ant-col-10 ant-form-item-control css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
           class="ant-form-item-control-input"
@@ -133,7 +137,11 @@ exports[`withFormItem passes props correctly to Form.Item and wrapped Input comp
           <div
             class="ant-form-item-control-input-content"
           >
-            <input />
+            <div
+              class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
+            >
+              <input />
+            </div>
           </div>
         </div>
       </div>
@@ -142,16 +150,16 @@ exports[`withFormItem passes props correctly to Form.Item and wrapped Input comp
 </DocumentFragment>
 `;
 
-exports[`withFormItem passes props correctly to Form.Item and wrapped Input component (without error and only child) 1`] = `
+exports[`withFormItem > passes props correctly to Form.Item and wrapped Input component (without error and only child) 1`] = `
 <DocumentFragment>
   <div
-    class="ant-form-item mb2-important"
+    class="ant-form-item mb2-important css-var-root ant-form-css-var css-dev-only-do-not-override-oc1rc0 ant-form-item-horizontal"
   >
     <div
-      class="ant-row ant-form-item-row"
+      class="ant-row ant-form-item-row css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
-        class="ant-col ant-col-24 ant-form-item-control"
+        class="ant-col ant-col-24 ant-form-item-control css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
           class="ant-form-item-control-input"
@@ -159,7 +167,11 @@ exports[`withFormItem passes props correctly to Form.Item and wrapped Input comp
           <div
             class="ant-form-item-control-input-content"
           >
-            <input />
+            <div
+              class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
+            >
+              <input />
+            </div>
           </div>
         </div>
       </div>

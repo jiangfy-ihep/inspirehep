@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { FileDoneOutlined } from '@ant-design/icons';
 import { Button, Tooltip } from 'antd';
 import { useParams } from 'react-router-dom';
@@ -13,15 +13,15 @@ function AssignOwnProfileAction({
   onUnassign,
   disabled,
   disabledAssignAction,
-  numberOfSelected,
-  claimingTooltip,
+  numberOfSelected = 1,
+  claimingTooltip = 'This paper is already claimed',
 }: {
   onAssign: Function;
   onUnassign: Function;
   disabled: boolean;
   disabledAssignAction: boolean;
-  numberOfSelected: number;
-  claimingTooltip: string;
+  numberOfSelected?: number;
+  claimingTooltip?: string;
 }) {
   const currentAuthorId = Number(useParams<{ id: string }>().id);
   const onSelfAssign = useCallback(() => {
@@ -46,7 +46,6 @@ function AssignOwnProfileAction({
           eventId="This is my paper"
         >
           <span
-            data-test-id="assign-self"
             data-testid="assign-self"
             key="assign-self"
             onClick={onSelfAssign}
@@ -70,12 +69,7 @@ function AssignOwnProfileAction({
           eventAction="Claim"
           eventId="This is not my paper"
         >
-          <span
-            data-test-id="unassign"
-            data-testid="unassign"
-            key="unassign"
-            onClick={onSelfUnassign}
-          >
+          <span data-testid="unassign" key="unassign" onClick={onSelfUnassign}>
             {numberOfSelected === 1
               ? 'This is not my paper'
               : 'These are not my papers'}
@@ -90,27 +84,24 @@ function AssignOwnProfileAction({
       <DropdownMenu
         disabled={disabled}
         title={
-          <Tooltip
-            title={
-              disabled
-                ? 'Please select the papers you want to claim or remove from the profile.'
-                : null
-            }
-          >
-            <Button data-test-id="btn-claim" data-testid="btn-claim">
-              <IconText text="claim" icon={<FileDoneOutlined />} />
-            </Button>
-          </Tooltip>
+          <span>
+            <Tooltip
+              title={
+                disabled
+                  ? 'Please select the papers you want to claim or remove from the profile.'
+                  : null
+              }
+            >
+              <Button data-testid="btn-claim" disabled={disabled}>
+                <IconText text="claim" icon={<FileDoneOutlined />} />
+              </Button>
+            </Tooltip>
+          </span>
         }
         items={menuItems}
       />
     </UserAction>
   );
 }
-
-AssignOwnProfileAction.defaultProps = {
-  claimingTooltip: 'This paper is already claimed',
-  numberOfSelected: 1,
-};
 
 export default AssignOwnProfileAction;

@@ -7,7 +7,6 @@ import {
   BACKOFFICE_SEARCH_REQUEST,
   BACKOFFICE_SEARCH_ERROR,
   BACKOFFICE_SEARCH_SUCCESS,
-  BACKOFFICE_SEARCH_QUERY_UPDATE,
   BACKOFFICE_AUTHOR_ERROR,
   BACKOFFICE_AUTHOR_REQUEST,
   BACKOFFICE_AUTHOR_SUCCESS,
@@ -34,6 +33,9 @@ import {
   BACKOFFICE_LITERATURE_REQUEST,
   BACKOFFICE_LITERATURE_SUCCESS,
   BACKOFFICE_LITERATURE_ERROR,
+  BACKOFFICE_UPDATE_LITERATURE_REQUEST,
+  BACKOFFICE_UPDATE_LITERATURE_SUCCESS,
+  BACKOFFICE_UPDATE_LITERATURE_ERROR,
 } from '../actions/actionTypes';
 
 export const initialState = fromJS({
@@ -50,12 +52,27 @@ export const initialState = fromJS({
   restartActionInProgress: null,
   dashboard: {
     loading: false,
+    pending: {
+      authors: false,
+      literature: false,
+    },
     facets: {
       authors: {},
       literature: {},
     },
   },
 });
+
+const setDashboardLoading = (state, key, isPending) => {
+  const next = state.setIn(['dashboard', 'pending', key], isPending);
+  return next.setIn(
+    ['dashboard', 'loading'],
+    Boolean(
+      next.getIn(['dashboard', 'pending', 'authors']) ||
+        next.getIn(['dashboard', 'pending', 'literature'])
+    )
+  );
+};
 
 const BackofficeReducer = (state = initialState, action) => {
   switch (action.type) {
@@ -100,10 +117,14 @@ const BackofficeReducer = (state = initialState, action) => {
       return state
         .set('loading', false)
         .set('literature', fromJS(action.payload.data));
-    case BACKOFFICE_SEARCH_QUERY_UPDATE:
-      return state.set('query', fromJS(action.payload));
     case BACKOFFICE_SEARCH_QUERY_RESET:
       return state.set('query', fromJS({ page: 1, size: 10 }));
+    case BACKOFFICE_UPDATE_LITERATURE_REQUEST:
+      return state.set('actionInProgress', fromJS(action.payload));
+    case BACKOFFICE_UPDATE_LITERATURE_SUCCESS:
+      return state.set('actionInProgress', null);
+    case BACKOFFICE_UPDATE_LITERATURE_ERROR:
+      return state.set('actionInProgress', null);
     case BACKOFFICE_RESOLVE_ACTION_REQUEST:
       return state.set('actionInProgress', fromJS(action.payload));
     case BACKOFFICE_RESOLVE_ACTION_SUCCESS:
@@ -132,24 +153,36 @@ const BackofficeReducer = (state = initialState, action) => {
     case BACKOFFICE_DELETE_ERROR:
       return state.set('loading', false);
     case BACKOFFICE_AUTHORS_DASHBOARD_REQUEST:
-      return state.set('dashboard', { loading: true });
-    case BACKOFFICE_AUTHORS_DASHBOARD_SUCCESS: {
-      return state
-        .setIn(['dashboard', 'facets', 'authors'], fromJS(action.payload))
-        .setIn(['dashboard', 'loading'], false);
-    }
+      return setDashboardLoading(state, 'authors', true);
+    case BACKOFFICE_AUTHORS_DASHBOARD_SUCCESS:
+      return setDashboardLoading(
+        state.setIn(['dashboard', 'facets', 'authors'], fromJS(action.payload)),
+        'authors',
+        false
+      );
     case BACKOFFICE_AUTHORS_DASHBOARD_ERROR:
-      return state.set('dashboard', initialState.get('dashboard'));
+      return setDashboardLoading(
+        state.setIn(['dashboard', 'facets', 'authors'], fromJS({})),
+        'authors',
+        false
+      );
     case BACKOFFICE_LITERATURE_DASHBOARD_REQUEST:
-      return state.set('dashboard', { loading: true });
-    case BACKOFFICE_LITERATURE_DASHBOARD_SUCCESS: {
-      return state
-        .setIn(['dashboard', 'facets', 'literature'], fromJS(action.payload))
-        .setIn(['dashboard', 'loading'], false);
-    }
-    case BACKOFFICE_LITERATURE_DASHBOARD_ERROR: {
-      return state.set('dashboard', initialState.get('dashboard'));
-    }
+      return setDashboardLoading(state, 'literature', true);
+    case BACKOFFICE_LITERATURE_DASHBOARD_SUCCESS:
+      return setDashboardLoading(
+        state.setIn(
+          ['dashboard', 'facets', 'literature'],
+          fromJS(action.payload)
+        ),
+        'literature',
+        false
+      );
+    case BACKOFFICE_LITERATURE_DASHBOARD_ERROR:
+      return setDashboardLoading(
+        state.setIn(['dashboard', 'facets', 'literature'], fromJS({})),
+        'literature',
+        false
+      );
     default:
       return state;
   }

@@ -1,4 +1,3 @@
-import React from 'react';
 import { screen, fireEvent } from '@testing-library/react';
 import { Set, fromJS } from 'immutable';
 
@@ -6,8 +5,8 @@ import AssignConferencesDrawer from '../AssignConferencesDrawer';
 import { getStore } from '../../../fixtures/store';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('react-router-dom', () => {
-  const actual = jest.requireActual('react-router-dom');
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
   return { ...actual, useParams: jest.fn().mockReturnValue({ id: 123 }) };
 });
 
@@ -63,6 +62,7 @@ describe('AssignConferencesDrawer', () => {
             baseAggregationsQuery: {},
             results: [
               {
+                id: 1,
                 metadata: {
                   control_number: 123,
                   titles: [
@@ -70,7 +70,7 @@ describe('AssignConferencesDrawer', () => {
                       title: 'Jessica Jones Conference',
                     },
                   ],
-                  acronyms: [{ acronym: 'JJC' }],
+                  acronyms: ['JJC'],
                   opening_date: '2023-01-01',
                   closing_date: '2023-01-03',
                   addresses: [],

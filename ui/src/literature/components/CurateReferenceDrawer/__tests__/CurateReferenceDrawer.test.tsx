@@ -1,4 +1,3 @@
-import React from 'react';
 import { screen } from '@testing-library/react';
 import { Map, fromJS } from 'immutable';
 import CurateReferenceDrawer, {
@@ -8,7 +7,7 @@ import { renderWithProviders } from '../../../../fixtures/render';
 
 describe('CurateReferenceDrawer', () => {
   const defaultProps = {
-    recordId: 1,
+    recordId: '1',
     recordUuid: '1',
     revisionId: 2,
     referenceId: 3,
@@ -35,7 +34,7 @@ describe('CurateReferenceDrawer', () => {
       }),
     });
 
-    renderWithProviders(renderReferenceItem(result));
+    renderWithProviders(renderReferenceItem(result, false));
     expect(screen.getByText('Title')).toBeInTheDocument();
     expect(screen.getByText('Urhan, Harun')).toBeInTheDocument();
     expect(screen.getByText('2022-05-12')).toBeInTheDocument();

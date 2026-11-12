@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Map } from 'immutable';
 import { Input, Button, Alert, Row, Col, Tooltip, Form } from 'antd';
@@ -53,7 +53,7 @@ class DataImporter extends Component {
         <Row className="mb3">
           <Col span={24}>
             <Alert
-              message="Fill in the field to automatically import more data from arXiv or DOI"
+              title="Fill in the field to automatically import more data from arXiv or DOI"
               type="info"
             />
           </Col>
@@ -62,7 +62,7 @@ class DataImporter extends Component {
           <Row className="mb3">
             <Col span={24}>
               <Alert
-                message={this.renderAlertMessage()}
+                title={this.renderAlertMessage()}
                 type="error"
                 showIcon
                 closable
@@ -77,7 +77,6 @@ class DataImporter extends Component {
           wrapperCol={WRAPPER_COL}
         >
           <Input
-            data-test-id="import-input"
             data-testid="import-input"
             placeholder="hep-th/9711200 or 1207.7235 or arXiv:1001.4538 or 10.1086/305772 or doi:10.1086/305772"
             onChange={this.onImportChange}
@@ -96,7 +95,6 @@ class DataImporter extends Component {
           </Col>
           <Col>
             <Button
-              data-test-id="import-button"
               data-testid="import-button"
               type="primary"
               onClick={this.onImportClick}

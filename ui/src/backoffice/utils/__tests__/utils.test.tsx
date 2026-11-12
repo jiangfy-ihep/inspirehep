@@ -1,112 +1,25 @@
-import React from 'react';
-import { render } from '@testing-library/react';
 import { List, Map as ImmutableMap } from 'immutable';
+import { vi } from 'vitest';
 import {
-  getIcon,
   refreshToken,
   filterByProperty,
   formatDateTime,
   getDag,
+  filterDecisions,
   hasPublicationInfo,
+  isLiteratureUpdateWorkflow,
+  createPdfLinksFromArxivEprints,
 } from '../utils';
 import storage from '../../../common/storage';
 import { BACKOFFICE_LOGIN_API } from '../../../common/routes';
-import { WorkflowStatuses, WorkflowTypes } from '../../constants';
+import { WorkflowTypes } from '../../constants';
+import { WorkflowDecisions } from '../../../common/constants';
 
-jest.mock('../../../common/storage');
-
-describe('getIcon', () => {
-  it('should return HourglassOutlined for approval status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.APPROVAL) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-hourglass')).toBeInTheDocument();
-  });
-
-  it('should return WarningOutlined for error status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.ERROR) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-warning')).toBeInTheDocument();
-  });
-
-  it('should return CheckOutlined for completed status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.COMPLETED) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-check')).toBeInTheDocument();
-  });
-
-  it('should return LoadingOutlined for running status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.RUNNING) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-loading')).toBeInTheDocument();
-  });
-
-  it('should return FieldTimeOutlined for processing status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.PROCESSING) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-field-time')).toBeInTheDocument();
-  });
-
-  it('should return StopOutlined for blocked status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.BLOCKED) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-stop')).toBeInTheDocument();
-  });
-
-  it('should return HourglassOutlined for fuzzy matching status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.APPROVAL_FUZZY_MATCHING) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-hourglass')).toBeInTheDocument();
-  });
-
-  it('should return HourglassOutlined for fuzzy merging status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.APPROVAL_MERGE) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-hourglass')).toBeInTheDocument();
-  });
-
-  it('should return WarningOutlined for multiple exact matches status', () => {
-    const { container } = render(
-      getIcon(
-        WorkflowStatuses.ERROR_MULTIPLE_EXACT_MATCHES
-      ) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-warning')).toBeInTheDocument();
-  });
-
-  it('should return WarningOutlined for validation error status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.ERROR_VALIDATION) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-warning')).toBeInTheDocument();
-  });
-
-  it('should return HourglassOutlined for core selection approval status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.APPROVAL_CORE_SELECTION) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-hourglass')).toBeInTheDocument();
-  });
-
-  it('should return HourglassOutlined for missing subject fields status', () => {
-    const { container } = render(
-      getIcon(WorkflowStatuses.MISSING_SUBJECT_FIELDS) as React.ReactElement
-    );
-    expect(container.querySelector('.anticon-hourglass')).toBeInTheDocument();
-  });
-
-  it('should return null for unknown status', () => {
-    const icon = getIcon('unknown');
-    expect(icon).toBeNull();
-  });
-});
+vi.mock('../../../common/storage');
+vi.mock('../../../common/constants', async () => ({
+  ...(await vi.importActual('../../../common/constants')),
+  LOCAL_TIMEZONE: 'UTC',
+}));
 
 describe('refreshToken', () => {
   beforeEach(() => {
@@ -140,25 +53,25 @@ describe('refreshToken', () => {
 });
 
 describe('filterByProperty', () => {
-  let testData: Map<string, Array<Map<string, string>>>;
+  let testData: ImmutableMap<string, Array<ImmutableMap<string, string>>>;
 
   beforeEach(() => {
     const items = [
-      new Map<string, string>([
+      ImmutableMap<string, string>([
         ['schema', 'ORCID'],
         ['value', '0000-0001-2345-6789'],
       ]),
-      new Map<string, string>([
+      ImmutableMap<string, string>([
         ['schema', 'DOI'],
         ['value', '10.1000/xyz123'],
       ]),
-      new Map<string, string>([
+      ImmutableMap<string, string>([
         ['schema', 'ORCID'],
         ['value', '0000-0002-6789-1234'],
       ]),
     ];
 
-    testData = new Map([['ids', items]]);
+    testData = ImmutableMap([['ids', items]]);
   });
 
   it('should include only items with schema value "ORCID"', () => {
@@ -180,17 +93,24 @@ describe('filterByProperty', () => {
 
 describe('formatDateTime', () => {
   it('should return an object with formatted date and time for a valid date', () => {
-    const rawDateTime = '2024-02-11T15:30:00Z';
+    const rawDateTime = '2024-02-11T15:30:00.134496+00:00';
     const result = formatDateTime(rawDateTime);
 
     expect(result).toEqual({
       date: '2024-02-11',
-      time: '15:30',
+      time: '03:30 PM',
     });
   });
 
   it('should return undefined for an invalid date', () => {
     const rawDateTime = 'invalid-date-string';
+    const result = formatDateTime(rawDateTime);
+
+    expect(result).toBeUndefined();
+  });
+
+  it('should return undefined for an undefined date', () => {
+    const rawDateTime = undefined;
     const result = formatDateTime(rawDateTime);
 
     expect(result).toBeUndefined();
@@ -202,15 +122,86 @@ describe('getDag', () => {
     [WorkflowTypes.AUTHOR_CREATE, 'author_create_initialization_dag'],
     [WorkflowTypes.AUTHOR_UPDATE, 'author_update_dag'],
     [WorkflowTypes.HEP_CREATE, 'hep_create_dag'],
+    [WorkflowTypes.HEP_PUBLISHER_CREATE, 'hep_create_dag'],
+    [WorkflowTypes.HEP_PUBLISHER_UPDATE, 'hep_create_dag'],
     [WorkflowTypes.HEP_SUBMISSION, 'hep_create_dag'],
     [WorkflowTypes.HEP_UPDATE, 'hep_create_dag'],
+    [WorkflowTypes.HEP_MANUAL_MERGE, 'hep_manual_merge_dag'],
     ['AUTHOR_CREATE', 'author_create_initialization_dag'],
     ['AUTHOR_UPDATE', 'author_update_dag'],
     ['HEP_CREATE', 'hep_create_dag'],
+    ['HEP_PUBLISHER_CREATE', 'hep_create_dag'],
+    ['HEP_PUBLISHER_UPDATE', 'hep_create_dag'],
     ['HEP_SUBMISSION', 'hep_create_dag'],
     ['HEP_UPDATE', 'hep_create_dag'],
+    ['HEP_MANUAL_MERGE', 'hep_manual_merge_dag'],
   ])('returns the expected DAG for %j', (input, expected) => {
     expect(getDag(input)).toBe(expected);
+  });
+});
+
+describe('isLiteratureUpdateWorkflow', () => {
+  it('returns true for HEP_UPDATE workflows', () => {
+    expect(isLiteratureUpdateWorkflow(WorkflowTypes.HEP_UPDATE)).toBe(true);
+  });
+
+  it('returns true for HEP_PUBLISHER_UPDATE workflows', () => {
+    expect(isLiteratureUpdateWorkflow(WorkflowTypes.HEP_PUBLISHER_UPDATE)).toBe(
+      true
+    );
+  });
+
+  it('returns false for non-update workflows', () => {
+    expect(isLiteratureUpdateWorkflow(WorkflowTypes.HEP_CREATE)).toBe(false);
+  });
+});
+
+describe('filterDecisions', () => {
+  const makeDecisions = (actions: string[]) =>
+    List(actions.map((action) => ImmutableMap({ action })));
+
+  it('returns null when decisions are undefined', () => {
+    expect(filterDecisions(undefined)).toBeNull();
+  });
+
+  it.each([
+    WorkflowDecisions.FUZZY_MATCH,
+    WorkflowDecisions.EXACT_MATCH,
+    WorkflowDecisions.MERGE_APPROVE,
+    WorkflowDecisions.MISSING_SUBJECT_FIELDS,
+  ])('filters out %s decisions', (action) => {
+    const result = filterDecisions(makeDecisions([action]));
+    expect(result?.size).toBe(0);
+  });
+
+  it('keeps decisions that are not in the hidden list', () => {
+    const result = filterDecisions(
+      makeDecisions([
+        WorkflowDecisions.HEP_ACCEPT,
+        WorkflowDecisions.HEP_REJECT,
+      ])
+    );
+    expect(result?.size).toBe(2);
+  });
+
+  it('removes only hidden decisions from a mixed list', () => {
+    const result = filterDecisions(
+      makeDecisions([
+        WorkflowDecisions.HEP_ACCEPT,
+        WorkflowDecisions.FUZZY_MATCH,
+        WorkflowDecisions.EXACT_MATCH,
+        WorkflowDecisions.MERGE_APPROVE,
+        WorkflowDecisions.MISSING_SUBJECT_FIELDS,
+        WorkflowDecisions.HEP_REJECT,
+      ])
+    );
+    expect(result?.size).toBe(2);
+    expect(
+      result
+        ?.map((d: ImmutableMap<string, any>) => d.get('action'))
+        .toList()
+        .toJS()
+    ).toEqual([WorkflowDecisions.HEP_ACCEPT, WorkflowDecisions.HEP_REJECT]);
   });
 });
 
@@ -243,5 +234,34 @@ describe('hasPublicationInfo', () => {
     ]);
 
     expect(hasPublicationInfo(publicationInfo)).toBe(false);
+  });
+});
+
+describe('createPdfLinksFromArxivEprints', () => {
+  it('returns an empty list when given an empty list', () => {
+    const result = createPdfLinksFromArxivEprints(List());
+    expect(result).toEqual(List());
+  });
+
+  it('converts a single eprint value to a pdf link', () => {
+    const eprints = List([ImmutableMap({ value: '2501.00001' })]);
+    const result = createPdfLinksFromArxivEprints(eprints);
+    expect(result).toEqual(
+      List([ImmutableMap({ value: '//arxiv.org/pdf/2501.00001' })])
+    );
+  });
+
+  it('converts multiple eprint values to pdf links', () => {
+    const eprints = List([
+      ImmutableMap({ value: '2501.00001' }),
+      ImmutableMap({ value: '2312.99999' }),
+    ]);
+    const result = createPdfLinksFromArxivEprints(eprints);
+    expect(result).toEqual(
+      List([
+        ImmutableMap({ value: '//arxiv.org/pdf/2501.00001' }),
+        ImmutableMap({ value: '//arxiv.org/pdf/2312.99999' }),
+      ])
+    );
   });
 });

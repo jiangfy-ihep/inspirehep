@@ -1,23 +1,21 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Abstract does not display abstractSource when it is null 1`] = `
+exports[`Abstract > does not display abstractSource when it is null 1`] = `
 <DocumentFragment>
   <div>
     <div>
       Abstract:
     </div>
-    <span
-      class="__Latex__"
-    >
+    <span>
       Test abstract
     </span>
   </div>
 </DocumentFragment>
 `;
 
-exports[`Abstract does not render if abstract is null 1`] = `<DocumentFragment />`;
+exports[`Abstract > does not render if abstract is null 1`] = `<DocumentFragment />`;
 
-exports[`Abstract renders with abstract 1`] = `
+exports[`Abstract > renders with abstract 1`] = `
 <DocumentFragment>
   <div>
     <div>
@@ -26,9 +24,7 @@ exports[`Abstract renders with abstract 1`] = `
          (arXiv)
       </span>
     </div>
-    <span
-      class="__Latex__"
-    >
+    <span>
       Test abstract
     </span>
   </div>

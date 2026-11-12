@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
 import { Button } from 'antd';
@@ -29,10 +29,7 @@ function ExistingConferencesAlert({
         <FieldInfoAlert
           description={
             <span>
-              <strong
-                data-test-id="conferences-exist-alert-number"
-                data-testid="conferences-exist-alert-number"
-              >
+              <strong data-testid="conferences-exist-alert-number">
                 {numberOfConferences}
               </strong>{' '}
               other {pluralizeUnlessSingle('conference', numberOfConferences)}{' '}

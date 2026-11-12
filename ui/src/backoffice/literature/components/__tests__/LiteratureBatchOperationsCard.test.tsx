@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 import { WorkflowStatuses } from '../../../constants';
@@ -25,5 +24,20 @@ describe('LiteratureBatchOperationsCard', () => {
     expect(onResolveAction).toHaveBeenCalledWith(
       WorkflowDecisions.HEP_ACCEPT_CORE
     );
+  });
+
+  it('renders a warning for full coverage selections', () => {
+    render(
+      <LiteratureBatchOperationsCard
+        selectedCount={2}
+        status={WorkflowStatuses.APPROVAL}
+        onResolveAction={jest.fn()}
+        hasFullCoverageSelection
+      />
+    );
+
+    expect(
+      screen.getByText('Some selected articles belong to fully taken journals.')
+    ).toBeInTheDocument();
   });
 });

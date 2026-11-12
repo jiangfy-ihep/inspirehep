@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Backoffice renders initial state 1`] = `
+exports[`Backoffice > renders initial state 1`] = `
 <div>
   <div
     class="w-100"
@@ -14,170 +14,143 @@ exports[`Backoffice renders initial state 1`] = `
         class="flex items-center justify-between mt3 mb2"
       >
         <nav
-          class="ant-breadcrumb"
+          class="ant-breadcrumb css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <ol>
-            <li>
-              <span
+            <li
+              class="ant-breadcrumb-item"
+            >
+              <a
                 class="ant-breadcrumb-link"
+                href="/"
               >
-                <a
-                  href="/"
+                <span
+                  aria-label="home"
+                  class="anticon anticon-home mr2"
+                  role="img"
                 >
-                  <span
-                    aria-label="home"
-                    class="anticon anticon-home mr2"
-                    role="img"
+                  <svg
+                    aria-hidden="true"
+                    data-icon="home"
+                    fill="currentColor"
+                    focusable="false"
+                    height="1em"
+                    viewBox="64 64 896 896"
+                    width="1em"
                   >
-                    <svg
-                      aria-hidden="true"
-                      data-icon="home"
-                      fill="currentColor"
-                      focusable="false"
-                      height="1em"
-                      viewBox="64 64 896 896"
-                      width="1em"
-                    >
-                      <path
-                        d="M946.5 505L560.1 118.8l-25.9-25.9a31.5 31.5 0 00-44.4 0L77.5 505a63.9 63.9 0 00-18.8 46c.4 35.2 29.7 63.3 64.9 63.3h42.5V940h691.8V614.3h43.4c17.1 0 33.2-6.7 45.3-18.8a63.6 63.6 0 0018.7-45.3c0-17-6.7-33.1-18.8-45.2zM568 868H456V664h112v204zm217.9-325.7V868H632V640c0-22.1-17.9-40-40-40H432c-22.1 0-40 17.9-40 40v228H238.1V542.3h-96l370-369.7 23.1 23.1L882 542.3h-96.1z"
-                      />
-                    </svg>
-                  </span>
-                   Inspirehep
-                </a>
-              </span>
-              <span
-                class="ant-breadcrumb-separator"
-              >
-                &gt;
-              </span>
+                    <path
+                      d="M946.5 505L560.1 118.8l-25.9-25.9a31.5 31.5 0 00-44.4 0L77.5 505a63.9 63.9 0 00-18.8 46c.4 35.2 29.7 63.3 64.9 63.3h42.5V940h691.8V614.3h43.4c17.1 0 33.2-6.7 45.3-18.8a63.6 63.6 0 0018.7-45.3c0-17-6.7-33.1-18.8-45.2zM568 868H456V664h112v204zm217.9-325.7V868H632V640c0-22.1-17.9-40-40-40H432c-22.1 0-40 17.9-40 40v228H238.1V542.3h-96l370-369.7 23.1 23.1L882 542.3h-96.1z"
+                    />
+                  </svg>
+                </span>
+                 Inspirehep
+              </a>
             </li>
-            <li>
-              <span
-                class="ant-breadcrumb-link"
-              >
-                <a
-                  href="/backoffice"
-                >
-                  Backoffice
-                </a>
-              </span>
-              <span
-                class="ant-breadcrumb-separator"
-              >
-                &gt;
-              </span>
+            <li
+              aria-hidden="true"
+              class="ant-breadcrumb-separator"
+            >
+              &gt;
             </li>
-            <li>
-              <span
+            <li
+              class="ant-breadcrumb-item"
+            >
+              <a
                 class="ant-breadcrumb-link"
+                href="/backoffice"
               >
-                <a
-                  href="/backoffice/"
-                >
-                  Dashboard
-                </a>
-              </span>
-              <span
-                class="ant-breadcrumb-separator"
+                Backoffice
+              </a>
+            </li>
+            <li
+              aria-hidden="true"
+              class="ant-breadcrumb-separator"
+            >
+              &gt;
+            </li>
+            <li
+              class="ant-breadcrumb-item"
+            >
+              <a
+                class="ant-breadcrumb-link"
+                href="/backoffice/"
               >
-                &gt;
-              </span>
+                Dashboard
+              </a>
             </li>
           </ol>
         </nav>
       </div>
       <div
-        class="inner-container mt4"
+        class="inner-container mt2"
       >
-        <h2
-          class="f2 center"
-        >
-          Search Backoffice
-        </h2>
         <div
-          class="search-container"
+          class="content-grid"
         >
-          <span
-            class="ant-input-group-wrapper ant-input-search ant-input-search-with-button"
+          <div
+            class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
           >
-            <span
-              class="ant-input-wrapper ant-input-group"
+            <div
+              class="ant-select ant-select-outlined ant-select-compact-item ant-select-compact-first-item css-var-root ant-select-css-var css-dev-only-do-not-override-oc1rc0 ant-select-single ant-select-show-arrow"
+              style="height: 48px;"
             >
-              <span
-                class="ant-input-group-addon"
+              <div
+                class="ant-select-content ant-select-content-has-value"
+                title="Authors"
               >
-                <div
-                  class="ant-select ant-select-single ant-select-show-arrow"
-                  placement="bottomLeft"
+                Authors
+                <input
+                  aria-autocomplete="list"
+                  aria-expanded="false"
+                  aria-haspopup="listbox"
+                  autocomplete="new-password"
+                  class="ant-select-input"
+                  id="test-id"
+                  readonly=""
+                  role="combobox"
+                  type="text"
+                  value=""
+                />
+              </div>
+              <div
+                class="ant-select-suffix"
+              >
+                <span
+                  aria-label="down"
+                  class="anticon anticon-down"
+                  role="img"
                 >
-                  <div
-                    class="ant-select-selector"
-                  >
-                    <span
-                      class="ant-select-selection-search"
-                    >
-                      <input
-                        aria-activedescendant="rc_select_TEST_OR_SSR_list_0"
-                        aria-autocomplete="list"
-                        aria-controls="rc_select_TEST_OR_SSR_list"
-                        aria-haspopup="listbox"
-                        aria-owns="rc_select_TEST_OR_SSR_list"
-                        autocomplete="off"
-                        class="ant-select-selection-search-input"
-                        id="rc_select_TEST_OR_SSR"
-                        readonly=""
-                        role="combobox"
-                        style="opacity: 0;"
-                        value=""
-                      />
-                    </span>
-                    <span
-                      class="ant-select-selection-item"
-                    >
-                      Authors
-                    </span>
-                  </div>
-                  <span
+                  <svg
                     aria-hidden="true"
-                    class="ant-select-arrow"
-                    style="user-select: none;"
-                    unselectable="on"
+                    data-icon="down"
+                    fill="currentColor"
+                    focusable="false"
+                    height="1em"
+                    viewBox="64 64 896 896"
+                    width="1em"
                   >
-                    <span
-                      aria-label="down"
-                      class="anticon anticon-down ant-select-suffix"
-                      role="img"
-                    >
-                      <svg
-                        aria-hidden="true"
-                        data-icon="down"
-                        fill="currentColor"
-                        focusable="false"
-                        height="1em"
-                        viewBox="64 64 896 896"
-                        width="1em"
-                      >
-                        <path
-                          d="M884 256h-75c-5.1 0-9.9 2.5-12.9 6.6L512 654.2 227.9 262.6c-3-4.1-7.8-6.6-12.9-6.6h-75c-6.5 0-10.3 7.4-6.5 12.7l352.6 486.1c12.8 17.6 39 17.6 51.7 0l352.6-486.1c3.9-5.3.1-12.7-6.4-12.7z"
-                        />
-                      </svg>
-                    </span>
-                  </span>
-                </div>
-              </span>
+                    <path
+                      d="M884 256h-75c-5.1 0-9.9 2.5-12.9 6.6L512 654.2 227.9 262.6c-3-4.1-7.8-6.6-12.9-6.6h-75c-6.5 0-10.3 7.4-6.5 12.7l352.6 486.1c12.8 17.6 39 17.6 51.7 0l352.6-486.1c3.9-5.3.1-12.7-6.4-12.7z"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div
+              class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-input-search css-var-root ant-input-search-with-button search-container css-dev-only-do-not-override-oc1rc0"
+            >
               <input
-                class="ant-input"
+                class="ant-input css-dev-only-do-not-override-oc1rc0 ant-input-outlined css-var-root ant-input-css-var ant-input-compact-item"
                 placeholder="Search Backoffice"
-                type="text"
+                type="search"
                 value=""
               />
-              <span
-                class="ant-input-group-addon"
+              <button
+                class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-default ant-btn-color-primary ant-btn-variant-solid ant-btn-compact-item ant-btn-compact-last-item ant-input-search-btn"
+                type="button"
               >
-                <button
-                  class="ant-btn ant-btn-primary ant-input-search-button"
-                  type="button"
+                <span
+                  class="ant-btn-icon"
                 >
                   <span
                     aria-label="search"
@@ -198,107 +171,69 @@ exports[`Backoffice renders initial state 1`] = `
                       />
                     </svg>
                   </span>
-                </button>
-              </span>
-            </span>
-          </span>
-        </div>
-        <h2
-          class="f2 center mb4"
-        >
-          Overview
-        </h2>
-        <div
-          class="ant-tabs ant-tabs-top ant-tabs-centered"
-        >
-          <div
-            class="ant-tabs-nav"
-            role="tablist"
-          >
-            <div
-              class="ant-tabs-nav-wrap"
-            >
-              <div
-                class="ant-tabs-nav-list"
-                style="transform: translate(0px, 0px);"
-              >
-                <div
-                  class="ant-tabs-tab ant-tabs-tab-active"
-                  data-node-key="1"
-                >
-                  <div
-                    aria-controls="rc-tabs-test-panel-1"
-                    aria-selected="true"
-                    class="ant-tabs-tab-btn"
-                    id="rc-tabs-test-tab-1"
-                    role="tab"
-                    tabindex="0"
-                  >
-                    <h3>
-                      Collections
-                    </h3>
-                  </div>
-                </div>
-                <div
-                  class="ant-tabs-ink-bar ant-tabs-ink-bar-animated"
-                />
-              </div>
-            </div>
-            <div
-              class="ant-tabs-nav-operations ant-tabs-nav-operations-hidden"
-            >
-              <button
-                aria-controls="rc-tabs-test-more-popup"
-                aria-expanded="false"
-                aria-haspopup="listbox"
-                aria-hidden="true"
-                class="ant-tabs-nav-more"
-                id="rc-tabs-test-more"
-                style="visibility: hidden; order: 1;"
-                tabindex="-1"
-                type="button"
-              >
-                <span
-                  aria-label="ellipsis"
-                  class="anticon anticon-ellipsis"
-                  role="img"
-                >
-                  <svg
-                    aria-hidden="true"
-                    data-icon="ellipsis"
-                    fill="currentColor"
-                    focusable="false"
-                    height="1em"
-                    viewBox="64 64 896 896"
-                    width="1em"
-                  >
-                    <path
-                      d="M176 511a56 56 0 10112 0 56 56 0 10-112 0zm280 0a56 56 0 10112 0 56 56 0 10-112 0zm280 0a56 56 0 10112 0 56 56 0 10-112 0z"
-                    />
-                  </svg>
                 </span>
               </button>
             </div>
           </div>
-          <div
-            class="ant-tabs-content-holder"
+        </div>
+        <div
+          class="flex w-100 justify-end pt3 content-grid"
+        >
+          <button
+            class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-default ant-btn-color-default ant-btn-variant-outlined"
+            type="button"
           >
-            <div
-              class="ant-tabs-content ant-tabs-content-top"
+            <span>
+              Expand all
+            </span>
+          </button>
+        </div>
+        <div
+          class="css-dev-only-do-not-override-oc1rc0 css-var-root ant-empty ant-empty-normal"
+        >
+          <div
+            class="ant-empty-image"
+          >
+            <svg
+              height="41"
+              viewBox="0 0 64 41"
+              width="64"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              <div
-                aria-hidden="false"
-                aria-labelledby="rc-tabs-test-tab-1"
-                class="ant-tabs-tabpane ant-tabs-tabpane-active"
-                id="rc-tabs-test-panel-1"
-                role="tabpanel"
-                tabindex="0"
+              <title>
+                No data
+              </title>
+              <g
+                fill="none"
+                fill-rule="evenodd"
+                transform="translate(0 1)"
               >
-                <div
-                  class="cards-container mt4"
+                <ellipse
+                  cx="32"
+                  cy="33"
+                  fill="#f5f5f5"
+                  rx="32"
+                  ry="7"
                 />
-              </div>
-            </div>
+                <g
+                  fill-rule="nonzero"
+                  stroke="#d9d9d9"
+                >
+                  <path
+                    d="M55 12.8 44.9 1.3Q44 0 42.9 0H21.1q-1.2 0-2 1.3L9 12.8V22h46z"
+                  />
+                  <path
+                    d="M41.6 16c0-1.7 1-3 2.2-3H55v18.1c0 2.2-1.3 3.9-3 3.9H12c-1.7 0-3-1.7-3-3.9V13h11.2c1.2 0 2.2 1.3 2.2 3s1 2.9 2.2 2.9h14.8c1.2 0 2.2-1.4 2.2-3"
+                    fill="#fafafa"
+                  />
+                </g>
+              </g>
+            </svg>
+          </div>
+          <div
+            class="ant-empty-description"
+          >
+            0 Results
           </div>
         </div>
       </div>

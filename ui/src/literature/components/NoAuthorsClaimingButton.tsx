@@ -1,4 +1,3 @@
-import React from 'react';
 import { FileDoneOutlined } from '@ant-design/icons';
 import { Button, Tooltip } from 'antd';
 
@@ -11,11 +10,13 @@ const NoAuthorsClaimingButton = () => (
     <DropdownMenu
       disabled
       title={
-        <Tooltip title="This paper has no authors.">
-          <Button disabled data-test-id="btn-claiming-authors">
-            <IconText text="claim" icon={<FileDoneOutlined />} />
-          </Button>
-        </Tooltip>
+        <span>
+          <Tooltip title="This paper has no authors.">
+            <Button disabled data-testid="btn-claiming-authors">
+              <IconText text="claim" icon={<FileDoneOutlined />} />
+            </Button>
+          </Tooltip>
+        </span>
       }
     />
   </UserAction>

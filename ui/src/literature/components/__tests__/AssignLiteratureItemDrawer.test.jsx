@@ -1,4 +1,3 @@
-import React from 'react';
 import { fireEvent } from '@testing-library/react';
 import { fromJS } from 'immutable';
 import { renderWithProviders } from '../../../fixtures/render';
@@ -32,7 +31,6 @@ describe('AssignLiteratureItemDrawer', () => {
         onAssign={onAssign}
         currentUserRecordId={12345676}
         itemLiteratureId={122334}
-        page="Page"
       />
     );
     expect(baseElement).toMatchSnapshot();
@@ -59,7 +57,6 @@ describe('AssignLiteratureItemDrawer', () => {
         currentUserRecordId={12345676}
         authors={authors}
         itemLiteratureId={122334}
-        page="Page"
       />
     );
 

@@ -1,26 +1,21 @@
-import React from 'react';
-import { fireEvent, render } from '@testing-library/react';
-
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import UserSettingsAction from '../UserSettingsAction';
 import UserSettingsModal from '../UserSettingsModal';
 
-jest.mock('../UserSettingsModal', () => {
-  const actual = jest.requireActual('../UserSettingsModal');
+vi.mock('../UserSettingsModal', async () => {
+  const actual = await vi.importActual('../UserSettingsModal');
   return {
     __esModule: true,
     default: jest.fn((props) => <actual.default {...props} />),
   };
 });
 
-jest.mock('../../containers/OrcidPushSettingContainer', () => () => (
-  <div data-testid="orcid-push-setting">ORCID Push Settings</div>
-));
-
-function wait(milisec = 2500) {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(), milisec);
-  });
-}
+vi.mock('../../containers/OrcidPushSettingContainer', async () => ({
+  default: () => (
+    <div data-testid="orcid-push-setting">ORCID Push Settings</div>
+  ),
+}));
 
 describe('UserSettingsAction', () => {
   it('renders', () => {
@@ -29,31 +24,30 @@ describe('UserSettingsAction', () => {
   });
 
   it('sets modal visible on click and invisible on modal cancel', async () => {
-    const screen = render(<UserSettingsAction />, { container: document.body });
+    const user = userEvent.setup();
+    const screen = render(<UserSettingsAction />);
 
     expect(UserSettingsModal).toBeCalledWith(
       expect.objectContaining({
         visible: false,
       }),
-      expect.anything()
+      undefined
     );
 
     const settingsBtn = screen.getByTestId('user-settings-button');
-    fireEvent.click(settingsBtn);
+    await user.click(settingsBtn);
 
-    await wait();
-
-    const closeButton = screen.getByLabelText('Close');
+    const closeButton = screen.getByRole('button', { name: 'Close' });
 
     expect(closeButton).toBeInTheDocument();
 
-    fireEvent.click(closeButton);
+    await user.click(closeButton);
 
     expect(UserSettingsModal).toBeCalledWith(
       expect.objectContaining({
         visible: false,
       }),
-      expect.anything()
+      undefined
     );
   });
 });

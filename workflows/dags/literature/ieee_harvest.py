@@ -1,21 +1,19 @@
 import datetime
 import logging
+import re
 from io import BytesIO
 
-from airflow.exceptions import AirflowException
-from airflow.models.variable import Variable
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.sdk import Param, dag, task
+from airflow.sdk import Param, Variable, dag, task
+from airflow.sdk.exceptions import AirflowException
 from hooks.backoffice.workflow_management_hook import (
     HEP,
 )
 from hooks.custom_fttps_hook import CustomFTPSHook
+from include.utils import ftp as ftp_utils
 from include.utils.alerts import FailedDagNotifierSetError
-from include.utils.ftp import list_ftp_files
 
 logger = logging.getLogger(__name__)
-s3_hook = S3Hook(aws_conn_id="s3_conn")
-ieee_bucket_name = Variable.get("s3_ieee_bucket_name")
 
 
 @dag(
@@ -34,6 +32,7 @@ ieee_bucket_name = Variable.get("s3_ieee_bucket_name")
     start_date=datetime.datetime(2024, 5, 5),
     schedule="0 0 * * 1",
     catchup=False,
+    default_args={"queue": "harvests"},
     on_failure_callback=FailedDagNotifierSetError(),
     tags=[HEP],
 )
@@ -57,27 +56,48 @@ def ieee_harvest_dag():
         """
         ftp_hook = CustomFTPSHook(ftp_conn_id="ieee_ftp")
         s3_hook = S3Hook(aws_conn_id="s3_conn")
+        ieee_bucket_name = Variable.get("s3_ieee_bucket_name")
 
         directories = ftp_hook.list_directory(sync_folder)
 
         has_new_directory = False
 
+        year, current_week, _ = context["logical_date"].isocalendar()
+
         for directory in directories:
+            match = re.fullmatch(
+                r"(?P<prefix>.*?)(?P<week_name>week(?P<week>\d+)[a-z]?)",
+                directory,
+            )
+            if not match:
+                logger.warning(
+                    f"Directory {directory} does not match the expected pattern"
+                )
+                continue
+
+            week_directory = int(match.group("week"))
+            year_prefix = year - 1 if week_directory > current_week else year
+            s3_directory = (
+                f"{match.group('prefix')}{year_prefix}-{match.group('week_name')}"
+            )
+
             there_is_key = s3_hook.check_for_wildcard_key(
-                f"{directory}/*", ieee_bucket_name
+                f"{s3_directory}/*", ieee_bucket_name
             )
 
             if not there_is_key:
                 logger.info(f"Pushing directory {directory} to s3")
-                has_new_directory = True
-                files = list_ftp_files(ftp_hook, directory)
+                files = ftp_utils.list_ftp_files(ftp_hook, directory)
 
                 for file in files:
                     bio = BytesIO()
                     ftp_hook.get_conn()
                     ftp_hook.retrieve_file(file, bio)
                     bio.seek(0)
-                    s3_hook.conn.upload_fileobj(bio, ieee_bucket_name, file)
+                    s3_file = file.replace(directory, s3_directory, 1)
+                    s3_hook.conn.upload_fileobj(bio, ieee_bucket_name, s3_file)
+
+                has_new_directory = True
 
         return has_new_directory
 

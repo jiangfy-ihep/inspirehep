@@ -1,7 +1,13 @@
+import uuid
+from unittest.mock import patch
+
 import pytest
+from airflow.sdk import Variable
+from botocore.exceptions import ClientError
+from include.utils.s3 import S3JsonStore
 
 
-@pytest.mark.usefixtures("_s3_store")
+@pytest.mark.usefixtures("s3_desy_env")
 class TestS3Hook:
     def test_read_write_s3(self):
         self.s3_store.write_object({"test": "data"}, key="test_key")
@@ -30,7 +36,119 @@ class TestS3Hook:
         flag_name = "test-flag"
         flag_value = True
 
+        existing_flags = {"is-update": True, "auto-approved": False}
+        self.s3_store.set_flags(existing_flags, workflow_id)
         self.s3_store.set_flag(flag_name, flag_value, workflow_id)
         retrieved_flag_value = self.s3_store.get_flag(flag_name, workflow_id)
 
         assert retrieved_flag_value == flag_value
+        assert self.s3_store.read_object(f"{workflow_id}/flags.json") == {
+            **existing_flags,
+            flag_name: flag_value,
+        }
+
+    @pytest.mark.parametrize(
+        ("operation", "error_code"),
+        [("HeadObject", "404"), ("GetObject", "NoSuchKey")],
+    )
+    def test_set_flag_initializes_missing_flags(self, operation, error_code):
+        workflow_id = str(uuid.uuid4())
+        key = f"{workflow_id}/flags.json"
+        read_error = ClientError(
+            {
+                "Error": {"Code": error_code},
+                "ResponseMetadata": {"HTTPStatusCode": 404},
+            },
+            operation,
+        )
+        with patch.object(self.s3_store, "read_object", side_effect=read_error):
+            self.s3_store.set_flag("approved", True, workflow_id)
+
+        assert self.s3_store.read_object(key) == {"approved": True}
+
+    @pytest.mark.parametrize(
+        ("operation", "error_code", "status"),
+        [
+            ("HeadObject", "403", 403),
+            ("HeadObject", "503", 503),
+            ("GetObject", "AccessDenied", 403),
+            ("GetObject", "SlowDown", 503),
+            ("GetObject", "NoSuchBucket", 404),
+        ],
+    )
+    def test_set_flag_preserves_flags_on_s3_read_error(
+        self, operation, error_code, status
+    ):
+        workflow_id = str(uuid.uuid4())
+        key = f"{workflow_id}/flags.json"
+        flags = {"is-update": True, "auto-approved": False}
+        self.s3_store.set_flags(flags, workflow_id)
+        read_error = ClientError(
+            {
+                "Error": {"Code": error_code},
+                "ResponseMetadata": {"HTTPStatusCode": status},
+            },
+            operation,
+        )
+        with patch.object(self.s3_store, "read_object", side_effect=read_error):
+            with pytest.raises(ClientError) as error:
+                self.s3_store.set_flag("approved", True, workflow_id)
+            assert error.value is read_error
+
+        assert self.s3_store.read_object(key) == flags
+
+    def test_key_to_s3_url(self):
+        bucket_name = self.s3_store.get_default_bucket_name()
+        key = "test/key/path"
+        url = self.s3_store.hook.conn.meta.endpoint_url
+        expected_url = f"{url}/{bucket_name}/{key}"
+        assert self.s3_store.key_to_s3_url(key) == expected_url
+
+    def test_cleanup_prefix(self):
+        prefix = f"cleanup-test-{uuid.uuid4()}/"
+        keys = [f"{prefix}file{i}.json" for i in range(3)]
+        for key in keys:
+            self.s3_store.write_object({"test": "data"}, key=key)
+
+        existing_keys = self.s3_store.hook.list_keys(
+            bucket_name=self.s3_store.bucket_name, prefix=prefix
+        )
+        assert len(existing_keys) == len(keys)
+
+        self.s3_store.cleanup_prefix([prefix])
+
+        remaining_keys = self.s3_store.hook.list_keys(
+            bucket_name=self.s3_store.bucket_name, prefix=prefix
+        )
+        assert not remaining_keys
+
+    def test_move_all_files_for_subdirectory(self):
+        src_bucket = Variable.get("s3_desy_input_bucket_name")
+        dest_bucket = Variable.get("s3_desy_output_bucket_name")
+
+        s3_publisher_store = S3JsonStore("s3_publisher_conn", src_bucket)
+
+        subdir = f"test-subdir-{str(uuid.uuid4())}/"
+
+        nb_files = 3
+
+        for i in range(nb_files):
+            s3_publisher_store.write_object(
+                {"test": f"data{i}"},
+                key=f"{subdir}file{i}.json",
+                bucket_name=src_bucket,
+            )
+
+        s3_publisher_store.move_all_files_for_subdirectory(
+            subdir, src_bucket, dest_bucket
+        )
+
+        dest_objects = s3_publisher_store.hook.list_keys(
+            prefix=subdir, bucket_name=dest_bucket
+        )
+        assert len(dest_objects) == nb_files
+
+        src_objects = s3_publisher_store.hook.list_keys(
+            prefix=subdir, bucket_name=src_bucket
+        )
+        assert src_objects == []

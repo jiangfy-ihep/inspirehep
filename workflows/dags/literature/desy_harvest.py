@@ -1,0 +1,84 @@
+import datetime
+import logging
+
+from airflow.sdk import Variable, dag, task
+from airflow.sdk.exceptions import AirflowSkipException
+from hooks.backoffice.workflow_management_hook import HEP, WorkflowManagementHook
+from include.utils.alerts import FailedDagNotifier
+from include.utils.desy import process_subdirectory
+from include.utils.s3 import S3JsonStore
+from literature.check_failures_task import check_failures
+
+logger = logging.getLogger(__name__)
+S3_PUBLISHER_CONN = "s3_publisher_conn"
+
+
+@dag(
+    start_date=datetime.datetime(2024, 11, 28),
+    schedule="0 * * * *",
+    catchup=False,
+    tags=["literature", "desy", "harvest"],
+    on_failure_callback=FailedDagNotifier(),
+    default_args={"queue": "harvests"},
+)
+def desy_harvest_dag():
+    """Harvest DESY JSONL batches from S3 and create literature workflows."""
+
+    DESY_OUTPUT_BUCKET_VARIABLE = "s3_desy_output_bucket_name"
+
+    @task
+    def process_subdirectories(**context):
+        workflow_management_hook = WorkflowManagementHook(HEP)
+        input_bucket = Variable.get("s3_desy_input_bucket_name")
+        output_bucket = Variable.get(DESY_OUTPUT_BUCKET_VARIABLE)
+        s3_publisher_store = S3JsonStore("s3_publisher_conn")
+
+        run_id = context["run_id"]
+        subdirectories = s3_publisher_store.hook.list_prefixes(
+            delimiter="/", bucket_name=input_bucket
+        )
+        if not subdirectories:
+            raise AirflowSkipException("No DESY subdirectories found to process")
+
+        failed_parse_records = []
+        failed_load_records = []
+        for subdirectory_name in subdirectories:
+            if s3_publisher_store.hook.list_keys(
+                output_bucket,
+                subdirectory_name,
+            ):
+                logger.info(
+                    "Skipping already processed DESY subdirectory %s",
+                    subdirectory_name,
+                )
+                continue
+
+            failed_records = process_subdirectory(
+                subdirectory_name=subdirectory_name,
+                s3_store=s3_publisher_store,
+                input_bucket=input_bucket,
+                output_bucket=output_bucket,
+                workflow_management_hook=workflow_management_hook,
+                submission_number=run_id,
+            )
+            failed_parse_records.extend(failed_records["failed_parse_records"])
+            failed_load_records.extend(failed_records["failed_load_records"])
+
+        return s3_publisher_store.write_object(
+            {
+                "failed_parse_records": failed_parse_records,
+                "failed_load_records": failed_load_records,
+            },
+            key=f"harvests/{run_id}",
+            bucket_name=output_bucket,
+        )
+
+    failed_record_key = process_subdirectories()
+    check_failures(
+        failed_record_key,
+        s3_conn=S3_PUBLISHER_CONN,
+        bucket_name_variable=DESY_OUTPUT_BUCKET_VARIABLE,
+    )
+
+
+desy_harvest_dag()

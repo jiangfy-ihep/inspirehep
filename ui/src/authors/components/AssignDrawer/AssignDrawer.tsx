@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Set, Map } from 'immutable';
 import { SelectOutlined } from '@ant-design/icons';
-import { Drawer, Radio, Row, Col, Button } from 'antd';
+import { Drawer, Radio, Row, Col, Button, RadioChangeEvent } from 'antd';
 
 import ResultsContainer from '../../../common/containers/ResultsContainer';
 import { ASSIGN_AUTHOR_NS } from '../../../search/constants';
@@ -36,7 +36,10 @@ function AssignDrawer({
   visible: boolean;
   onDrawerClose:
     | ((
-        e: React.MouseEvent<Element, MouseEvent> | React.KeyboardEvent<Element>
+        e:
+          | React.MouseEvent<Element, MouseEvent>
+          | KeyboardEvent
+          | React.KeyboardEvent<Element>
       ) => void)
     | undefined;
   selectedPapers: Set<string>;
@@ -44,7 +47,7 @@ function AssignDrawer({
 }) {
   const currentAuthorId = Number(useParams<{ id: string }>().id);
   const [selectedAuthorId, setSelectedAuthorId] = useState();
-  const onSelectedAuthorChange = useCallback((event) => {
+  const onSelectedAuthorChange = useCallback((event: RadioChangeEvent) => {
     setSelectedAuthorId(event.target.value);
   }, []);
   const onAssignClick = useCallback(() => {
@@ -55,7 +58,7 @@ function AssignDrawer({
   }, [currentAuthorId, selectedAuthorId, onAssign]);
   return (
     <Drawer
-      className="search-drawer"
+      rootClassName="search-drawer"
       placement="right"
       onClose={onDrawerClose}
       open={visible}

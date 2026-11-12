@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ConferenceInfoList renders conference link 1`] = `
+exports[`ConferenceInfoList > renders conference link 1`] = `
 <DocumentFragment>
   <div
     class="__InlineList__"
@@ -15,7 +15,7 @@ exports[`ConferenceInfoList renders conference link 1`] = `
       <li>
         <span>
           <a
-            data-test-id="literature-conference-link"
+            data-testid="literature-conference-link"
             href="/conferences/111111"
           >
             Test Conferece 2
@@ -26,7 +26,7 @@ exports[`ConferenceInfoList renders conference link 1`] = `
       <li>
         <span>
           <a
-            data-test-id="literature-conference-link"
+            data-testid="literature-conference-link"
             href="/conferences/222222"
           >
             Test Conferece 2
@@ -38,7 +38,7 @@ exports[`ConferenceInfoList renders conference link 1`] = `
 </DocumentFragment>
 `;
 
-exports[`ConferenceInfoList renders contribution label if document type is other than proceedings 1`] = `
+exports[`ConferenceInfoList > renders contribution label if document type is other than proceedings 1`] = `
 <DocumentFragment>
   <div
     class="__InlineList__"
@@ -53,7 +53,7 @@ exports[`ConferenceInfoList renders contribution label if document type is other
       <li>
         <span>
           <a
-            data-test-id="literature-conference-link"
+            data-testid="literature-conference-link"
             href="/conferences/111111"
           >
             Test Conferece 2
@@ -64,7 +64,7 @@ exports[`ConferenceInfoList renders contribution label if document type is other
       <li>
         <span>
           <a
-            data-test-id="literature-conference-link"
+            data-testid="literature-conference-link"
             href="/conferences/222222"
           >
             Test Conferece 2
@@ -76,7 +76,7 @@ exports[`ConferenceInfoList renders contribution label if document type is other
 </DocumentFragment>
 `;
 
-exports[`ConferenceInfoList renders proceedings label if document type is proceedings 1`] = `
+exports[`ConferenceInfoList > renders proceedings label if document type is proceedings 1`] = `
 <DocumentFragment>
   <div
     class="__InlineList__"
@@ -91,7 +91,7 @@ exports[`ConferenceInfoList renders proceedings label if document type is procee
       <li>
         <span>
           <a
-            data-test-id="literature-conference-link"
+            data-testid="literature-conference-link"
             href="/conferences/111111"
           >
             Test Conferece 2
@@ -102,7 +102,7 @@ exports[`ConferenceInfoList renders proceedings label if document type is procee
       <li>
         <span>
           <a
-            data-test-id="literature-conference-link"
+            data-testid="literature-conference-link"
             href="/conferences/222222"
           >
             Test Conferece 2

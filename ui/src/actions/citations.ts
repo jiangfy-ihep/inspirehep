@@ -1,6 +1,6 @@
 import { stringify } from 'qs';
 import { Action, ActionCreator } from 'redux';
-import { RootStateOrAny } from 'react-redux';
+import { RootState } from '../types';
 
 import { HttpClientWrapper, isCancelError } from '../common/http';
 import {
@@ -21,22 +21,25 @@ function fetchingCitationSummary(namespace: string) {
   };
 }
 
-function fetchCitationSummarySuccess<T, K>(result: {
-  took: number;
-  timed_out: boolean;
-  hits: T;
-  aggregations: K;
-}) {
+function fetchCitationSummarySuccess<T, K>(
+  namespace: string,
+  result: {
+    took: number;
+    timed_out: boolean;
+    hits: T;
+    aggregations: K;
+  }
+) {
   return {
     type: CITATIONS_SUMMARY_SUCCESS,
-    payload: result,
+    payload: { ...result, namespace },
   };
 }
 
-function fetchCitationSummaryError(error: { error: Error }) {
+function fetchCitationSummaryError(namespace: string, error: { error: Error }) {
   return {
     type: CITATIONS_SUMMARY_ERROR,
-    payload: error,
+    payload: { ...error, namespace },
   };
 }
 
@@ -44,7 +47,7 @@ export function fetchCitationSummary(
   namespace: string
 ): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -63,12 +66,16 @@ export function fetchCitationSummary(
 
       const queryString = stringify(query, { indices: false });
       const url = `/literature/facets?${queryString}`;
-      const response = await http.get(url, {}, 'citations-summary');
-      dispatch(fetchCitationSummarySuccess(response.data));
+      const response = await http.get(
+        url,
+        {},
+        `citations-summary-${namespace}`
+      );
+      dispatch(fetchCitationSummarySuccess(namespace, response.data));
     } catch (err) {
       if (!isCancelError(err as Error)) {
         const { error } = httpErrorToActionPayload(err);
-        dispatch(fetchCitationSummaryError({ error }));
+        dispatch(fetchCitationSummaryError(namespace, { error }));
       }
     }
   };
@@ -101,7 +108,7 @@ function fetchCitationsByYearError(error: { error: Error }) {
 
 export function fetchCitationsByYear(literatureSearchQuery: {}): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {

@@ -1,13 +1,14 @@
-import React, { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { ActionCreator, Action } from 'redux';
-import { connect, RootStateOrAny } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import { Map } from 'immutable';
-import { push } from 'connected-react-router';
+import { push } from 'redux-first-history';
 
 import './LiteratureDetailPageContainer.less';
 
-import { Col, Row, Table } from 'antd';
+import { Alert, Col, Row } from 'antd';
+import { RootState } from '../../../types';
 import { RestartActionButtons } from '../../common/components/Detail/RestartActionButtons';
 import {
   deleteWorkflow,
@@ -25,9 +26,14 @@ import ContentBox from '../../../common/components/ContentBox';
 import { BACKOFFICE_LITERATURE_SEARCH_NS } from '../../../search/constants';
 import Breadcrumbs from '../../common/components/Breadcrumbs/Breadcrumbs';
 import DocumentHead from '../../../common/components/DocumentHead';
-import { filterDecisions, formatDateTime, getDag } from '../../utils/utils';
+import {
+  filterDecisions,
+  formatDateTime,
+  getDag,
+  isFullCoverageWorkflow,
+  isLiteratureUpdateWorkflow,
+} from '../../utils/utils';
 import { isSuperUser } from '../../../common/authorization';
-import { columnsSubject } from './columnData';
 import { StatusBanner } from '../../common/components/Detail/StatusBanner';
 import { TicketsList } from '../../common/components/Detail/TicketsList';
 import { LITERATURE_PID_TYPE } from '../../../common/constants';
@@ -39,7 +45,13 @@ import Links from '../../common/components/Links/Links';
 import LiteratureDecisionBox from '../components/LiteratureDecisionBox';
 import LiteratureReferences from '../components/LiteratureReferences';
 import LiteratureMatches from '../components/LiteratureMatches';
-import { WorkflowStatuses, WorkflowTypes } from '../../constants';
+import ExactMatchesCallout from '../components/ExactMatchesCallout';
+import {
+  WorkflowActions,
+  WorkflowStatuses,
+  WorkflowTypes,
+} from '../../constants';
+import SubjectArea from '../components/SubjectArea';
 
 type LiteratureDetailPageContainerProps = {
   dispatch: ActionCreator<Action>;
@@ -47,6 +59,7 @@ type LiteratureDetailPageContainerProps = {
   loading: boolean;
   restartActionInProgress: Map<string, any> | null;
   isSuperUserLoggedIn: boolean;
+  actionInProgress: Map<string, any> | null;
 };
 
 const LiteratureDetailPageContainer = ({
@@ -55,25 +68,32 @@ const LiteratureDetailPageContainer = ({
   loading,
   restartActionInProgress,
   isSuperUserLoggedIn,
+  actionInProgress,
 }: LiteratureDetailPageContainerProps) => {
   const { id } = useParams<{ id: string }>();
 
   useEffect(() => {
-    dispatch(fetchLiteratureRecord(id));
+    dispatch(fetchLiteratureRecord(id!));
   }, []);
 
   const workflowType = literature?.get('workflow_type');
-  const isLiteratureUpdate = workflowType === WorkflowTypes.HEP_UPDATE;
+  const isLiteratureUpdate = isLiteratureUpdateWorkflow(workflowType);
   const data = literature?.get('data');
   const relevancePrediction = literature?.get('relevance_prediction');
   const referenceCount = literature?.get('reference_count');
   const classifierResults = literature?.get('classifier_results');
   const matches = literature?.get('matches');
+  const exactMatches = matches?.get('exact');
   const fuzzyMatches = matches?.get('fuzzy');
   const status = literature?.get('status');
+  const hasExactMatches =
+    !!exactMatches?.size &&
+    status === WorkflowStatuses.ERROR_MULTIPLE_EXACT_MATCHES;
   const hasFuzzyMatches =
     !!fuzzyMatches?.size && status === WorkflowStatuses.APPROVAL_FUZZY_MATCHING;
   const title = data?.getIn(['titles', 0, 'title']);
+  const acquisitionSourceSource = data?.getIn(['acquisition_source', 'source']);
+  const acquisitionSourceEmail = data?.getIn(['acquisition_source', 'email']);
   const controlNumber = data?.get('control_number');
   const tickets =
     literature?.get('tickets')?.size !== 0 && literature?.get('tickets');
@@ -81,13 +101,25 @@ const LiteratureDetailPageContainer = ({
   const filteredDecisions = filterDecisions(decisions);
   const decision = filteredDecisions?.first();
   const journalCoverage = literature?.get('journal_coverage');
-  const isFullCoverage =
-    workflowType === WorkflowTypes.HEP_CREATE && journalCoverage === 'full';
-  const inspireCategories = data?.get('inspire_categories')?.toJS();
+  const isFullCoverage = isFullCoverageWorkflow(workflowType, journalCoverage);
+  const shouldShowSubmissionModal =
+    workflowType === WorkflowTypes.HEP_SUBMISSION &&
+    status === WorkflowStatuses.APPROVAL;
+  const submissionContext: any = shouldShowSubmissionModal
+    ? { email: acquisitionSourceEmail, title }
+    : undefined;
+  const inspireCategoriesImmutable = data?.get('inspire_categories');
+
+  const inspireCategories = useMemo(
+    () => inspireCategoriesImmutable?.toJS() ?? [],
+    [inspireCategoriesImmutable]
+  );
+  const hasInspireCategories = !!inspireCategories?.length;
   const rawDateTime = data?.getIn(['acquisition_source', 'datetime']);
   const urls = data?.get('urls');
   const ids = data?.get('ids');
   const references = data?.get('references')?.toJS();
+  const rawReferences = literature?.getIn(['form_data', 'references']);
   const totalReferences =
     references && Array.isArray(references) ? references.length : 0;
 
@@ -95,8 +127,8 @@ const LiteratureDetailPageContainer = ({
   const acquisitionSourceDateTime = formattedDateTime
     ? `${formattedDateTime.date} ${formattedDateTime.time}`
     : undefined;
-  const acquisitionSourceSource = data?.getIn(['acquisition_source', 'source']);
   const acquisitionSourceMethod = data?.getIn(['acquisition_source', 'method']);
+  const privateNotes = data?.get('_private_notes');
 
   const DAGS_URL = getConfigFor('INSPIRE_WORKFLOWS_DAGS_URL');
   const DAG_FULL_URL = `${DAGS_URL}${getDag(workflowType)}/runs/${id}`;
@@ -110,24 +142,23 @@ const LiteratureDetailPageContainer = ({
     'delete',
   ].filter(Boolean);
 
-  const handleResolveAction = (action: string, value: string) => {
-    const payload = {
-      action,
-      value,
-    };
-    dispatch(resolveLiteratureAction(id, payload));
+  const isUpdatingSubjects =
+    actionInProgress?.get('type') === WorkflowActions.UPDATE;
+
+  const handleResolveAction = async (action: string, value: string) => {
+    dispatch(resolveLiteratureAction(id!, { action, value }));
   };
 
   const handleRestart = () => {
-    dispatch(restartWorkflowAction(id, LITERATURE_PID_TYPE));
+    dispatch(restartWorkflowAction(id!, LITERATURE_PID_TYPE));
   };
 
   const handleRestartCurrent = () => {
-    dispatch(restartCurrentWorkflowAction(id, LITERATURE_PID_TYPE));
+    dispatch(restartCurrentWorkflowAction(id!, LITERATURE_PID_TYPE));
   };
 
   const handleDelete = () => {
-    dispatch(deleteWorkflow(LITERATURE_PID_TYPE, id));
+    dispatch(deleteWorkflow(LITERATURE_PID_TYPE, id!));
   };
 
   return (
@@ -163,12 +194,16 @@ const LiteratureDetailPageContainer = ({
             <Row justify="center">
               <Col xs={24} md={22} lg={21} xxl={18}>
                 <StatusBanner status={status} />
+                {hasExactMatches && (
+                  <ExactMatchesCallout exactMatches={exactMatches} />
+                )}
                 <Row className="mv3" justify="center" gutter={35}>
                   <Col xs={24} lg={16}>
                     {data && (
                       <LiteratureMainInfo
                         data={data}
                         isLiteratureUpdate={isLiteratureUpdate}
+                        page="Backoffice literature detail page"
                       />
                     )}
                     <CollapsableForm openSections={OPEN_SECTIONS}>
@@ -184,29 +219,33 @@ const LiteratureDetailPageContainer = ({
                         header="Subject areas"
                         key="subjectAreas"
                       >
-                        <Table
-                          columns={columnsSubject}
-                          dataSource={inspireCategories}
-                          pagination={false}
-                          size="small"
-                          rowKey={(record) =>
-                            `${record?.term}+${Math.random()}`
-                          }
+                        <SubjectArea
+                          workflowId={id!}
+                          status={status}
+                          inspireCategories={inspireCategories}
+                          disableActions={isUpdatingSubjects}
                         />
                       </CollapsableForm.Section>
-                      {totalReferences && (
+                      {!!totalReferences && (
                         <CollapsableForm.Section
                           header="References"
                           key="references"
                         >
-                          <LiteratureReferences references={references} />
+                          <LiteratureReferences
+                            references={references}
+                            rawReferences={rawReferences}
+                          />
                         </CollapsableForm.Section>
                       )}
                       {status === WorkflowStatuses.ERROR && (
                         <CollapsableForm.Section header="Errors" key="errors">
                           <p>
                             See error details here:{' '}
-                            <a href={DAG_FULL_URL} target="_blank">
+                            <a
+                              href={DAG_FULL_URL}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
                               {DAG_FULL_URL}
                             </a>
                           </p>
@@ -242,13 +281,16 @@ const LiteratureDetailPageContainer = ({
                         status={status}
                         decision={decision}
                         controlNumber={controlNumber}
-                        inspireCategories={inspireCategories}
                         relevancePrediction={relevancePrediction}
                         referenceCount={referenceCount}
                         totalReferences={totalReferences}
                         classifierResults={classifierResults}
                         workflowId={id}
                         isFullCoverage={isFullCoverage}
+                        shouldShowSubmissionModal={shouldShowSubmissionModal}
+                        submissionContext={submissionContext}
+                        hasInspireCategories={hasInspireCategories}
+                        disableActions={isUpdatingSubjects}
                       />
                     </ContentBox>
                     <ContentBox
@@ -258,10 +300,36 @@ const LiteratureDetailPageContainer = ({
                     >
                       <>
                         Harvested on <b>{acquisitionSourceDateTime}</b> from{' '}
-                        <b>{acquisitionSourceSource}</b> using{' '}
-                        <b> {acquisitionSourceMethod}</b>
+                        <b>
+                          {acquisitionSourceSource === 'submitter'
+                            ? acquisitionSourceEmail
+                            : acquisitionSourceSource}
+                        </b>{' '}
+                        using <b> {acquisitionSourceMethod}</b>
                       </>
                     </ContentBox>
+                    {privateNotes?.size > 0 && (
+                      <ContentBox
+                        className="mb3"
+                        fullHeight={false}
+                        subTitle="Notes"
+                      >
+                        {privateNotes.map((note: Map<string, any>) =>
+                          note.get('value') === '*Temporary entry*' ? (
+                            <Alert
+                              key={note.get('value')}
+                              type="warning"
+                              title={note.get('value')}
+                              showIcon
+                            />
+                          ) : (
+                            <p key={note.get('value')} className="notes">
+                              {note.get('value')}
+                            </p>
+                          )
+                        )}
+                      </ContentBox>
+                    )}
                     <ContentBox
                       className="mb3"
                       fullHeight={false}
@@ -297,11 +365,12 @@ const LiteratureDetailPageContainer = ({
   );
 };
 
-const stateToProps = (state: RootStateOrAny) => ({
+const stateToProps = (state: RootState) => ({
   literature: state.backoffice.get('literature'),
   loading: state.backoffice.get('loading'),
   restartActionInProgress: state.backoffice.get('restartActionInProgress'),
   isSuperUserLoggedIn: isSuperUser(state.user.getIn(['data', 'roles'])),
+  actionInProgress: state.backoffice.get('actionInProgress'),
 });
 
 export default connect(stateToProps)(LiteratureDetailPageContainer);

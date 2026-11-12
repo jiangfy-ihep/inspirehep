@@ -1,56 +1,23 @@
-import { onlyOn } from '@cypress/skip-test';
-
-describe('Institution Search', () => {
-  onlyOn('headless', () => {
-    it.skip('matches image snapshot', () => {
-      cy.registerRoute();
-      cy.visit('/institutions');
-      cy.waitForRoute();
-      cy.waitForSearchResults();
-      cy.matchSnapshots('InstitutionSearch');
-    });
-  });
-});
-
-describe('Institution Detail', () => {
-  onlyOn('headless', () => {
-    it.skip('matches image snapshot', () => {
-      cy.registerRoute();
-      cy.visit('/institutions/902858?ui-citation-summary=true');
-      cy.waitForRoute();
-      cy.waitForSearchResults();
-      cy.matchSnapshots('InstitutionDetail');
-    });
-  });
-});
-
-describe('Institution Submission', () => {
+describe("Institution Submission", () => {
   beforeEach(() => {
-    cy.login('cataloger');
+    cy.login("cataloger");
   });
 
-  onlyOn('headless', () => {
-    it.skip('matches image snapshot', () => {
-      cy.visit('/submissions/institutions');
-      cy.get('form').should('be.visible');
-      cy.matchSnapshots('InstitutionSubmission', { skipMobile: true });
-    });
-  });
-
-  it('submits a new institution', () => {
+  it("submits a new institution", () => {
     const formData = {
-      identifier: 'Amazing New Institution',
+      identifier: "Amazing New Institution",
     };
     const expectedMetadata = {
-      identifier: 'Amazing New Institution',
+      identifier: "Amazing New Institution",
     };
-    cy.visit('/submissions/institutions');
-    cy.wait(500);
+    cy.visit("/submissions/institutions");
+    cy.get('[data-testid="loading-spinner"]').should("be.visible");
+    cy.waitForLoading();
     cy.testSubmission({
       expectedMetadata: expectedMetadata.identifier,
       formData,
-      collection: 'institutions',
-      submissionType: 'editor',
+      collection: "institutions",
+      submissionType: "editor",
     });
   });
 
@@ -59,23 +26,23 @@ describe('Institution Submission', () => {
   });
 });
 
-describe('Institutions Editor', () => {
+describe("Institutions Editor", () => {
   beforeEach(() => {
-    cy.login('cataloger');
+    cy.login("cataloger");
   });
 
   afterEach(() => {
     cy.logout();
   });
 
-  it('edits an institution', () => {
-    cy.on('uncaught:exception', () => {
+  it("edits an institution", () => {
+    cy.on("uncaught:exception", () => {
       return false;
     });
 
-    const RECORD_URL = '/institutions/902858';
+    const RECORD_URL = "/institutions/902858";
     const RECORD_API = `/api${RECORD_URL}`;
-    const API = '/api/**';
+    const API = "/api/**";
 
     cy.registerRoute(API);
 
@@ -85,18 +52,18 @@ describe('Institutions Editor', () => {
 
     cy.registerRoute({
       url: RECORD_API,
-      method: 'PUT',
+      method: "PUT",
     });
 
     cy.get('[data-path="/institution_hierarchy/0/name"]').type(
-      'Updated by Cypress Test{enter}'
+      "Updated by Cypress Test{enter}",
     );
-    cy.contains('button', 'Save').click();
+    cy.contains("button", "Save").click();
 
     cy.waitForRoute(RECORD_API);
 
     cy.visit(RECORD_URL);
     cy.waitForRoute(API);
-    cy.get('span').should('contain.text', 'Updated by Cypress');
+    cy.get("span").should("contain.text", "Updated by Cypress");
   });
 });

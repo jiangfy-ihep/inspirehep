@@ -1,4 +1,3 @@
-import React from 'react';
 import PropTypes from 'prop-types';
 import { Row, Col, Alert } from 'antd';
 import { Formik } from 'formik';
@@ -18,7 +17,7 @@ const ExperimentSubmission = ({ onSubmit, error = null }) => {
         <Row className="mb3">
           <Col span={24}>
             <Alert
-              message={error.message}
+              title={error.message}
               type="error"
               showIcon
               closable

@@ -1,4 +1,3 @@
-import React from 'react';
 import { fromJS } from 'immutable';
 
 import { renderWithProviders } from '../../../fixtures/render';
@@ -15,14 +14,14 @@ import { AUTHOR_PUBLICATIONS_NS } from '../../../search/constants';
 import { searchQueryUpdate } from '../../../actions/search';
 import { EXCLUDE_SELF_CITATIONS_PREFERENCE } from '../../../reducers/user';
 
-jest.mock('../../../actions/citations');
+vi.mock('../../../actions/citations');
 
-jest.mock('../../../actions/search');
+vi.mock('../../../actions/search');
 mockActionCreator(searchQueryUpdate);
 
-jest.mock('../../components/CitationSummaryGraph/CitationSummaryGraph', () => {
+vi.mock('../../components/CitationSummaryGraph/CitationSummaryGraph', () => {
   const MockCitationSummaryGraph = jest.fn(() => null);
-  return MockCitationSummaryGraph;
+  return { default: MockCitationSummaryGraph };
 });
 
 const mockCiteableData = [
@@ -90,40 +89,44 @@ const mockPublishedData = [
 const mockLoading = false;
 const mockError = null;
 const mockCitationsState = fromJS({
-  loadingCitationSummary: mockLoading,
-  errorCitationSummary: mockError,
-  citationSummary: {
-    doc_count: 30,
-    'h-index': {
-      value: {
-        all: 8,
-        published: 9,
-      },
-    },
-    citations: {
-      buckets: {
-        all: {
-          doc_count: 29,
-          citations_count: {
-            value: 2,
-          },
-          citation_buckets: {
-            buckets: mockCiteableData,
-          },
-          average_citations: {
-            value: 4.12345,
+  namespaces: {
+    [AUTHOR_PUBLICATIONS_NS]: {
+      loadingCitationSummary: mockLoading,
+      errorCitationSummary: mockError,
+      citationSummary: {
+        doc_count: 30,
+        'h-index': {
+          value: {
+            all: 8,
+            published: 9,
           },
         },
-        published: {
-          doc_count: 0,
-          citations_count: {
-            value: 20,
-          },
-          citation_buckets: {
-            buckets: mockPublishedData,
-          },
-          average_citations: {
-            value: 9,
+        citations: {
+          buckets: {
+            all: {
+              doc_count: 29,
+              citations_count: {
+                value: 2,
+              },
+              citation_buckets: {
+                buckets: mockCiteableData,
+              },
+              average_citations: {
+                value: 4.12345,
+              },
+            },
+            published: {
+              doc_count: 0,
+              citations_count: {
+                value: 20,
+              },
+              citation_buckets: {
+                buckets: mockPublishedData,
+              },
+              average_citations: {
+                value: 9,
+              },
+            },
           },
         },
       },
@@ -157,7 +160,7 @@ describe('CitationSummaryGraphContainer', () => {
         selectedBar: null,
         excludeSelfCitations: true,
       }),
-      expect.any(Object)
+      undefined
     );
   });
 
@@ -285,7 +288,7 @@ describe('CitationSummaryGraphContainer', () => {
           xValue: '500--250',
         },
       }),
-      expect.any(Object)
+      undefined
     );
   });
 
@@ -314,7 +317,7 @@ describe('CitationSummaryGraphContainer', () => {
           xValue: '0--0',
         },
       }),
-      expect.any(Object)
+      undefined
     );
   });
 });

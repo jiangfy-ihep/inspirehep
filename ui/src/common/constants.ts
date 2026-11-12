@@ -38,9 +38,9 @@ export const JOURNALS_PID_TYPE = 'journals';
 export const DATA_PID_TYPE = 'data';
 
 export const INVENIO_URL = '//invenio-software.org';
-export const HOLDINGPEN_URL = '/holdingpen';
 export const LEGACY_URL = 'https://old.inspirehep.net';
-export const AUTHORLIST_TOOL_URL = '/tools/authorlist';
+export const AUTHORLIST_TOOL_URL =
+  'https://cern.service-now.com/service-portal?sys_kb_id=c306d05e83f60b10bd5a5fb6feaad38a&id=kb_article_view&sysparm_rank=1&sysparm_tsqueryId=10a255eb837e4710bd5a5fb6feaad33c';
 export const INSPIRE_TWITTER_ACCOUNT = 'https://x.com/inspirehep';
 export const INSPIRE_BLUESKY_ACCOUNT =
   'https://bsky.app/profile/inspirehep.net';
@@ -89,8 +89,17 @@ export const SEARCH_PAGE_COL_SIZE_WITHOUT_FACETS = {
 };
 export const SEARCH_PAGE_COL_SIZE_NO_RESULTS = { xs: 24 };
 
-export const LOCAL_TIMEZONE =
-  Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+function getLocalTimezone(): string {
+  try {
+    const { timeZone } = Intl.DateTimeFormat().resolvedOptions();
+    Intl.DateTimeFormat(undefined, { timeZone });
+    return timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
+export const LOCAL_TIMEZONE = getLocalTimezone();
 
 export enum WorkflowDecisions {
   ACCEPT = 'accept',
@@ -105,5 +114,16 @@ export enum WorkflowDecisions {
   HEP_ACCEPT = 'hep_accept',
   HEP_ACCEPT_CORE = 'hep_accept_core',
   HEP_REJECT = 'hep_reject',
+  MANUAL_MERGE_APPROVE = 'manual_merge_approve',
+  MERGE_APPROVE = 'merge_approve',
+  MISSING_SUBJECT_FIELDS = 'missing_subject_fields',
   REJECT = 'reject',
+  WITHDRAWN = 'withdrawn',
 }
+
+export const HIDDEN_DECISION_ACTIONS = new Set([
+  WorkflowDecisions.FUZZY_MATCH,
+  WorkflowDecisions.EXACT_MATCH,
+  WorkflowDecisions.MERGE_APPROVE,
+  WorkflowDecisions.MISSING_SUBJECT_FIELDS,
+]);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Row, Col, Upload, Button, Form, Alert, UploadFile } from 'antd';
 import { Map, List } from 'immutable';
 import { InboxOutlined } from '@ant-design/icons';
@@ -24,7 +24,7 @@ const META_DESCRIPTION =
 
 const TITLE = 'Bibliography Generator';
 
-const Cite = ({ children }: { children: JSX.Element | string }) => (
+const Cite = ({ children }: { children: React.JSX.Element | string }) => (
   <code>\cite{`{${children}}`}</code>
 );
 
@@ -227,10 +227,7 @@ function BibliographyGenerator({
                         <Col span={24}>
                           {citationErrors.map((e) => (
                             <div key={e.get('message')} className="mb2">
-                              <Alert
-                                type="warning"
-                                message={e.get('message')}
-                              />
+                              <Alert type="warning" title={e.get('message')} />
                             </div>
                           ))}
                         </Col>

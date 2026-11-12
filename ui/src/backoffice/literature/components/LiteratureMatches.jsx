@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, Radio, Button, Typography, Descriptions, Space } from 'antd';
 import { ExportOutlined } from '@ant-design/icons';
 import { List, Map } from 'immutable';
@@ -9,6 +9,9 @@ import Latex from '../../../common/components/Latex';
 import { WorkflowDecisions } from '../../../common/constants';
 import { hasPublicationInfo } from '../../utils/utils';
 import ToggleableAbstract from './ToggleableAbstract';
+import LiteratureDocumentTypes from './LiteratureDocumentTypes';
+import './LiteratureMatches.less';
+import ReportNumberList from '../../../literature/components/ReportNumberList';
 
 const { Text, Paragraph } = Typography;
 
@@ -23,9 +26,12 @@ const LiteratureMatchItem = ({ match, selectedBestMatch, onSelect }) => {
   const abstract = abstractValue ? Map({ value: abstractValue }) : null;
   const arxivEprint = match.get('arxiv_eprint');
   const authors = match.get('authors', List());
+  const authorsCount = match.get('authors_count');
+  const documentTypes = match.get('document_type', List());
   const earliestDate = match.get('earliest_date');
   const numberOfPages = match.get('number_of_pages');
   const publicNotes = match.get('public_notes', List());
+  const reportNumbers = match.get('report_numbers', List());
   const publicationInfo = match.get('publication_info', List());
   const hasPublicationInfoValue = hasPublicationInfo(publicationInfo);
 
@@ -33,21 +39,29 @@ const LiteratureMatchItem = ({ match, selectedBestMatch, onSelect }) => {
     <Card
       size="small"
       style={{ marginBottom: 12 }}
-      bodyStyle={{ paddingTop: 8 }}
+      styles={{ body: { paddingTop: 8 } }}
+      className="literature-match-item"
       title={
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <Radio
-            value={controlNumber}
-            checked={selectedBestMatch === controlNumber}
-            onChange={handleRadioChange}
-          />
-          <div
-            style={{ flex: 1, whiteSpace: 'normal', wordBreak: 'break-word' }}
-          >
-            <LinkWithTargetBlank href={`${LITERATURE}/${controlNumber}`}>
-              <Latex>{match.get('title')}</Latex>
-              <ExportOutlined style={{ marginLeft: '4px' }} />
-            </LinkWithTargetBlank>
+        <div>
+          {documentTypes.size > 0 && (
+            <div style={{ marginBottom: 4 }}>
+              <LiteratureDocumentTypes documentTypes={documentTypes} />
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <Radio
+              value={controlNumber}
+              checked={selectedBestMatch === controlNumber}
+              onChange={handleRadioChange}
+            />
+            <div
+              style={{ flex: 1, whiteSpace: 'normal', wordBreak: 'break-word' }}
+            >
+              <LinkWithTargetBlank href={`${LITERATURE}/${controlNumber}`}>
+                <Latex>{match.get('title')}</Latex>
+                <ExportOutlined style={{ marginLeft: '4px' }} />
+              </LinkWithTargetBlank>
+            </div>
           </div>
         </div>
       }
@@ -56,12 +70,12 @@ const LiteratureMatchItem = ({ match, selectedBestMatch, onSelect }) => {
         <div style={{ marginBottom: 8 }}>
           <Text>
             {authors.map((a) => a.get('full_name')).join('; ')}
-            {authors.size > 1 && <> ({authors.size} authors)</>}
+            {authorsCount > 1 && <> ({authorsCount} authors)</>}
           </Text>
         </div>
       )}
 
-      <Descriptions column={1} size="small" labelStyle={{ width: 140 }}>
+      <Descriptions column={1} size="small" styles={{ label: { width: 140 } }}>
         {hasPublicationInfoValue && (
           <Descriptions.Item label="Published In">
             <PublicationInfoList
@@ -90,6 +104,11 @@ const LiteratureMatchItem = ({ match, selectedBestMatch, onSelect }) => {
             <Paragraph style={{ margin: 0, whiteSpace: 'pre-line' }}>
               {publicNotes.map((pn) => pn.get('value')).join('\n')}
             </Paragraph>
+          </Descriptions.Item>
+        )}
+        {reportNumbers.size > 0 && (
+          <Descriptions.Item label="Report numbers">
+            <ReportNumberList reportNumbers={reportNumbers} hideLabel />
           </Descriptions.Item>
         )}
       </Descriptions>

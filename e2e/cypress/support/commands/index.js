@@ -1,4 +1,5 @@
-import './core';
-import './visual';
-import './user';
-import './form';
+import "./core";
+import "./user";
+import "./form";
+import "./backoffice";
+import "./editor";

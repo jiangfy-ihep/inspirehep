@@ -9,6 +9,7 @@ jobs:
     uses: ./.github/workflows/test-workflows.yml
     with:
       ref: ${{ github.ref }}
+      push: true
     secrets: inherit
   deploy:
     name: Deploy (workflows)
@@ -16,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: send event
-        uses: cern-sis/gh-workflows/.github/actions/kubernetes-project-new-images@v6.3.1
+        uses: cern-sis/gh-workflows/.github/actions/kubernetes-project-new-images@v7.1.0
         with:
           repo: cern-sis/kubernetes-airflow
           event-type: update

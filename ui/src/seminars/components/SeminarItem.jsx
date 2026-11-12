@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { Map } from 'immutable';
@@ -16,7 +15,7 @@ import { LOCAL_TIMEZONE } from '../../common/constants';
 import ExportToCalendarAction from './ExportToCalendarAction/ExportToCalendarAction';
 import UrlsAction from '../../literature/components/UrlsAction';
 
-function SeminarItem({ metadata, selectedTimezone, enableActions }) {
+function SeminarItem({ metadata, selectedTimezone, enableActions = true }) {
   const title = metadata.get('title');
   const recordId = metadata.get('control_number');
   const canEdit = metadata.get('can_edit', false);
@@ -80,7 +79,7 @@ function SeminarItem({ metadata, selectedTimezone, enableActions }) {
       </Row>
       <Row>
         <Col>
-          <AuthorList authors={speakers} page="Seminars search" />
+          <AuthorList authors={speakers} />
         </Col>
       </Row>
       <Row>
@@ -120,10 +119,6 @@ SeminarItem.propTypes = {
   metadata: PropTypes.instanceOf(Map).isRequired,
   selectedTimezone: PropTypes.string,
   enableActions: PropTypes.bool,
-};
-
-SeminarItem.defaultProps = {
-  enableActions: true,
 };
 
 export default SeminarItem;

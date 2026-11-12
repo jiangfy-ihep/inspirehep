@@ -1,10 +1,8 @@
 import { combineReducers } from 'redux';
-import { connectRouter } from 'connected-react-router';
 
 import search, { initialState as searchInitialState } from './search';
 import literature from './literature';
 import exceptions from './exceptions';
-import inspect from './inspect';
 import user, { initialState as userInitialState } from './user';
 import submissions from './submissions';
 import citations from './citations';
@@ -22,13 +20,14 @@ import ui, { initialState as uiInitialState } from './ui';
 import backoffice, {
   initialState as backofficeInitialState,
 } from './backoffice';
+import editor, { initialState as editorInitialState } from './editor';
 import { LITERATURE_NS, LITERATURE_REFERENCES_NS } from '../search/constants';
+import authorlist from './authorlist';
 
-export default function createRootReducer(history) {
+export default function createRootReducer(routerReducer) {
   return combineReducers({
-    router: connectRouter(history),
+    router: routerReducer,
     exceptions,
-    inspect,
     literature,
     user,
     settings,
@@ -44,8 +43,10 @@ export default function createRootReducer(history) {
     experiments,
     data,
     bibliographyGenerator,
+    authorlist,
     journals,
     backoffice,
+    editor,
   });
 }
 
@@ -63,4 +64,5 @@ export const REDUCERS_TO_PERSISTS = [
     statePath: ['namespaces', LITERATURE_NS, 'query', 'size'],
   },
   { name: 'backoffice', initialState: backofficeInitialState },
+  { name: 'editor', initialState: editorInitialState },
 ];

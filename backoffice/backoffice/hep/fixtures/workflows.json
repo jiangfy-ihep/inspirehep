@@ -793,6 +793,7 @@
             "authors_count": 1,
             "control_number": 1790396,
             "earliest_date": "2020-03-17",
+            "document_type": ["article"],
             "publication_info": [
               {
                 "artid": "033101",
@@ -818,6 +819,7 @@
             "control_number": 1752989,
             "earliest_date": "2017",
             "number_of_pages": 151,
+            "document_type": ["conference paper"],
             "public_notes": [
               {
                 "value": "Fermilab Library Only"
@@ -839,6 +841,7 @@
             "control_number": 1989726,
             "earliest_date": "2021",
             "number_of_pages": 163,
+            "document_type": ["article"],
             "publication_info": [
               {
                 "year": 2021
@@ -887,6 +890,15 @@
         "_private_notes": [
           {
             "value": "Also some comments"
+          },
+          {
+            "value": "*Temporary entry*"
+          },
+          {
+            "value": "https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ITCS.2026.17"
+          },
+          {
+            "value": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc non mattis enim. Ut quis nunc sed felis aliquet tempus. Ut eget semper augue. Donec ac nisl eget magna blandit interdum. Nulla tempus orci eu lectus sodales euismod. Mauris at dolor in arcu hendrerit ornare. Etiam leo orci, dapibus quis dolor vitae, dapibus molestie metus. Fusce interdum dui ex, ac tincidunt turpis faucibus at. Proin auctor sem ex, sit amet tempus ligula tincidunt id. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Donec quis eros a elit interdum ullamcorper a quis libero."
           }
         ],
         "acquisition_source": {
@@ -1062,12 +1074,20 @@
             "source": "submitter"
           }
         ],
+        "authors": [{ "full_name": "Gooding, James, James Andrew, Jamie." }],
         "$schema": "https://inspirehep.net/schemas/records/hep.json",
         "_collections": ["Literature"],
         "arxiv_eprints": [
           {
             "value": "2507.26900",
             "categories": ["cs.CV", "cs.AI", "cs.LG", "cs.RO"]
+          }
+        ],
+        "number_of_pages": 15,
+        "public_notes": [
+          {
+            "value": "15 pages",
+            "source": "arXiv"
           }
         ],
         "document_type": ["article"],
@@ -1083,7 +1103,13 @@
           "source": "submitter",
           "datetime": "2024-11-18T11:34:19.809575",
           "internal_uid": 50872
-        }
+        },
+        "inspire_categories": [
+          {
+            "term": "Data Analysis and Statistics",
+            "source": "arxiv"
+          }
+        ]
       },
       "status": "approval",
       "_created_at": "2024-11-25T13:49:53.009Z",
@@ -4692,13 +4718,24 @@
                 "value": "Preliminary results"
               }
             ],
+            "report_numbers": [
+              {
+                "value": "LHCb-PAPER-2025-014",
+                "source": "arXiv"
+              },
+              {
+                "value": "CERN-EP-2025-123",
+                "source": "arXiv"
+              }
+            ],
             "earliest_date": "2011-10-14",
             "control_number": 1258254,
+            "document_type": ["article"],
             "number_of_pages": 12
           }
         ]
       },
-      "status": "approval_fuzzy_matching",
+      "status": "missing_subject_fields",
       "_created_at": "2025-11-01T00:00:00.000Z",
       "_updated_at": "2025-11-01T00:00:00.000Z"
     }
@@ -4800,6 +4837,7 @@
             "authors_count": 1,
             "earliest_date": "2020-09-28",
             "control_number": 1837351,
+            "document_type": ["thesis"],
             "number_of_pages": 236,
             "publication_info": [
               {
@@ -5037,7 +5075,17 @@
       },
       "status": "missing_subject_fields",
       "_created_at": "2024-11-25T13:49:53.009Z",
-      "_updated_at": "2024-11-25T13:49:54.756Z"
+      "_updated_at": "2024-11-25T13:49:54.756Z",
+      "relevance_prediction": {
+        "scores": {
+          "CORE": 0.9637278318405151,
+          "Non-CORE": 0.01828720048069954,
+          "Rejected": 0.017984995618462563
+        },
+        "decision": "CORE",
+        "max_score": 0.9637278318405151,
+        "relevance_score": 1.9637278318405151
+      }
     }
   },
   {
@@ -5055,9 +5103,7 @@
         "$schema": "https://inspirehep.net/schemas/records/hep.json",
         "authors": [
           {
-            "emails": [
-              "georgios.voutsinas@unige.ch"
-            ],
+            "emails": ["georgios.voutsinas@unige.ch"],
             "full_name": "Voutsinas, G.",
             "raw_affiliations": [
               {
@@ -5275,9 +5321,7 @@
               }
             ],
             "reference": {
-              "misc": [
-                "CTAO, \"Cherenkov Telescope Array Observatory"
-              ],
+              "misc": ["CTAO, \"Cherenkov Telescope Array Observatory"],
               "urls": [
                 {
                   "value": "https://www.ctao.org"
@@ -5325,9 +5369,7 @@
               }
             ],
             "reference": {
-              "misc": [
-                "Teraelectronvolt Astronomy, Annual Review of"
-              ],
+              "misc": ["Teraelectronvolt Astronomy, Annual Review of"],
               "label": "3",
               "authors": [
                 {
@@ -5769,9 +5811,7 @@
               }
             ],
             "reference": {
-              "dois": [
-                "10.1029/2004JD005186"
-              ],
+              "dois": ["10.1029/2004JD005186"],
               "misc": [
                 "Stratosphere-troposphere exchange of mass and ozone, Journal of Geophysical Research: Atmospheres 109"
               ],
@@ -6225,9 +6265,7 @@
               }
             ],
             "reference": {
-              "misc": [
-                "The global lightning-induced nitrogen oxides source"
-              ],
+              "misc": ["The global lightning-induced nitrogen oxides source"],
               "label": "30",
               "authors": [
                 {
@@ -6357,9 +6395,7 @@
               }
             ],
             "reference": {
-              "dois": [
-                "10.1016/B978-0-12-257060-5.50026-5"
-              ],
+              "dois": ["10.1016/B978-0-12-257060-5.50026-5"],
               "misc": [
                 "Chemistry of the Upper and Lower Atmosphere",
                 "Press, San Diego"
@@ -6504,9 +6540,7 @@
               }
             ],
             "reference": {
-              "misc": [
-                "The HITRAN2020 molecular spectroscopic database"
-              ],
+              "misc": ["The HITRAN2020 molecular spectroscopic database"],
               "label": "38",
               "authors": [
                 {
@@ -6640,9 +6674,7 @@
               }
             ],
             "reference": {
-              "misc": [
-                "CORSIKA: An Air Shower Simulation Program"
-              ],
+              "misc": ["CORSIKA: An Air Shower Simulation Program"],
               "label": "43",
               "authors": [
                 {
@@ -6669,9 +6701,7 @@
               }
             ],
             "reference": {
-              "dois": [
-                "10.5281/zenodo.14198379"
-              ],
+              "dois": ["10.5281/zenodo.14198379"],
               "misc": [
                 "CTAO Simulation Telescope Models for CORSIKA and sim telarray - Prod6, Nov"
               ],
@@ -6910,9 +6940,7 @@
               }
             ],
             "reference": {
-              "misc": [
-                "CTAO, \"Data Processing and Preservation System"
-              ],
+              "misc": ["CTAO, \"Data Processing and Preservation System"],
               "urls": [
                 {
                   "value": "https://www.ctao.org/emission-to-discovery/data-and-computing/"
@@ -6922,20 +6950,14 @@
             }
           }
         ],
-        "_collections": [
-          "Literature"
-        ],
+        "_collections": ["Literature"],
         "arxiv_eprints": [
           {
             "value": "2603.02833",
-            "categories": [
-              "astro-ph.IM"
-            ]
+            "categories": ["astro-ph.IM"]
           }
         ],
-        "document_type": [
-          "article"
-        ],
+        "document_type": ["article"],
         "preprint_date": "2026-03-03",
         "acquisition_source": {
           "method": "hepcrawl",
@@ -6950,7 +6972,7 @@
           }
         ]
       },
-      "relevance_prediction":{
+      "relevance_prediction": {
         "scores": {
           "CORE": 0.8641530275344849,
           "Non-CORE": 0.09599084407091141,
@@ -6960,7 +6982,7 @@
         "max_score": 0.8641530275344849,
         "relevance_score": 1.8641530275344849
       },
-      "classifier_results":{
+      "classifier_results": {
         "fulltext_used": true,
         "complete_output": {
           "acronyms": [],
@@ -7082,162 +7104,102 @@
           "composite_keywords": [
             {
               "number": 25,
-              "details": [
-                2,
-                28
-              ],
+              "details": [2, 28],
               "keyword": "radiation, Cherenkov"
             },
             {
               "number": 10,
-              "details": [
-                14,
-                38
-              ],
+              "details": [14, 38],
               "keyword": "cross section, absorption"
             },
             {
               "number": 3,
-              "details": [
-                52,
-                16
-              ],
+              "details": [52, 16],
               "keyword": "atmosphere, density"
             },
             {
               "number": 3,
-              "details": [
-                11,
-                52
-              ],
+              "details": [11, 52],
               "keyword": "showers, atmosphere"
             },
             {
               "number": 3,
-              "details": [
-                31,
-                11
-              ],
+              "details": [31, 11],
               "keyword": "detector, efficiency"
             },
             {
               "number": 2,
-              "details": [
-                16,
-                41
-              ],
+              "details": [16, 41],
               "keyword": "density, ratio"
             },
             {
               "number": 2,
-              "details": [
-                52,
-                4
-              ],
+              "details": [52, 4],
               "keyword": "atmosphere, model"
             },
             {
               "number": 2,
-              "details": [
-                11,
-                23
-              ],
+              "details": [11, 23],
               "keyword": "showers, energy"
             },
             {
               "number": 2,
-              "details": [
-                23,
-                10
-              ],
+              "details": [23, 10],
               "keyword": "energy, high"
             },
             {
               "number": 2,
-              "details": [
-                23,
-                3
-              ],
+              "details": [23, 3],
               "keyword": "energy, low"
             },
             {
               "number": 2,
-              "details": [
-                7,
-                6
-              ],
+              "details": [7, 6],
               "keyword": "emission, spectrum"
             },
             {
               "number": 1,
-              "details": [
-                52,
-                19
-              ],
+              "details": [52, 19],
               "keyword": "atmosphere, effect"
             },
             {
               "number": 1,
-              "details": [
-                52,
-                13
-              ],
+              "details": [52, 13],
               "keyword": "atmosphere, pressure"
             },
             {
               "number": 1,
-              "details": [
-                31,
-                31
-              ],
+              "details": [31, 31],
               "keyword": "detector, optical"
             },
             {
               "number": 1,
-              "details": [
-                52,
-                8
-              ],
+              "details": [52, 8],
               "keyword": "atmosphere, gas"
             },
             {
               "number": 1,
-              "details": [
-                52,
-                7
-              ],
+              "details": [52, 7],
               "keyword": "atmosphere, temperature"
             },
             {
               "number": 1,
-              "details": [
-                52,
-                2
-              ],
+              "details": [52, 2],
               "keyword": "atmosphere, monitoring"
             },
             {
               "number": 1,
-              "details": [
-                52,
-                1
-              ],
+              "details": [52, 1],
               "keyword": "atmosphere, transparency"
             },
             {
               "number": 1,
-              "details": [
-                31,
-                3
-              ],
+              "details": [31, 3],
               "keyword": "detector, sensitivity"
             },
             {
               "number": 1,
-              "details": [
-                11,
-                23
-              ],
+              "details": [11, 23],
               "keyword": "gamma ray, energy"
             }
           ]
@@ -7277,6 +7239,508 @@
         }
       },
       "journal_coverage": "full",
+      "status": "approval",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "2b390a50-f2c1-4a45-a7dc-7d85492a56b8",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "The publisher harvest journal coverage test",
+            "source": "Elsevier Ltd"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "publication_info": [
+          {
+            "journal_title": "Phys.Rev.D",
+            "journal_record": {
+              "$ref": "https://inspirehep.net/api/journals/1613970"
+            }
+          }
+        ],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "Elsevier",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "submission_number": "scheduled__2024-11-18T11:34:19.809575"
+        }
+      },
+      "journal_coverage": "full",
+      "status": "approval",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "a2fccc44-4c2f-41c9-b0bb-82c5d977a39c",
+    "fields": {
+      "workflow_type": "HEP_SUBMISSION",
+      "data": {
+        "titles": [
+          {
+            "title": "The submission rejection with reason test",
+            "source": "submitter"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "email": "user@cern.ch",
+          "orcid": "0000-0000-0000-0000",
+          "method": "submitter",
+          "source": "submitter",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "internal_uid": 50872
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "8ce44fd3-b909-4840-bf95-64cfe5f4cb7c",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "The publisher harvest fixture test",
+            "source": "Elsevier B. V."
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "Elsevier",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "submission_number": "scheduled__2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "95f3950e-57f2-4e9c-8293-8418d7720c60",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_UPDATE",
+      "data": {
+        "titles": [
+          {
+            "title": "The publisher update fixture test",
+            "source": "Elsevier B. V."
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "control_number": 1234567,
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "Elsevier",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "submission_number": "scheduled__2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "22222222-2222-2222-2222-222222222222",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "Fixture with cds source",
+            "source": "cds"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "cds",
+          "datetime": "2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "33333333-3333-3333-3333-333333333333",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "Fixture with desy source / Heriot-Watt U.",
+            "source": "Heriot-Watt U."
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "desy",
+          "datetime": "2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "33333333-3333-3333-3333-333333333334",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "Fixture with desy source / Wiley",
+            "source": "Wiley"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "desy",
+          "datetime": "2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "33333333-3333-3333-3333-333333333336",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "Fixture with desy source / Wiley bis",
+            "source": "Wiley"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "desy",
+          "datetime": "2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "33333333-3333-3333-3333-333333333335",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "Fixture with desy source / IOP",
+            "source": "IOP"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "desy",
+          "datetime": "2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "44444444-4444-4444-4444-444444444444",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "Fixture with aps source",
+            "source": "aps"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "aps",
+          "datetime": "2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "95ab3fe0-8a7b-4ef0-ad0c-b0593ae72710",
+    "fields": {
+      "workflow_type": "HEP_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "The multiple exact matches fixture test",
+            "source": "Elsevier Ltd"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "Elsevier",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "submission_number": "scheduled__2024-11-18T11:34:19.809575"
+        }
+      },
+      "matches": {
+        "exact": [1415120, 1383683]
+      },
+      "status": "error_multiple_exact_matches",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "a0a228e6-b73c-4e17-9fb8-066652e0913b",
+    "fields": {
+      "workflow_type": "HEP_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "The withdrawn fixture test",
+            "source": "Elsevier Ltd"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "Elsevier",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "submission_number": "scheduled__2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "completed",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "4be436bb-ed30-4b64-8fb8-b30c891eba03",
+    "fields": {
+      "workflow_type": "HEP_UPDATE",
+      "data": {
+        "titles": [
+          {
+            "title": "The arxiv update fixture test",
+            "source": "arXiv"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "control_number": 1234568,
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "arXiv",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "submission_number": "scheduled__2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "running",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "aaaa0001-0000-0000-0000-000000000000",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_CREATE",
+      "data": {
+        "titles": [
+          {
+            "title": "The publisher harvest approval fixture test",
+            "source": "Elsevier Ltd"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "Elsevier",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "submission_number": "scheduled__2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "approval",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "aaaa0002-0000-0000-0000-000000000000",
+    "fields": {
+      "workflow_type": "HEP_PUBLISHER_UPDATE",
+      "data": {
+        "titles": [
+          {
+            "title": "The publisher update approval fixture test",
+            "source": "Elsevier B. V."
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "control_number": 1234569,
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "Elsevier",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "submission_number": "scheduled__2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "approval",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "aaaa0003-0000-0000-0000-000000000000",
+    "fields": {
+      "workflow_type": "HEP_UPDATE",
+      "data": {
+        "titles": [
+          {
+            "title": "The arxiv update approval fixture test",
+            "source": "arXiv"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "control_number": 1234570,
+        "acquisition_source": {
+          "method": "hepcrawl",
+          "source": "arXiv",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "submission_number": "scheduled__2024-11-18T11:34:19.809575"
+        }
+      },
+      "status": "approval",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "aaaa0004-0000-0000-0000-000000000000",
+    "fields": {
+      "workflow_type": "HEP_SUBMISSION",
+      "data": {
+        "titles": [
+          {
+            "title": "The literature submission approval fixture test",
+            "source": "submitter"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "email": "user@cern.ch",
+          "orcid": "0000-0000-0000-0000",
+          "method": "submitter",
+          "source": "submitter",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "internal_uid": 50872
+        }
+      },
+      "status": "approval",
+      "_created_at": "2024-11-25T13:49:53.009Z",
+      "_updated_at": "2024-11-25T13:49:54.756Z"
+    }
+  },
+  {
+    "model": "hep.hepworkflow",
+    "pk": "aaaa0005-0000-0000-0000-000000000000",
+    "fields": {
+      "workflow_type": "HEP_MANUAL_MERGE",
+      "data": {
+        "titles": [
+          {
+            "title": "The literature submission approval fixture test",
+            "source": "submitter"
+          }
+        ],
+        "$schema": "https://inspirehep.net/schemas/records/hep.json",
+        "_collections": ["Literature"],
+        "document_type": ["article"],
+        "acquisition_source": {
+          "email": "user@cern.ch",
+          "orcid": "0000-0000-0000-0000",
+          "method": "submitter",
+          "source": "submitter",
+          "datetime": "2024-11-18T11:34:19.809575",
+          "internal_uid": 50872
+        }
+      },
       "status": "approval",
       "_created_at": "2024-11-25T13:49:53.009Z",
       "_updated_at": "2024-11-25T13:49:54.756Z"

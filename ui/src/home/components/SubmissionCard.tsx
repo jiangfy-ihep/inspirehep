@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Card } from 'antd';
 import RouterLinkButton from '../../common/components/RouterLinkButton';
 
@@ -12,7 +12,7 @@ function SubmissionCard({
   formLink,
 }: {
   title: string;
-  children: JSX.Element | JSX.Element[];
+  children: React.JSX.Element | React.JSX.Element[];
   formLink: string;
 }) {
   const actions = useMemo(
@@ -27,8 +27,7 @@ function SubmissionCard({
     <Card
       title={title}
       actions={actions}
-      headStyle={TEXT_CENTER}
-      bodyStyle={TEXT_CENTER}
+      styles={{ body: TEXT_CENTER, header: TEXT_CENTER }}
     >
       {children}
     </Card>

@@ -1,4 +1,5 @@
 import { notification } from 'antd';
+import { vi, type MockInstance } from 'vitest';
 
 import {
   notifyLoginError,
@@ -7,18 +8,16 @@ import {
 } from '../notifications';
 
 describe('Notification Functions', () => {
-  let errorSpy: jest.SpyInstance;
-  let successSpy: jest.SpyInstance;
+  let errorSpy: MockInstance;
+  let successSpy: MockInstance;
 
   beforeEach(() => {
-    errorSpy = jest.spyOn(notification, 'error').mockImplementation(jest.fn());
-    successSpy = jest
-      .spyOn(notification, 'success')
-      .mockImplementation(jest.fn());
+    errorSpy = vi.spyOn(notification, 'error').mockImplementation(vi.fn());
+    successSpy = vi.spyOn(notification, 'success').mockImplementation(vi.fn());
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   test('notifyLoginError should trigger notification.error with the correct arguments', () => {
@@ -28,7 +27,7 @@ describe('Notification Functions', () => {
 
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith({
-      message: 'Login unsuccessful',
+      title: 'Login unsuccessful',
       description: errorMessage,
       duration: 7,
     });
@@ -41,9 +40,8 @@ describe('Notification Functions', () => {
 
     expect(successSpy).toHaveBeenCalledTimes(1);
     expect(successSpy).toHaveBeenCalledWith({
-      message: 'Success',
+      title: 'Success',
       description: 'Delete performed successfully',
-      duration: 10,
     });
   });
 
@@ -54,9 +52,8 @@ describe('Notification Functions', () => {
 
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith({
-      message: 'Unable to perform action',
+      title: 'Unable to perform action',
       description: errorMessage,
-      duration: 10,
     });
   });
 });

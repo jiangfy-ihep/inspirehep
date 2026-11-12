@@ -1,5 +1,3 @@
-import React from 'react';
-import { screen } from '@testing-library/react';
 import { fromJS } from 'immutable';
 
 import { getStore } from '../../../fixtures/store';
@@ -7,8 +5,8 @@ import CurateReferenceDrawerContainer from '../CurateReferenceDrawerContainer';
 import { CURATE_REFERENCE_NS } from '../../../search/constants';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('react-router-dom', () => {
-  const actual = jest.requireActual('react-router-dom');
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
   return {
     ...actual,
     useParams: jest.fn().mockImplementation(() => ({
@@ -17,15 +15,17 @@ jest.mock('react-router-dom', () => {
   };
 });
 
-jest.mock(
+vi.mock(
   '../../components/CurateReferenceDrawer/CurateReferenceDrawer',
-  () => (props: any) => (
-    <div data-testid="curate-reference-drawer">
-      <div data-testid="reference-id">{props.referenceId}</div>
-      <div data-testid="visible">{props.visible ? 'true' : 'false'}</div>
-      <div data-testid="loading">{props.loading ? 'true' : 'false'}</div>
-    </div>
-  )
+  async () => ({
+    default: (props: any) => (
+      <div data-testid="curate-reference-drawer">
+        <div data-testid="reference-id">{props.referenceId}</div>
+        <div data-testid="visible">{props.visible ? 'true' : 'false'}</div>
+        <div data-testid="loading">{props.loading ? 'true' : 'false'}</div>
+      </div>
+    ),
+  })
 );
 
 describe('CurateReferenceDrawerContainer', () => {
@@ -51,7 +51,7 @@ describe('CurateReferenceDrawerContainer', () => {
     const { findByTestId } = renderWithProviders(
       <CurateReferenceDrawerContainer
         namespace={CURATE_REFERENCE_NS}
-        recordId={1234}
+        recordId="1234"
         recordUuid="1234"
         revisionId={1}
       />,

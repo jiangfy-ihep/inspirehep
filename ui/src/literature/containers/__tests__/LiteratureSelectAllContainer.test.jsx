@@ -1,4 +1,3 @@
-import React from 'react';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { fromJS, Set } from 'immutable';
@@ -9,7 +8,7 @@ import { setLiteratureSelection } from '../../../actions/literature';
 import { LITERATURE_NS } from '../../../search/constants';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('../../../actions/literature');
+vi.mock('../../../actions/literature');
 mockActionCreator(setLiteratureSelection);
 
 describe('LiteratureSelectAllContainer', () => {

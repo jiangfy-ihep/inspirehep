@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ToolOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
@@ -39,7 +39,6 @@ function ToolAction({
               : null
           }
           disabled={disabledBulkAssign}
-          data-test-id="assign-conference"
           data-testid="assign-conference"
           onClick={() => onAssignToConference()}
         >
@@ -57,7 +56,6 @@ function ToolAction({
               : null
           }
           disabled={disabledBulkAssign}
-          data-test-id="export-to-CDS"
           data-testid="export-to-CDS"
           onClick={onClickExportToCds}
         >

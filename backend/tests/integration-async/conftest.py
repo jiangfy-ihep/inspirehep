@@ -3,11 +3,12 @@
 #
 # inspirehep is free software; you can redistribute it and/or modify it under
 # the terms of the MIT License; see LICENSE file for more details.
+import os
 from contextlib import contextmanager
 from functools import partial
+from unittest import mock
 
 import boto3
-import mock
 import pytest
 import structlog
 from click.testing import CliRunner
@@ -26,6 +27,7 @@ LOGGER = structlog.getLogger()
 
 @pytest.fixture(scope="session")
 def app():
+    os.environ["SERVER_NAME"] = "localhost:5000"
     app = inspire_create_app()
     app_config = {}
     app_config["DEBUG"] = False

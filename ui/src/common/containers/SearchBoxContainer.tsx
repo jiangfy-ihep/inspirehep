@@ -1,8 +1,10 @@
-import { connect, RootStateOrAny } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import { Action, ActionCreator } from 'redux';
+import { RootState } from '../../types';
 
 import SearchBox from '../components/SearchBox';
 import { searchAI, searchQueryUpdate } from '../../actions/search';
+import { isAiSearchQuery } from '../../actions/aiSearch';
 import { LITERATURE_NS } from '../../search/constants';
 import { appendQueryToLocationSearch } from '../../actions/router';
 import { clearLiteratureSelection } from '../../actions/literature';
@@ -10,7 +12,7 @@ import { UI_CITATION_SUMMARY_PARAM } from '../../literature/containers/CitationS
 import { UI_EXCLUDE_SELF_CITATIONS_PARAM } from '../../literature/containers/ExcludeSelfCitationsContainer';
 import { getConfigFor } from '../config';
 
-const stateToProps = (state: RootStateOrAny) => ({
+const stateToProps = (state: RootState) => ({
   value: state.search.getIn([
     'namespaces',
     state.search.get('searchBoxNamespace'),
@@ -31,7 +33,10 @@ export const dispatchToProps = (dispatch: ActionCreator<Action>) => ({
       );
     } else {
       dispatch(clearLiteratureSelection());
-      if (getConfigFor('QUERY_AI_ON_SEARCH_FEATURE_FLAG')) {
+      if (
+        getConfigFor('QUERY_AI_ON_SEARCH_FEATURE_FLAG') &&
+        !isAiSearchQuery(value)
+      ) {
         dispatch(searchAI(value));
       }
     }

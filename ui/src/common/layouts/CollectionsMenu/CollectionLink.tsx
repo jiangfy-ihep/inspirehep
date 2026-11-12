@@ -1,5 +1,3 @@
-import React from 'react';
-import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import classNames from 'classnames';
 
@@ -14,7 +12,7 @@ function CollectionLink({
 }: {
   to: string;
   active: boolean;
-  children: JSX.Element | JSX.Element[] | string;
+  children: React.JSX.Element | React.JSX.Element[] | string;
   newCollection?: boolean;
 }) {
   return (
@@ -26,12 +24,5 @@ function CollectionLink({
     </span>
   );
 }
-
-CollectionLink.propTypes = {
-  to: PropTypes.string.isRequired,
-  active: PropTypes.bool,
-  newCollection: PropTypes.bool,
-  children: PropTypes.node,
-};
 
 export default CollectionLink;

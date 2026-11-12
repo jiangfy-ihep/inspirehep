@@ -3,6 +3,7 @@ import pytest
 from copy import deepcopy
 from unittest.mock import Mock, patch
 from requests.exceptions import RequestException
+from django.db import transaction
 from django.urls import reverse
 from backoffice.common.constants import WORKFLOW_DAGS
 from backoffice.common import airflow_utils
@@ -60,19 +61,17 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
             id=uuid.UUID(int=2),
         )
 
-    def test_list_curator(self):
+    def test_list_not_allowed_curator(self):
         self.api_client.force_authenticate(user=self.curator)
         response = self.api_client.get(self.endpoint, format="json")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 405)
 
-    def test_list_admin(self):
+    def test_list_not_allowed_admin(self):
         self.api_client.force_authenticate(user=self.admin)
         response = self.api_client.get(self.endpoint, format="json")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 405)
 
     def test_list_anonymous(self):
         self.api_client.force_authenticate(user=self.user)
@@ -113,9 +112,208 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         response = self.api_client.post(url, format="json", data=data)
         json_response = response.json()
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(json_response["data"], data["data"])
+        self.assertEqual(json_response["data"], {**data["data"]})
         self.assertEqual(json_response["workflow_type"], data["workflow_type"])
         self.assertIn("id", json_response)
+
+    @patch(
+        "backoffice.hep.api.views.is_another_hep_submission_running",
+        return_value=True,
+    )
+    def test_create_hep_returns_409_if_matching_submission_exists(
+        self, mock_is_running
+    ):
+        self.api_client.force_authenticate(user=self.curator)
+        data = {
+            "workflow_type": HepWorkflowType.HEP_SUBMISSION,
+            "status": HepStatusChoices.RUNNING,
+            "data": {
+                **hep_data_valid(),
+                "arxiv_eprints": [{"value": "2502.05665"}],
+            },
+        }
+
+        response = self.api_client.post(self.endpoint, format="json", data=data)
+
+        self.assertEqual(response.status_code, 409)
+        mock_is_running.assert_called_once_with(data)
+        self.assertEqual(HepWorkflow.objects.count(), 1)
+
+    @patch(
+        "backoffice.hep.api.views.is_another_hep_submission_running",
+        return_value=True,
+    )
+    @patch("backoffice.hep.api.views.trigger_hep_workflow_initialization.delay")
+    def test_create_non_submission_skips_matching_submission_check(
+        self, mock_trigger_workflow, mock_is_running
+    ):
+        self.api_client.force_authenticate(user=self.curator)
+        data = {
+            "workflow_type": HepWorkflowType.HEP_CREATE,
+            "status": HepStatusChoices.RUNNING,
+            "data": hep_data_valid(),
+        }
+
+        response = self.api_client.post(self.endpoint, format="json", data=data)
+
+        self.assertEqual(response.status_code, 201)
+        mock_is_running.assert_not_called()
+        mock_trigger_workflow.assert_called_once()
+
+    @patch("backoffice.hep.api.views.trigger_hep_workflow_initialization")
+    def test_create_hep_initializes_synchronously_if_broker_is_unavailable(
+        self, mock_trigger_workflow
+    ):
+        self.api_client.force_authenticate(user=self.curator)
+        mock_trigger_workflow.delay.side_effect = RuntimeError("broker unavailable")
+        data = {
+            "workflow_type": HepWorkflowType.HEP_CREATE,
+            "status": HepStatusChoices.RUNNING,
+            "data": hep_data_valid(),
+        }
+
+        response = self.api_client.post(self.endpoint, format="json", data=data)
+
+        self.assertEqual(response.status_code, 201)
+        workflow_id = response.json()["id"]
+        mock_trigger_workflow.delay.assert_called_once_with(
+            workflow_id, data["workflow_type"]
+        )
+        mock_trigger_workflow.assert_called_once_with(
+            workflow_id, data["workflow_type"]
+        )
+
+    @patch("backoffice.hep.api.views.trigger_hep_workflow_initialization.delay")
+    def test_create_hep_initializes_only_after_transaction_commits(
+        self, mock_trigger_workflow
+    ):
+        self.api_client.force_authenticate(user=self.curator)
+        data = {
+            "workflow_type": HepWorkflowType.HEP_CREATE,
+            "status": HepStatusChoices.RUNNING,
+            "data": hep_data_valid(),
+        }
+
+        with transaction.atomic():
+            response = self.api_client.post(self.endpoint, format="json", data=data)
+            self.assertEqual(response.status_code, 201)
+            mock_trigger_workflow.assert_not_called()
+
+        mock_trigger_workflow.assert_called_once_with(
+            response.json()["id"], data["workflow_type"]
+        )
+
+    @patch("backoffice.hep.api.views.trigger_hep_workflow_initialization.delay")
+    def test_create_hep_removes_null_characters(self, mock_trigger_workflow):
+        self.api_client.force_authenticate(user=self.curator)
+        hep_data = hep_data_valid()
+        hep_data["titles"] = [
+            {"source": "submitter", "title": "Atom\x00 interferometry"}
+        ]
+        data = {
+            "workflow_type": HepWorkflowType.HEP_CREATE,
+            "status": HepStatusChoices.RUNNING,
+            "data": hep_data,
+            "form_data": {"references": "[1] First\x00 line\n[2] Second line"},
+        }
+
+        response = self.api_client.post(self.endpoint, format="json", data=data)
+
+        self.assertEqual(response.status_code, 201)
+        workflow = HepWorkflow.objects.get(id=response.json()["id"])
+        expected_titles = [{"source": "submitter", "title": "Atom interferometry"}]
+        self.assertEqual(workflow.data["titles"], expected_titles)
+        self.assertEqual(workflow.source_data["titles"], expected_titles)
+        self.assertEqual(
+            workflow.form_data["references"], "[1] First line\n[2] Second line"
+        )
+
+    @patch("backoffice.common.signals.update_registry_after_commit")
+    def test_create_hep_calls_on_commit_signal_processor(
+        self, mock_update_registry_after_commit
+    ):
+        self.api_client.force_authenticate(user=self.curator)
+
+        data = {
+            "workflow_type": HepWorkflowType.HEP_CREATE,
+            "status": HepStatusChoices.RUNNING,
+            "data": hep_data_valid(),
+        }
+
+        response = self.api_client.post(self.endpoint, format="json", data=data)
+
+        self.assertEqual(response.status_code, 201)
+        created_workflow = HepWorkflow.objects.get(id=response.json()["id"])
+        mock_update_registry_after_commit.assert_called_once_with(
+            instance=created_workflow
+        )
+
+    @patch("backoffice.hep.api.views.trigger_hep_workflow_initialization.delay")
+    def test_create_hep_publisher_workflow(
+        self, mock_trigger_hep_workflow_initialization
+    ):
+        self.api_client.force_authenticate(user=self.curator)
+
+        data = {
+            "workflow_type": HepWorkflowType.HEP_PUBLISHER_CREATE,
+            "status": HepStatusChoices.RUNNING,
+            "data": hep_data_valid(),
+        }
+
+        url = reverse("api:hep-list")
+        response = self.api_client.post(url, format="json", data=data)
+        json_response = response.json()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(json_response["data"], {**data["data"]})
+        self.assertEqual(json_response["workflow_type"], data["workflow_type"])
+        self.assertIn("id", json_response)
+        mock_trigger_hep_workflow_initialization.assert_called_once_with(
+            json_response["id"], data["workflow_type"]
+        )
+
+    @patch("backoffice.common.signals.delete_from_registry_after_commit")
+    def test_delete_hep_calls_on_commit_signal_processor(
+        self, mock_delete_from_registry_after_commit
+    ):
+        self.api_client.force_authenticate(user=self.curator)
+        workflow_id = self.workflow.id
+        workflow_type = self.workflow.workflow_type
+
+        url = reverse("api:hep-detail", kwargs={"pk": self.workflow.id})
+        response = self.api_client.delete(url)
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(HepWorkflow.objects.filter(id=workflow_id).exists())
+        mock_delete_from_registry_after_commit.assert_called_once()
+        deleted_instance = mock_delete_from_registry_after_commit.call_args.kwargs[
+            "instance"
+        ]
+        self.assertIsInstance(deleted_instance, HepWorkflow)
+        self.assertEqual(deleted_instance.pk, workflow_id)
+        self.assertEqual(deleted_instance.workflow_type, workflow_type)
+
+    @patch("backoffice.hep.api.views.trigger_hep_workflow_initialization.delay")
+    def test_create_hep_publisher_update_workflow(
+        self, mock_trigger_hep_workflow_initialization
+    ):
+        self.api_client.force_authenticate(user=self.curator)
+
+        data = {
+            "workflow_type": HepWorkflowType.HEP_PUBLISHER_UPDATE,
+            "status": HepStatusChoices.RUNNING,
+            "data": hep_data_valid(),
+        }
+
+        url = reverse("api:hep-list")
+        response = self.api_client.post(url, format="json", data=data)
+        json_response = response.json()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(json_response["data"], {**data["data"]})
+        self.assertEqual(json_response["workflow_type"], data["workflow_type"])
+        self.assertIn("id", json_response)
+        mock_trigger_hep_workflow_initialization.assert_called_once_with(
+            json_response["id"], data["workflow_type"]
+        )
 
     @pytest.mark.vcr
     def test_create_hep_with_invalid_data_still_creates_workflow(self):
@@ -132,7 +330,7 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         json_response = response.json()
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(json_response["data"], data["data"])
+        self.assertEqual(json_response["data"], {**data["data"]})
         self.assertEqual(json_response["workflow_type"], data["workflow_type"])
         self.assertIn("id", json_response)
 
@@ -173,7 +371,7 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         response = self.api_client.get(detail_url)
         json_response = response.json()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(json_response["data"], data_invalid)
+        self.assertEqual(json_response["data"], {**data_invalid})
         self.assertEqual(json_response["validation_errors"], [])
 
         response = self.api_client.get(detail_url, {"validate": "true"})
@@ -298,6 +496,27 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         )
         self.assertEqual(self.workflow.status, HepStatusChoices.RUNNING)
 
+    @patch("backoffice.common.airflow_utils.requests.post")
+    def test_resolve_is_idempotent(self, mock_post):
+        self.api_client.force_authenticate(user=self.curator)
+        url = reverse(
+            "api:hep-resolve",
+            kwargs={"pk": self.workflow.id},
+        )
+        data = {
+            "action": HepResolutions.hep_accept,
+        }
+        response1 = self.api_client.post(url, format="json", data=data)
+        self.assertEqual(response1.status_code, 200)
+
+        response2 = self.api_client.post(url, format="json", data=data)
+        self.assertEqual(response2.status_code, 200)
+
+        self.assertEqual(
+            self.workflow.decisions.filter(action=HepResolutions.hep_accept).count(),
+            1,
+        )
+
     @patch(
         "backoffice.common.airflow_utils.requests.post",
         side_effect=RequestException("Airflow clear failed"),
@@ -314,7 +533,7 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         response = self.api_client.post(url, format="json", data=data)
         self.assertEqual(response.status_code, 502)
         self.workflow.refresh_from_db()
-        self.assertEqual(self.workflow.decisions.exists(), False)
+        self.assertTrue(self.workflow.decisions.exists())
 
     @patch("backoffice.common.airflow_utils.requests.post")
     def test_batch_resolve(self, mock_post):
@@ -325,7 +544,7 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         )
         self.api_client.force_authenticate(user=self.curator)
         url = reverse(
-            "api:hep-batch-resolve",
+            "api:hep-batch-resolve-list",
         )
 
         wfs_ids = []
@@ -342,7 +561,7 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
             "action": HepResolutions.hep_accept,
         }
         response = self.api_client.post(url, format="json", data=data)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
         for id in wfs_ids:
             workflow = HepWorkflow.objects.get(id=id)
             self.assertEqual(
@@ -353,7 +572,37 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         self.assertEqual(mock_post.call_count, len(wfs_ids))
 
     @patch("backoffice.common.airflow_utils.requests.post")
-    def test_batch_resolve_exception_partial_rollback(self, mock_post):
+    def test_batch_resolve_skips_workflow_with_exclusive_decision(self, mock_post):
+        workflow = HepWorkflow.objects.create(
+            data={},
+            status=HepStatusChoices.APPROVAL,
+            workflow_type=HepWorkflowType.HEP_CREATE,
+        )
+        HepDecision.objects.create(
+            workflow=workflow,
+            user=self.curator,
+            action=HepResolutions.hep_accept_core,
+        )
+        self.api_client.force_authenticate(user=self.curator)
+
+        response = self.api_client.post(
+            reverse("api:hep-batch-resolve-list"),
+            format="json",
+            data={
+                "ids": [workflow.id],
+                "action": HepResolutions.hep_accept,
+            },
+        )
+
+        self.assertEqual(response.status_code, 202, response.data)
+        self.assertEqual(response.data["ids"], [])
+        mock_post.assert_not_called()
+        workflow.refresh_from_db()
+        self.assertEqual(workflow.status, HepStatusChoices.APPROVAL)
+        self.assertEqual(workflow.decisions.count(), 1)
+
+    @patch("backoffice.common.airflow_utils.requests.post")
+    def test_batch_resolve_exception_partial_success(self, mock_post):
         response_ok = Mock(
             status_code=200,
             content=b"",
@@ -366,7 +615,7 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         ]
         self.api_client.force_authenticate(user=self.curator)
         url = reverse(
-            "api:hep-batch-resolve",
+            "api:hep-batch-resolve-list",
         )
 
         wf_resolve_success = [True, False, True]
@@ -384,19 +633,21 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
             "ids": wfs_ids,
             "action": HepResolutions.hep_accept,
         }
-        self.api_client.post(url, format="json", data=data)
+        response = self.api_client.post(url, format="json", data=data)
+        self.assertEqual(response.status_code, 202)
 
         for wf_id, success in zip(wfs_ids, wf_resolve_success):
             workflow = HepWorkflow.objects.get(id=wf_id)
             if success:
+                self.assertEqual(workflow.status, HepStatusChoices.RUNNING)
                 self.assertEqual(
                     workflow.decisions.first().action, HepResolutions.hep_accept
                 )
-                self.assertEqual(workflow.status, HepStatusChoices.RUNNING)
-
             else:
-                self.assertFalse(workflow.decisions.exists())
-                self.assertEqual(workflow.status, HepStatusChoices.APPROVAL)
+                self.assertEqual(workflow.status, HepStatusChoices.ERROR)
+                self.assertEqual(
+                    workflow.decisions.first().action, HepResolutions.hep_accept
+                )
 
     @pytest.mark.vcr
     def test_discard(self):
@@ -447,6 +698,9 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
 
     @pytest.mark.vcr
     def test_restart(self):
+        self.workflow.status = HepStatusChoices.ERROR
+        self.workflow.save()
+
         dag_id = WORKFLOW_DAGS[self.workflow.workflow_type].initialize
 
         self.content, self.status_code = airflow_utils.trigger_airflow_dag(
@@ -467,6 +721,31 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         self.assertEqual(self.workflow.status, HepStatusChoices.RUNNING)
 
         airflow_utils.delete_workflow_dag(dag_id, self.workflow.id)
+
+    @patch("backoffice.hep.api.views.airflow_utils.clear_airflow_dag_run")
+    def test_restart_current_task_requires_workflow_in_error_state(
+        self, mock_clear_airflow_dag_run
+    ):
+        self.api_client.force_authenticate(user=self.curator)
+        url = reverse(
+            "api:hep-restart",
+            kwargs={"pk": self.workflow.id},
+        )
+
+        response = self.api_client.post(
+            url,
+            format="json",
+            data={"restart_current_task": True},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["message"],
+            "Can only restart current task for workflows in error state.",
+        )
+        self.workflow.refresh_from_db()
+        self.assertEqual(self.workflow.status, HepStatusChoices.APPROVAL)
+        mock_clear_airflow_dag_run.assert_not_called()
 
     def test_restart_completed_workflow(self):
         completed_workflow = HepWorkflow.objects.create(
@@ -489,4 +768,60 @@ class TestWorkflowViewSet(BaseTransactionTestCase):
         self.assertEqual(completed_workflow.status, HepStatusChoices.COMPLETED)
         self.assertEqual(
             response.json()["message"], "Cannot restart a completed workflow."
+        )
+
+    def test_restore_publisher_workflow(self):
+        source_data = hep_data_valid()
+        updated_data = deepcopy(source_data)
+        updated_data["titles"][0]["title"] = "Changed title"
+        self.workflow.data = updated_data
+        self.workflow.source_data = source_data
+        self.workflow.workflow_type = HepWorkflowType.HEP_PUBLISHER_UPDATE
+        self.workflow.save()
+        HepDecision.objects.create(
+            workflow=self.workflow, user=self.user, action=HepResolutions.hep_accept
+        )
+
+        self.api_client.force_authenticate(user=self.curator)
+        url = reverse(
+            "api:hep-restore",
+            kwargs={"pk": self.workflow.id},
+        )
+        response = self.api_client.post(url, format="json")
+
+        self.workflow.refresh_from_db()
+        self.assertFalse(self.workflow.decisions.exists())
+        self.assertEqual(response.json()["data"], {**source_data})
+        self.assertEqual(
+            response.json()["workflow_type"], HepWorkflowType.HEP_PUBLISHER_CREATE
+        )
+
+    def test_restore_submission_workflow(self):
+        source_data = hep_data_valid()
+        source_data["acquisition_source"] = {
+            "source": "submitter",
+            "method": "submitter",
+        }
+        updated_data = deepcopy(source_data)
+        updated_data["titles"][0]["title"] = "Changed title"
+        self.workflow.data = updated_data
+        self.workflow.source_data = source_data
+        self.workflow.workflow_type = HepWorkflowType.HEP_UPDATE
+        self.workflow.save()
+        HepDecision.objects.create(
+            workflow=self.workflow, user=self.user, action=HepResolutions.hep_accept
+        )
+
+        self.api_client.force_authenticate(user=self.curator)
+        url = reverse(
+            "api:hep-restore",
+            kwargs={"pk": self.workflow.id},
+        )
+        response = self.api_client.post(url, format="json")
+
+        self.workflow.refresh_from_db()
+        self.assertFalse(self.workflow.decisions.exists())
+        self.assertEqual(response.json()["data"], {**source_data})
+        self.assertEqual(
+            response.json()["workflow_type"], HepWorkflowType.HEP_SUBMISSION
         )

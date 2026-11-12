@@ -1,4 +1,3 @@
-import React from 'react';
 import { fireEvent, screen } from '@testing-library/react';
 import { fromJS } from 'immutable';
 
@@ -8,7 +7,7 @@ import { fetchLiteratureReferences } from '../../../actions/literature';
 import ReferenceListContainer from '../ReferenceListContainer';
 import { LITERATURE_REFERENCES_NS } from '../../../search/constants';
 
-jest.mock('../../../actions/literature');
+vi.mock('../../../actions/literature');
 fetchLiteratureReferences.mockReturnValue(async () => {});
 
 describe('ReferenceListContainer', () => {

@@ -1,4 +1,3 @@
-import React from 'react';
 import { FileSearchOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 
@@ -22,7 +21,7 @@ const ReferenceSearchLinkAction = ({
     >
       <Link
         to={`${LITERATURE}?q=citedby:recid:${recordId}`}
-        data-test-id="reference-search-button"
+        data-testid="reference-search-button"
       >
         <IconText text="reference search" icon={<FileSearchOutlined />} />
       </Link>

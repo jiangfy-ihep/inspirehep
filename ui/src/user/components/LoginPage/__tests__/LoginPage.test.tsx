@@ -1,9 +1,8 @@
-import React from 'react';
 import { render, within } from '@testing-library/react';
 
 import LoginPage from '../LoginPage';
 
-jest.mock('../../../../actions/user');
+vi.mock('../../../../actions/user');
 
 describe('LoginPage', () => {
   it('renders page', () => {

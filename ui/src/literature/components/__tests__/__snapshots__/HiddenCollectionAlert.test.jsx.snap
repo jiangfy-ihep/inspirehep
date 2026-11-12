@@ -1,20 +1,20 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`HiddenCollectionAlert renders alert 1`] = `
+exports[`HiddenCollectionAlert > renders alert 1`] = `
 <DocumentFragment>
   <div
     class="mb2"
   >
     <div
-      class="ant-alert ant-alert-warning ant-alert-no-icon"
+      class="ant-alert ant-alert-warning ant-alert-outlined ant-alert-no-icon css-var-root css-dev-only-do-not-override-oc1rc0"
       data-show="true"
       role="alert"
     >
       <div
-        class="ant-alert-content"
+        class="ant-alert-section"
       >
         <div
-          class="ant-alert-message"
+          class="ant-alert-title"
         >
           <span>
             This record is not part of the INSPIRE Literature collection. 

@@ -1,31 +1,35 @@
-import React from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import Loadable from 'react-loadable';
 
+import { Routes, Route } from 'react-router-dom';
 import { renderWithProviders } from '../../fixtures/render';
 import Conferences from '..';
+import { CONFERENCES } from '../../common/routes';
 
-jest.mock('../containers/DetailPageContainer', () => () => (
-  <div data-testid="detail-page-container">Detail Page</div>
-));
+vi.mock('../containers/DetailPageContainer', () => ({
+  default: () => <div data-testid="detail-page-container">Detail Page</div>,
+}));
 
-jest.mock('../containers/SearchPageContainer', () => () => (
-  <div data-testid="search-page-container">Search Page</div>
-));
+vi.mock('../containers/SearchPageContainer', () => ({
+  default: () => <div data-testid="search-page-container">Search Page</div>,
+}));
+
+const renderConferences = (route) =>
+  renderWithProviders(
+    <Routes>
+      <Route path={`${CONFERENCES}/*`} element={<Conferences />} />
+    </Routes>,
+    { route }
+  );
 
 describe('Conferences', () => {
-  beforeEach(async () => {
-    await Loadable.preloadAll();
-  });
-
   it('renders initial state', () => {
     renderWithProviders(<Conferences />);
     expect(screen.getByTestId('conferences')).toBeInTheDocument();
   });
 
   it('navigates to DetailPageContainer when /conferences/:id', async () => {
-    renderWithProviders(<Conferences />, { route: '/conferences/123' });
+    renderConferences('/conferences/123');
 
     await waitFor(() => {
       expect(screen.getByTestId('detail-page-container')).toBeInTheDocument();
@@ -33,7 +37,7 @@ describe('Conferences', () => {
   });
 
   it('navigates to SearchPage when /conferences', async () => {
-    renderWithProviders(<Conferences />, { route: '/conferences' });
+    renderConferences('/conferences');
 
     await waitFor(() => {
       expect(screen.getByTestId('search-page-container')).toBeInTheDocument();

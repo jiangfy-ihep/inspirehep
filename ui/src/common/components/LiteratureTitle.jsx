@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import { Map } from 'immutable';
 import PropTypes from 'prop-types';
 
@@ -8,7 +8,7 @@ class LiteratureTitle extends Component {
   render() {
     const { title } = this.props;
     return (
-      <span data-test-id="literature-detail-title">
+      <span data-testid="literature-detail-title">
         <Latex>{title.get('title')}</Latex>
         {title.has('subtitle') && (
           <span>

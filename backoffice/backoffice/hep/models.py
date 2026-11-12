@@ -5,6 +5,7 @@ from backoffice.hep.constants import (
     HEP_DEFAULT_STATUS_CHOICE,
     HEP_DEFAULT_TICKET_TYPE,
     HEP_DEFAULT_WORKFLOW_TYPE,
+    HEP_EXCLUSIVE_RESOLUTIONS,
     HEP_TICKET_TYPES,
     HepStatusChoices,
     HepWorkflowType,
@@ -16,12 +17,12 @@ from backoffice.common.models import BaseDecision, BaseWorkflow, BaseWorkflowTic
 class HepWorkflow(BaseWorkflow):
     workflow_type = models.CharField(
         max_length=30,
-        choices=HepWorkflowType.choices,
+        choices=HepWorkflowType,
         default=HEP_DEFAULT_WORKFLOW_TYPE,
     )
     journal_coverage = models.CharField(
         max_length=20,
-        choices=HepJournalCoverage.choices,
+        choices=HepJournalCoverage,
         null=True,
         blank=True,
     )
@@ -31,9 +32,10 @@ class HepWorkflow(BaseWorkflow):
     reference_count = models.JSONField(null=True, blank=True)
     matches = models.JSONField(null=True, blank=True)
     form_data = models.JSONField(null=True, blank=True)
+    source_data = models.JSONField(null=True, blank=True)
     status = models.CharField(
         max_length=30,
-        choices=HepStatusChoices.choices,
+        choices=HepStatusChoices,
         default=HEP_DEFAULT_STATUS_CHOICE,
     )
 
@@ -52,4 +54,17 @@ class HepDecision(BaseDecision):
         HepWorkflow, related_name="decisions", on_delete=models.CASCADE
     )
     action = models.CharField(max_length=30, choices=HEP_DECISION_CHOICES)
-    value = models.CharField(max_length=30, default="", blank=True)
+    value = models.TextField(default="", blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workflow"],
+                condition=models.Q(action__in=HEP_EXCLUSIVE_RESOLUTIONS),
+                name="unique_hep_resolution_per_workflow",
+            ),
+            models.UniqueConstraint(
+                fields=["workflow", "action"],
+                name="unique_hep_decision_per_workflow_and_action",
+            ),
+        ]

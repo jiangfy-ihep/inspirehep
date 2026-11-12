@@ -1,4 +1,3 @@
-import React from 'react';
 import { EditOutlined } from '@ant-design/icons';
 
 import UserAction from './UserAction';
@@ -57,7 +56,10 @@ export default function EditRecordAction({
         eventAction="Edit"
         eventId={`Edit ${pidType} record`}
       >
-        <LinkWithTargetBlank href={`${pidTypeRoute}/${pidValue}`}>
+        <LinkWithTargetBlank
+          href={`${pidTypeRoute}/${pidValue}`}
+          data-testid={`edit-record-${pidValue}`}
+        >
           <IconText text="edit" icon={<EditOutlined />} />
         </LinkWithTargetBlank>
       </EventTracker>

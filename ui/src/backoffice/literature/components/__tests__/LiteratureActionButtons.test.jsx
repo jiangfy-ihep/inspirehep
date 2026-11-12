@@ -1,10 +1,10 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 import LiteratureActionButtons from '../LiteratureActionButtons';
 import { WorkflowStatuses } from '../../../constants';
 import { WorkflowDecisions } from '../../../../common/constants';
+import { renderWithProviders } from '../../../../fixtures/render';
 
 describe('<LiteratureActionButtons />', () => {
   test('hides buttons and shows message after action', async () => {
@@ -14,6 +14,7 @@ describe('<LiteratureActionButtons />', () => {
       <LiteratureActionButtons
         status={WorkflowStatuses.APPROVAL}
         handleResolveAction={handleResolveAction}
+        disableActions={false}
       />
     );
 
@@ -31,10 +32,12 @@ describe('<LiteratureActionButtons />', () => {
 
   test('shows missing subject fields actions when categories are missing', () => {
     const handleResolveAction = jest.fn();
-    render(
+    renderWithProviders(
       <LiteratureActionButtons
         status={WorkflowStatuses.MISSING_SUBJECT_FIELDS}
         handleResolveAction={handleResolveAction}
+        disableActions={false}
+        hasInspireCategories={false}
       />
     );
 
@@ -45,6 +48,65 @@ describe('<LiteratureActionButtons />', () => {
       screen.queryByRole('button', { name: 'Core' })
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
+  });
+
+  test('shows missing subject fields actions when categories are filled', () => {
+    const handleResolveAction = jest.fn();
+    render(
+      <LiteratureActionButtons
+        status={WorkflowStatuses.MISSING_SUBJECT_FIELDS}
+        handleResolveAction={handleResolveAction}
+        disableActions={false}
+        hasInspireCategories
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Core' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
+  });
+
+  test('shows submission rejection modal only for submission workflows', async () => {
+    const handleResolveAction = jest.fn();
+    const user = userEvent.setup();
+    render(
+      <LiteratureActionButtons
+        status={WorkflowStatuses.APPROVAL}
+        handleResolveAction={handleResolveAction}
+        shouldShowSubmissionModal
+        submissionContext={{
+          email: 'submitter@example.org',
+          title: 'Suggested title',
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
+
+    expect(screen.getByText('Reason for rejection')).toBeInTheDocument();
+    expect(handleResolveAction).not.toHaveBeenCalled();
+  });
+
+  test('does not show submission rejection modal for missing subject fields', async () => {
+    const handleResolveAction = jest.fn();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <LiteratureActionButtons
+        status={WorkflowStatuses.MISSING_SUBJECT_FIELDS}
+        handleResolveAction={handleResolveAction}
+        submissionContext={{
+          email: 'submitter@example.org',
+          title: 'Suggested title',
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
+
+    expect(handleResolveAction).toHaveBeenCalledWith(
+      WorkflowDecisions.HEP_REJECT
+    );
+    expect(screen.queryByText('Reason for rejection')).not.toBeInTheDocument();
   });
 
   test('shows resolve conflicts editor button for approval merge status', () => {
@@ -63,6 +125,6 @@ describe('<LiteratureActionButtons />', () => {
       'href',
       '/editor/backoffice/literature/workflow-1'
     );
-    expect(resolveConflictsButton).toHaveClass('bg-resolve-conflict');
+    expect(resolveConflictsButton).toHaveClass('ant-btn-color-orange');
   });
 });

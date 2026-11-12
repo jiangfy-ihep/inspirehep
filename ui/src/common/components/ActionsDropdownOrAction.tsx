@@ -1,4 +1,3 @@
-import React from 'react';
 import { List } from 'immutable';
 import { Button } from 'antd';
 
@@ -12,7 +11,7 @@ const ActionsDropdownOrAction = ({
   renderAction,
 }: {
   values: List<any>;
-  title: string | JSX.Element;
+  title: string | React.JSX.Element;
   renderDropdownAction: (args: any) => any;
   renderAction: Function;
 }) => {

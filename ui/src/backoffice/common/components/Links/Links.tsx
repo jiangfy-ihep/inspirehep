@@ -1,4 +1,3 @@
-import React from 'react';
 import { Map } from 'immutable';
 import Icon, {
   CopyOutlined,
@@ -8,9 +7,9 @@ import Icon, {
   UserOutlined,
 } from '@ant-design/icons';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { ReactComponent as mastodonLogo } from '../../../../common/assets/mastodon.svg';
-import { ReactComponent as blueskyLogo } from '../../../../common/assets/bluesky.svg';
-import { ReactComponent as orcidLogo } from '../../../../common/assets/orcid.svg';
+import mastodonLogo from '../../../../common/assets/mastodon.svg?react';
+import blueskyLogo from '../../../../common/assets/bluesky.svg?react';
+import orcidLogo from '../../../../common/assets/orcid.svg?react';
 
 type LinksProps = {
   urls: Map<string, any>;
@@ -89,20 +88,12 @@ function getLinkData(schema: string, value: string) {
   }
 }
 
-const Id = ({
-  schema,
-  value,
-  href,
-}: {
-  schema: string;
-  value: string;
-  href: string | undefined;
-}) => {
+const Id = ({ value, href }: { value: string; href: string | undefined }) => {
   if (!href) {
     return <span>{value}</span>;
   }
   return (
-    <a href={href} target="_blank">
+    <a href={href} target="_blank" rel="noreferrer">
       {' '}
       {value}{' '}
     </a>
@@ -125,7 +116,7 @@ export const Ids = ({ ids, noIcon = false }: IdsProps) => (
           {schema && (
             <b className="dib ttc">{socialPlatformMap[schema] || schema}:</b>
           )}{' '}
-          <Id schema={schema} value={value} href={href} />
+          <Id value={value} href={href} />
           {showCopyBtn && (
             <CopyToClipboard text={value}>
               <span className="ml1 pointer">
@@ -150,7 +141,7 @@ export const Urls = ({ urls }: UrlsProps) => (
         <p key={value}>
           {linkData?.icon}
           {description && <b className="dib ml1 ttc">{description}:</b>}{' '}
-          <a href={value} target="_blank">
+          <a href={value} target="_blank" rel="noreferrer">
             {value}
           </a>
         </p>
@@ -159,13 +150,11 @@ export const Urls = ({ urls }: UrlsProps) => (
   </>
 );
 
-const Links = ({ urls, ids }: LinksProps) => {
-  return (
-    <>
-      <Ids ids={ids} />
-      <Urls urls={urls} />
-    </>
-  );
-};
+const Links = ({ urls, ids }: LinksProps) => (
+  <>
+    <Ids ids={ids} />
+    <Urls urls={urls} />
+  </>
+);
 
 export default Links;

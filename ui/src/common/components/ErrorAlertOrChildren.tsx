@@ -1,4 +1,3 @@
-import React from 'react';
 import { Map } from 'immutable';
 
 import { getFromObjectOrImmutableMap } from '../utils';
@@ -9,7 +8,7 @@ const ErrorAlertOrChildren = ({
   children,
 }: {
   error: Map<string, string> | undefined;
-  children: JSX.Element;
+  children: React.JSX.Element;
 }) => {
   if (error) {
     return (

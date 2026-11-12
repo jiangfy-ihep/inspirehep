@@ -452,14 +452,14 @@ describe('utils', () => {
 
   describe('removeProtocolAndWwwFromUrl', () => {
     // regexp does not work on tests as it does on real browser
-    xit('removes protocol and www from url', () => {
+    it.skip('removes protocol and www from url', () => {
       const url = 'https://wwww.home.cern/about';
       const expected = 'home.cern/about';
       const result = removeProtocolAndWwwFromUrl(url);
       expect(result).toEqual(expected);
     });
 
-    xit('removes www from url', () => {
+    it.skip('removes www from url', () => {
       const url = 'wwww.home.cern/about';
       const expected = 'home.cern/about';
       const result = removeProtocolAndWwwFromUrl(url);
@@ -671,6 +671,19 @@ describe('utils', () => {
         'Europe/Zurich',
         'America/Chicago'
       );
+      expect(output).toEqual(true);
+    });
+    it('returns false if a timezone is unknown to dayjs timezone', () => {
+      advanceTo(new Date('2020-05-13T13:31:00+00:00'));
+      const output = doTimezonesHaveDifferentTimes(
+        'Europe/Zurich',
+        'Not/AZone'
+      );
+      expect(output).toEqual(false);
+    });
+    it('resolves a recently-added IANA zone from the updated tzdata', () => {
+      advanceTo(new Date('2026-01-01T00:00:00+00:00'));
+      const output = doTimezonesHaveDifferentTimes('America/Coyhaique', 'UTC');
       expect(output).toEqual(true);
     });
   });

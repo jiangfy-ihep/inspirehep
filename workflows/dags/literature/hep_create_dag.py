@@ -6,18 +6,14 @@ from contextlib import suppress
 from copy import deepcopy
 from tempfile import TemporaryDirectory
 
-from airflow.exceptions import AirflowException, AirflowFailException
-from airflow.models.variable import Variable
 from airflow.providers.standard.operators.empty import EmptyOperator
-from airflow.sdk import Param, dag, task, task_group
+from airflow.sdk import Param, Variable, dag, task, task_group
+from airflow.sdk.exceptions import AirflowException, AirflowFailException
 from airflow.task.trigger_rule import TriggerRule
 from airflow.utils.edgemodifier import Label
 from hooks.backoffice.workflow_management_hook import (
     HEP,
     WorkflowManagementHook,
-)
-from hooks.backoffice.workflow_ticket_management_hook import (
-    LiteratureWorkflowTicketManagementHook,
 )
 from hooks.generic_http_hook import GenericHttpHook
 from hooks.inspirehep.inspire_http_hook import (
@@ -28,18 +24,19 @@ from hooks.inspirehep.inspire_http_hook import (
 from hooks.inspirehep.inspire_http_record_management_hook import (
     InspireHTTPRecordManagementHook,
 )
-from include.inspire.approval import auto_approve, is_first_category_core
+from include.inspire.approval import auto_approve
 from include.inspire.grobid_authors_parser import GrobidAuthors
 from include.inspire.guess_coreness import calculate_coreness
 from include.inspire.hidden_collections import (
     affiliations_for_hidden_collections,
+    is_fermilab_report,
     reports_for_hidden_collections,
+    should_hide_record,
 )
 from include.inspire.is_record_relevant import (
-    is_auto_approved,
-    is_auto_rejected,
-    is_journal_coverage_full,
+    is_auto_accepted_core,
     is_submission,
+    should_auto_reject,
 )
 from include.inspire.journal_title_normalization import (
     get_normalized_publication_info,
@@ -55,6 +52,7 @@ from include.inspire.refextract_utils import (
 )
 from include.utils import opensearch, s3, tickets, workflows
 from include.utils.alerts import FailedDagNotifierSetError
+from include.utils.arxiv import eprint_to_datetime
 from include.utils.constants import (
     ANTIHEP_KEYWORDS,
     DECISION_AUTO_ACCEPT_CORE,
@@ -67,6 +65,10 @@ from include.utils.constants import (
     DECISION_HEP_ACCEPT_CORE,
     DECISION_HEP_REJECT,
     DECISION_MERGE_APPROVE,
+    DISCARDABLE_STATUSES,
+    FERMILAB_COLLECTION_NAME,
+    HEP_PUBLISHER_CREATE,
+    HEP_PUBLISHER_UPDATE,
     HEP_UPDATE,
     LITERATURE_PID_TYPE,
     RUNNING_STATUSES,
@@ -76,9 +78,12 @@ from include.utils.constants import (
     STATUS_APPROVAL_MERGE,
     STATUS_BLOCKED,
     STATUS_COMPLETED,
+    STATUS_ERROR_MULTIPLE_EXACT_MATCHES,
     STATUS_MISSING_SUBJECT_FIELDS,
     STATUS_RUNNING,
+    TICKET_HEP_CURATION,
     TICKET_HEP_CURATION_CORE,
+    TICKET_HEP_PUBLISHER_CURATION_CORE,
     TICKET_HEP_SUBMISSION,
 )
 from include.utils.download_documents import load_document_to_s3
@@ -113,6 +118,7 @@ from literature.set_workflow_status_tasks import (
 )
 from literature.store_root_task import store_root
 from literature.validate import validate_record
+from operators.short_circuit_branch import ShortCircuitBranchOperator
 from plotextractor.api import process_tarball
 from plotextractor.converter import untar
 from plotextractor.errors import (
@@ -122,7 +128,6 @@ from plotextractor.errors import (
 from pylatexenc.latex2text import LatexNodes2Text
 from refextract.extract import extract_journal_info as refextract_journal_info
 from refextract.extract import extract_references_from_list
-from tenacity import RetryError
 from werkzeug.utils import secure_filename
 
 logger = logging.getLogger(__name__)
@@ -151,22 +156,27 @@ def hep_create_dag():
     arxiv_hook = GenericHttpHook(http_conn_id="arxiv_connection")
     s3_store = s3.S3JsonStore(aws_conn_id="s3_conn")
 
-    @task
-    def check_env():
-        environment = Variable.get("ENVIRONMENT")
-        if environment.lower() != "dev":
-            raise AirflowException("This DAG will not run on prod")
+    @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
+    def save_and_complete_workflow(**context):
+        workflow_id = context["params"]["workflow_id"]
+        workflow_data = s3_store.read_workflow(workflow_id)
+        workflow_data["status"] = STATUS_COMPLETED
+
+        workflow_management_hook.update_workflow(workflow_id, workflow_data)
+
+    save_and_complete_workflow_task = save_and_complete_workflow()
 
     @task
-    def get_workflow_data(**context):
-        workflow_data = workflow_management_hook.get_workflow(
+    def restore_and_get_workflow_data(**context):
+        workflow_data = workflow_management_hook.restore_workflow(
             context["params"]["workflow_id"]
         )
         return s3_store.write_workflow(workflow_data)
 
     @task
-    def set_schema(**context):
-        workflow_data = s3_store.read_workflow(context["params"]["workflow_id"])
+    def set_schema_and_flags(**context):
+        workflow_id = context["params"]["workflow_id"]
+        workflow_data = s3_store.read_workflow(workflow_id)
         schema = Variable.get("hep_schema")
 
         workflow_data = workflow_management_hook.partial_update_workflow(
@@ -178,18 +188,24 @@ def hep_create_dag():
 
         s3_store.write_workflow(workflow_data)
 
-    @task.branch
-    def discard_older_wfs_w_same_source(**context):
+        s3_store.set_flags({}, workflow_id)
+
+    def _discard_older_wfs_w_same_source(**context):
         workflow_id = context["params"]["workflow_id"]
         workflow_data = s3_store.read_workflow(workflow_id)
 
         matches = opensearch.find_matching_workflows(
-            workflow_data,
-            statuses=RUNNING_STATUSES + [STATUS_BLOCKED],
+            workflow_data, DISCARDABLE_STATUSES
         )
 
-        if is_submission(workflow_data) and len(matches) > 0:
-            raise AirflowFailException("Only one submission is allowed at a time")
+        submission_matches = [match for match in matches if is_submission(match)]
+
+        if is_submission(workflow_data) and len(submission_matches) > 0:
+            matched_ids = [match["id"] for match in submission_matches]
+            raise AirflowFailException(
+                f"Only one submission is allowed at a time. "
+                f"Matches found: {matched_ids}"
+            )
 
         has_older_match_w_same_source = False
         has_found_match_with_same_source = False
@@ -214,15 +230,11 @@ def hep_create_dag():
                 workflow_id=workflow_id,
                 decision_data={"action": DECISION_DISCARD},
             )
-            workflow_management_hook.set_workflow_status(
-                status_name=STATUS_COMPLETED,
-                workflow_id=workflow_id,
-            )
-            return "run_next_if_necessary"
+            return "save_and_complete_workflow"
 
         return "check_for_blocking_workflows"
 
-    @task.short_circuit(ignore_downstream_trigger_rules=False)
+    @task.short_circuit
     def check_for_blocking_workflows(**context):
         workflow_id = context["params"]["workflow_id"]
         workflow_data = s3_store.read_workflow(workflow_id)
@@ -244,7 +256,7 @@ def hep_create_dag():
         )
         return True
 
-    @task.branch
+    @task.branch(on_failure_callback=None)
     def check_for_exact_matches(**context):
         workflow_id = context["params"]["workflow_id"]
         workflow_data = s3_store.read_workflow(workflow_id)
@@ -258,14 +270,33 @@ def hep_create_dag():
         matches = response.json()["matched_ids"]
 
         if len(matches) >= 2:
+            workflow_data["status"] = STATUS_ERROR_MULTIPLE_EXACT_MATCHES
+            workflow_data["matches"] = get_value(workflow_data, "matches", {}) or {}
+            workflow_data["matches"]["exact"] = matches
+            s3_store.write_workflow(workflow_data)
+            workflow_management_hook.partial_update_workflow(
+                workflow_id=workflow_id,
+                workflow_partial_update_data={
+                    "status": STATUS_ERROR_MULTIPLE_EXACT_MATCHES,
+                    "matches": workflow_data["matches"],
+                },
+            )
             raise AirflowException(
                 f"Multiple exact matches found. {matches} should be merged by a curator"
                 f" before proceeding."
             )
         if len(matches) == 1:
+            workflow_data["matches"] = get_value(workflow_data, "matches", {}) or {}
+            workflow_data["matches"]["exact"] = matches
             context["ti"].xcom_push(key="match", value=matches[0])
             s3_store.set_flag("is-update", True, workflow_id)
             s3_store.write_workflow(workflow_data)
+            workflow_management_hook.partial_update_workflow(
+                workflow_id=workflow_id,
+                workflow_partial_update_data={
+                    "matches": workflow_data["matches"],
+                },
+            )
             return "stop_if_existing_submission_notify_and_close"
         return "check_for_fuzzy_matches"
 
@@ -348,8 +379,7 @@ def hep_create_dag():
         s3_store.write_workflow(workflow_data)
         return True
 
-    @task.branch(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-    def stop_if_existing_submission_notify_and_close(**context):
+    def _stop_if_existing_submission_notify_and_close(**context):
         """Send notification if the workflow is a submission."""
         workflow_id = context["params"]["workflow_id"]
         workflow_data = s3_store.read_workflow(workflow_id)
@@ -369,11 +399,11 @@ def hep_create_dag():
         ]
 
         reply_template_context = workflows.get_reply_curation_context(
-            workflow_data["data"], inspire_http_hook
+            workflow_data, inspire_http_hook
         )
 
-        inspire_http_hook.close_ticket(
-            ticket_id, "user_rejected_exists", reply_template_context
+        tickets.close_ticket(
+            inspire_http_hook, ticket_id, "user_rejected_exists", reply_template_context
         )
 
         return "save_and_complete_workflow"
@@ -384,14 +414,14 @@ def hep_create_dag():
         workflow_data = s3_store.read_workflow(workflow_id)
         data = workflow_data.get("data", {})
 
-        is_sub = is_submission(data)
+        is_sub = is_submission(workflow_data)
 
         is_auto_approve = False if is_sub else auto_approve(data)
 
         s3_store.set_flag("auto-approved", is_auto_approve, workflow_id)
         is_update = s3_store.get_flag("is-update", workflow_id)
 
-        if is_auto_approve and not is_update and is_first_category_core(data):
+        if not is_update and is_auto_accepted_core(workflow_id, s3_store):
             workflow_data["core"] = True
             workflow_management_hook.add_decision(
                 workflow_id=workflow_id,
@@ -400,20 +430,50 @@ def hep_create_dag():
 
         s3_store.write_workflow(workflow_data)
 
-    @task.branch
-    def check_if_previously_rejected(**context):
+    def _check_if_previously_rejected(**context):
         """Equivalent to first IF of PROCESS_HOLDINGPEN_MATCH_HARVEST"""
 
         workflow_id = context["params"]["workflow_id"]
         workflow_data = s3_store.read_workflow(workflow_id)
 
-        if (
-            not s3_store.get_flag("is-update", workflow_id)
-            and not s3_store.get_flag("auto-approved", workflow_id)
-            and workflows.has_previously_rejected_wf_in_backoffice_w_same_source(
+        eprints = get_value(workflow_data, "data.arxiv_eprints.value", [])
+        eprint_value = eprints[0] if eprints else None
+        created_at = workflow_data.get("_created_at")
+
+        is_arxiv = workflows.is_arxiv_paper(workflow_data["data"])
+        datetime_created = datetime.datetime.fromisoformat(created_at).replace(
+            tzinfo=None
+        )
+
+        is_sub = is_submission(workflow_data)
+
+        is_old_arxiv = False
+        if is_arxiv and eprint_value:
+            try:
+                is_old_arxiv = eprint_to_datetime(
+                    eprint_value
+                ) < datetime_created - datetime.timedelta(days=60)
+            except ValueError:
+                is_old_arxiv = False
+
+        is_update = s3_store.get_flag("is-update", workflow_id)
+        is_auto_approved = s3_store.get_flag("auto-approved", workflow_id)
+        has_rejected_duplicate = (
+            workflows.has_previously_rejected_wf_in_backoffice_w_same_source(
                 workflow_data
             )
-        ):
+        )
+
+        is_likely_duplicate_of_rejection = (
+            not is_auto_approved and has_rejected_duplicate
+        )
+        should_auto_reject = (
+            not is_update
+            and not is_sub
+            and (is_likely_duplicate_of_rejection or is_old_arxiv)
+        )
+
+        if should_auto_reject:
             workflow_management_hook.add_decision(
                 workflow_id=workflow_id,
                 decision_data={"action": DECISION_AUTO_REJECT},
@@ -981,15 +1041,10 @@ def hep_create_dag():
 
             endpoint = f"/pdf/{arxiv_id}"
 
-            try:
-                response = arxiv_hook.call_api(
-                    endpoint=endpoint,
-                    extra_options={"stream": True, "allow_redirects": True},
-                )
-            except RetryError as e:
-                if "404:Not Found" in str(e.last_attempt.exception()):
-                    logger.info("No PDF is available for %s", arxiv_id)
-                    return
+            response = arxiv_hook.call_api(
+                endpoint=endpoint,
+                extra_options={"stream": True, "allow_redirects": True},
+            )
 
             if not workflows.is_pdf_link(response):
                 return
@@ -1016,7 +1071,7 @@ def hep_create_dag():
 
             s3_store.write_workflow(workflow_data)
 
-        @task
+        @task(execution_timeout=datetime.timedelta(minutes=5))
         def arxiv_plot_extract(tarball_key, **context):
             """Extract plots from an arXiv archive."""
 
@@ -1055,11 +1110,9 @@ def hep_create_dag():
                 logger.info("Processing plots. Number of plots: %s", len(plots))
                 plot_keys = []
                 for index, plot in enumerate(plots):
-                    plot_name = os.path.basename(plot.get("url"))
+                    plot_name = f"{index}_{os.path.basename(plot.get('url'))}"
 
-                    key = (
-                        f"{context['params']['workflow_id']}/plots/{index}_{plot_name}"
-                    )
+                    key = f"{context['params']['workflow_id']}/plots/{plot_name}"
                     s3_store.hook.load_file(
                         plot.get("url"),
                         key,
@@ -1068,6 +1121,7 @@ def hep_create_dag():
                     plot_keys.append(key)
 
                     lb.add_figure(
+                        filename=plot_name,
                         key=key,
                         caption="".join(plot.get("captions", [])),
                         label=plot.get("label"),
@@ -1082,7 +1136,7 @@ def hep_create_dag():
             workflows.delete_empty_key(workflow, "figures")
             s3_store.write_workflow(workflow)
 
-        @task
+        @task(trigger_rule=TriggerRule.ALL_DONE_MIN_ONE_SUCCESS)
         def arxiv_author_list(tarball_key, **context):
             """Extract authors from any author XML found in the arXiv archive.
 
@@ -1138,11 +1192,19 @@ def hep_create_dag():
                     s3_store.write_workflow(workflow_data)
             return has_author_xml
 
-        @task(pool="high_memory", queue="high_memory")
+        @task(pool="high-memory", queue="high-memory")
         def guess_coreness(**context):
+            workflow_id = context["params"]["workflow_id"]
+
+            if is_auto_accepted_core(workflow_id, s3_store) or s3_store.get_flag(
+                "is-update", workflow_id
+            ):
+                return
+
+            workflow_data = s3_store.read_workflow(workflow_id)
+
             from inspire_classifier import Classifier
 
-            workflow_data = s3_store.read_workflow(context["params"]["workflow_id"])
             title = get_value(workflow_data, "data.titles.title[0]", "")
             abstract = get_value(workflow_data, "data.abstracts.value[0]", "")
 
@@ -1150,6 +1212,20 @@ def hep_create_dag():
             results = clf.predict_coreness(title, abstract)
             workflow_data["relevance_prediction"] = calculate_coreness(results)
             s3_store.write_workflow(workflow_data)
+
+        def _check_guess_coreness_rejection(**context):
+            workflow_id = context["params"]["workflow_id"]
+            workflow_data = s3_store.read_workflow(workflow_id)
+
+            if should_auto_reject(
+                workflow_data, workflow_id, s3_store
+            ) and not should_hide_record(workflow_data):
+                workflow_management_hook.add_decision(
+                    workflow_id=workflow_id,
+                    decision_data={"action": DECISION_AUTO_REJECT},
+                )
+                return "save_and_complete_workflow"
+            return "preprocessing.refextract"
 
         @task(multiple_outputs=True)
         def normalize_collaborations(**context):
@@ -1171,6 +1247,14 @@ def hep_create_dag():
         arxiv_author_list_task = arxiv_author_list(arxiv_package_download_task)
         normalize_journal_titles_task = normalize_journal_titles()
         extract_authors_from_pdf_task = extract_authors_from_pdf()
+        refextract_task = refextract()
+        check_guess_coreness_rejection_task = ShortCircuitBranchOperator(
+            task_id="check_guess_coreness_rejection",
+            python_callable=_check_guess_coreness_rejection,
+        )
+        save_workflow_task = save_workflow.override(
+            trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS
+        )()
 
         check_is_arxiv_paper_task >> [
             populate_submission_document_task,
@@ -1195,22 +1279,27 @@ def hep_create_dag():
         (
             extract_authors_from_pdf_task
             >> normalize_journal_titles_task
-            >> refextract()
+            >> populate_journal_coverage()
+            >> guess_coreness()
+            >> check_guess_coreness_rejection_task
+            >> [save_and_complete_workflow_task, refextract_task]
+        )
+        (
+            refextract_task
             >> count_reference_coreness()
             >> extract_journal_info()
-            >> populate_journal_coverage()
             >> classify_paper(
                 only_core_tags=False, spires=True, with_author_keywords=False
             )
-            >> guess_coreness()
             >> normalize_collaborations()
-            >> save_workflow()
+            >> save_workflow_task
         )
 
     @task
     def notify_if_submission(**context):
         """Send notification if the workflow is a submission."""
         workflow_data = s3_store.read_workflow(context["params"]["workflow_id"])
+        workflow_id = context["params"]["workflow_id"]
 
         if not is_submission(workflow_data) or get_ticket_by_type(
             workflow_data, TICKET_HEP_SUBMISSION
@@ -1221,23 +1310,24 @@ def hep_create_dag():
         email = data["acquisition_source"].get("email", "")
         title = LiteratureReader(data).title
         subject = f"Your suggestion to INSPIRE: {title}"
+        curation_context = {
+            "email": email,
+            "url": inspire_http_hook.get_backoffice_url(HEP, workflow_id),
+        }
 
-        response = inspire_http_hook.create_ticket(
+        ticket_id = tickets.create_ticket(
+            inspire_http_hook,
             LITERATURE_SUBMISSIONS_FUNCTIONAL_CATEGORY,
             "curator_submitted",
             subject,
             email,
-            {
-                "email": email,
-                "url": inspire_http_hook.get_backoffice_url(
-                    HEP, context["params"]["workflow_id"]
-                ),
-            },
+            curation_context,
+            TICKET_HEP_SUBMISSION,
+            workflow_id,
         )
 
-        ticket_id = response.json()["ticket_id"]
-
-        response = inspire_http_hook.reply_ticket(
+        tickets.reply_ticket(
+            inspire_http_hook,
             ticket_id,
             "user_submitted",
             {
@@ -1245,12 +1335,6 @@ def hep_create_dag():
                 "title": title,
             },
             email,
-        )
-
-        LiteratureWorkflowTicketManagementHook().create_ticket_entry(
-            workflow_id=context["params"]["workflow_id"],
-            ticket_type=TICKET_HEP_SUBMISSION,
-            ticket_id=ticket_id,
         )
 
     @task_group
@@ -1273,10 +1357,17 @@ def hep_create_dag():
         def check_is_update(match_approved_id, **context):
             if match_approved_id:
                 workflow = s3_store.read_workflow(context["params"]["workflow_id"])
-                workflow["workflow_type"] = HEP_UPDATE
+                is_publisher_workflow = workflow.get("workflow_type") in {
+                    HEP_PUBLISHER_CREATE,
+                    HEP_PUBLISHER_UPDATE,
+                }
+                next_workflow_type = (
+                    HEP_PUBLISHER_UPDATE if is_publisher_workflow else HEP_UPDATE
+                )
+                workflow["workflow_type"] = next_workflow_type
                 s3_store.write_workflow(workflow)
                 workflow_management_hook.partial_update_workflow(
-                    workflow["id"], {"workflow_type": HEP_UPDATE}
+                    workflow["id"], {"workflow_type": next_workflow_type}
                 )
                 return (
                     "halt_for_approval_if_new_or_reject_if_not_relevant.merge_articles"
@@ -1297,13 +1388,15 @@ def hep_create_dag():
             """
             workflow_id = context["params"]["workflow_id"]
             workflow_data = s3_store.read_workflow(workflow_id)
+            normalized_matched_control_number = maybe_int(matched_control_number)
 
             update = workflow_data["data"]
+            update["control_number"] = normalized_matched_control_number
             update_source = LiteratureReader(update).source
 
             record_data = inspire_http_record_management_hook.get_record(
                 pid_type=LITERATURE_PID_TYPE,
-                control_number=matched_control_number,
+                control_number=normalized_matched_control_number,
             )
 
             head_uuid = record_data["uuid"]
@@ -1313,6 +1406,11 @@ def hep_create_dag():
 
             head_root = workflows.read_wf_record_source(
                 record_uuid=head_uuid, source=update_source.lower()
+            )
+
+            s3_store.write_object(
+                head_root,
+                key=f"{workflow_id}/original_merge_root.json",
             )
 
             head_root = deepcopy(head_root["json"] if head_root else {})
@@ -1326,13 +1424,16 @@ def hep_create_dag():
             except MaxThresholdExceededError as e:
                 raise AirflowException(f"Conflict resolution failed. {e}") from None
 
+            logger.info(
+                "Merged record with conflicts: %s",
+                len(conflicts),
+            )
             workflow_data["data"] = merged
 
             workflow_data["merge_details"] = {
                 "head_uuid": str(head_uuid),
                 "head_version_id": head_version_id,
                 "merger_head_revision": head_revision_id,
-                "merger_original_root": head_root,
             }
 
             if conflicts:
@@ -1340,9 +1441,7 @@ def hep_create_dag():
 
             s3_store.write_workflow(workflow_data)
 
-            workflows.save_workflow(workflow_data)
-
-        @task
+        @task.short_circuit
         def await_merge_conflicts_resolved(**context):
             workflow_id = context["params"]["workflow_id"]
             workflow_data = workflow_management_hook.get_workflow(workflow_id)
@@ -1360,6 +1459,7 @@ def hep_create_dag():
                 return False
 
             s3_store.set_flag("approved", True, workflow_id)
+            s3_store.write_workflow(workflow_data)
             return True
 
         @task.branch
@@ -1378,17 +1478,11 @@ def hep_create_dag():
             workflow_id = context["params"]["workflow_id"]
             workflow_data = s3_store.read_workflow(workflow_id)
 
-            if (
-                is_submission(workflow_data)
-                or is_journal_coverage_full(workflow_data)
-                or is_auto_approved(workflow_id, s3_store)
-            ):
-                return (
-                    "halt_for_approval_if_new_or_reject_if_not_relevant."
-                    "await_decision_approval"
+            if should_auto_reject(workflow_data, workflow_id, s3_store):
+                workflow_management_hook.add_decision(
+                    workflow_id=workflow_id,
+                    decision_data={"action": DECISION_AUTO_REJECT},
                 )
-
-            if is_auto_rejected(workflow_data):
                 return (
                     "halt_for_approval_if_new_or_reject_if_not_relevant."
                     "should_replace_collection_to_hidden"
@@ -1396,7 +1490,7 @@ def hep_create_dag():
 
             return (
                 "halt_for_approval_if_new_or_reject_if_not_relevant."
-                "await_decision_approval"
+                "save_workflow_before_approval"
             )
 
         @task.branch(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
@@ -1404,15 +1498,9 @@ def hep_create_dag():
             s3_workflow_id = context["params"]["workflow_id"]
             workflow_data = s3_store.read_workflow(s3_workflow_id)
 
-            report_numbers = get_value(workflow_data, "data.report_numbers", [])
-            affiliations = flatten_list(
-                get_value(workflow_data, "data.authors.raw_affiliations.value", [])
-            )
-            should_hide = bool(
-                affiliations_for_hidden_collections(affiliations)
-            ) or bool(reports_for_hidden_collections(report_numbers))
-
-            if should_hide and not s3_store.get_flag("approved", s3_workflow_id):
+            if should_hide_record(workflow_data) and not s3_store.get_flag(
+                "approved", s3_workflow_id
+            ):
                 s3_store.set_flag("approved", True, s3_workflow_id)
                 s3_store.write_workflow(workflow_data)
                 return (
@@ -1420,15 +1508,6 @@ def hep_create_dag():
                     "replace_collection_to_hidden"
                 )
 
-            decision = get_decision(
-                workflow_data.get("decisions", []), DECISION_HEP_REJECT
-            )
-
-            if not decision:
-                workflow_management_hook.add_decision(
-                    workflow_id=context["params"]["workflow_id"],
-                    decision_data={"action": DECISION_AUTO_REJECT},
-                )
             return "halt_for_approval_if_new_or_reject_if_not_relevant.halt_end"
 
         @task
@@ -1461,6 +1540,7 @@ def hep_create_dag():
                     DECISION_HEP_REJECT,
                 ],
             )
+            logger.info("Got decision: %s", decision)
 
             action = decision.get("action") if decision else None
 
@@ -1530,14 +1610,14 @@ def hep_create_dag():
         )
         (
             is_record_relevant_task
+            >> save_workflow.override(task_id="save_workflow_before_approval")()
             >> await_decision_approval()
             >> should_replace_collection_to_hidden_task
             >> [replace_collection_task, halt_end]
         )
         is_record_relevant_task >> should_replace_collection_to_hidden_task
 
-    @task.branch(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-    def is_record_accepted(**context):
+    def _is_record_accepted(**context):
         """Check if the record has been accepted"""
 
         workflow_id = context["params"]["workflow_id"]
@@ -1558,7 +1638,10 @@ def hep_create_dag():
             "ticket_id"
         ]
 
-        inspire_http_hook.close_ticket(ticket_id)
+        decision = get_decision(workflow_data.get("decisions", []), DECISION_HEP_REJECT)
+        message = decision.get("value") if decision else None
+
+        tickets.close_ticket(inspire_http_hook, ticket_id, message=message)
 
     @task_group
     def postprocessing():
@@ -1580,7 +1663,7 @@ def hep_create_dag():
 
             decision = get_decision(
                 workflow_data.get("decisions"),
-                "hep_accept_core",
+                DECISION_HEP_ACCEPT_CORE,
             )
 
             workflow_data["data"]["core"] = bool(decision)
@@ -1633,7 +1716,27 @@ def hep_create_dag():
             ):
                 with suppress(ValueError):
                     data["document_type"].remove("article")
-                data["document_type"].append("conference paper")
+                    data["document_type"].append("conference paper")
+
+            s3_store.write_workflow(workflow_data)
+
+        @task
+        def add_fermilab_collection(**context):
+            s3_workflow_id = context["params"]["workflow_id"]
+            workflow_data = s3_store.read_workflow(s3_workflow_id)
+
+            report_numbers = get_value(workflow_data, "data.report_numbers", [])
+            if not is_fermilab_report(report_numbers):
+                return
+
+            collections = workflow_data["data"]["_collections"]
+            if FERMILAB_COLLECTION_NAME in collections:
+                return
+
+            workflow_data["data"]["_collections"] = [
+                *collections,
+                FERMILAB_COLLECTION_NAME,
+            ]
 
             s3_store.write_workflow(workflow_data)
 
@@ -1647,6 +1750,7 @@ def hep_create_dag():
             >> set_refereed
             >> normalize_author_affiliations_task
             >> link_institutions_with_affiliations_task
+            >> add_fermilab_collection()
             >> save_workflow()
             >> validate_record()
         )
@@ -1663,11 +1767,11 @@ def hep_create_dag():
         ]
 
         reply_template_context = workflows.get_reply_curation_context(
-            workflow_data["data"], inspire_http_hook
+            workflow_data, inspire_http_hook
         )
 
-        inspire_http_hook.close_ticket(
-            ticket_id, "user_accepted", reply_template_context
+        tickets.close_ticket(
+            inspire_http_hook, ticket_id, "user_accepted", reply_template_context
         )
 
     @task
@@ -1677,7 +1781,14 @@ def hep_create_dag():
 
         is_update = s3_store.get_flag("is-update", workflow_id)
 
-        if is_update:
+        if is_update or get_ticket_by_type(
+            workflow_data,
+            [
+                TICKET_HEP_CURATION,
+                TICKET_HEP_CURATION_CORE,
+                TICKET_HEP_PUBLISHER_CURATION_CORE,
+            ],
+        ):
             return
 
         data = workflow_data["data"]
@@ -1693,20 +1804,19 @@ def hep_create_dag():
             )
         )
 
+        recid = data.get("control_number")
+
         for functional_category in functional_categories:
-            response = inspire_http_hook.create_ticket(
+            tickets.create_ticket(
+                inspire_http_hook,
                 functional_category,
                 "curation_core",
                 subject,
                 email,
                 curation_context,
-            )
-            ticket_id = response.json()["ticket_id"]
-
-            LiteratureWorkflowTicketManagementHook().create_ticket_entry(
-                workflow_id=context["params"]["workflow_id"],
-                ticket_type=TICKET_HEP_CURATION_CORE,
-                ticket_id=ticket_id,
+                TICKET_HEP_CURATION,
+                workflow_id,
+                recid=recid,
             )
 
         functional_category, ticket_type = (
@@ -1716,18 +1826,19 @@ def hep_create_dag():
         )
 
         if functional_category:
-            response = inspire_http_hook.create_ticket(
-                functional_category, "curation_core", subject, email, curation_context
-            )
-            ticket_id = response.json()["ticket_id"]
-            LiteratureWorkflowTicketManagementHook().create_ticket_entry(
-                workflow_id=context["params"]["workflow_id"],
-                ticket_type=ticket_type,
-                ticket_id=ticket_id,
+            tickets.create_ticket(
+                inspire_http_hook,
+                functional_category,
+                "curation_core",
+                subject,
+                email,
+                curation_context,
+                ticket_type,
+                workflow_id,
+                recid=recid,
             )
 
-    @task.branch
-    def should_proceed_to_core_selection(**context):
+    def _should_proceed_to_core_selection(**context):
         workflow_data = s3_store.read_workflow(context["params"]["workflow_id"])
 
         is_auto_approved = s3_store.get_flag(
@@ -1784,7 +1895,7 @@ def hep_create_dag():
             }
 
             decision = get_decision(
-                workflow_data.get("decisions", []), "core_selection_accept_core"
+                workflow_data.get("decisions", []), DECISION_CORE_SELECTION_ACCEPT_CORE
             )
 
             is_core_selection_accepted = bool(decision)
@@ -1879,20 +1990,16 @@ def hep_create_dag():
         subject = workflows.get_curation_ticket_subject(data)
         email = data["acquisition_source"].get("email", "")
 
-        response = inspire_http_hook.create_ticket(
+        tickets.create_ticket(
+            inspire_http_hook,
             LITERATURE_ARXIV_CURATION_FUNCTIONAL_CATEGORY,
             "curation_core",
             subject,
             email,
             curation_ticket_context,
-        )
-
-        ticket_id = response.json()["ticket_id"]
-
-        LiteratureWorkflowTicketManagementHook().create_ticket_entry(
-            workflow_id=context["params"]["workflow_id"],
-            ticket_type=TICKET_HEP_CURATION_CORE,
-            ticket_id=ticket_id,
+            TICKET_HEP_CURATION_CORE,
+            workflow_id,
+            recid=data.get("control_number"),
         )
 
     @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
@@ -1909,21 +2016,11 @@ def hep_create_dag():
         s3_store.write_workflow(workflow_data)
 
     @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-    def save_and_complete_workflow(**context):
-        workflow_id = context["params"]["workflow_id"]
-        workflow_data = s3_store.read_workflow(workflow_id)
-        workflow_data["status"] = STATUS_COMPLETED
-
-        workflow_management_hook.update_workflow(workflow_id, workflow_data)
-
-    @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
     def run_next_if_necessary(**context):
         workflow_id = context["params"]["workflow_id"]
         workflow = s3_store.read_workflow(workflow_id)
 
-        matches = opensearch.find_matching_workflows(
-            workflow, RUNNING_STATUSES + [STATUS_BLOCKED]
-        )
+        matches = opensearch.find_matching_workflows(workflow, DISCARDABLE_STATUSES)
 
         older_workflow = None
 
@@ -1949,9 +2046,14 @@ def hep_create_dag():
     check_for_fuzzy_matches_task = check_for_fuzzy_matches()
     check_for_exact_matches_task = check_for_exact_matches()
     check_auto_approve_task = check_auto_approve()
-    save_and_complete_workflow_task = save_and_complete_workflow()
-    stop_if_existing_submission_notify_and_close_task = (
-        stop_if_existing_submission_notify_and_close()
+    check_if_previously_rejected_task = ShortCircuitBranchOperator(
+        task_id="check_if_previously_rejected",
+        python_callable=_check_if_previously_rejected,
+    )
+    stop_if_existing_submission_notify_and_close_task = ShortCircuitBranchOperator(
+        task_id="stop_if_existing_submission_notify_and_close",
+        python_callable=_stop_if_existing_submission_notify_and_close,
+        trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
     )
 
     (
@@ -1970,7 +2072,7 @@ def hep_create_dag():
     )
     (
         check_auto_approve_task
-        >> check_if_previously_rejected()
+        >> check_if_previously_rejected_task
         >> [preprocessing_group, save_and_complete_workflow_task]
     )
 
@@ -1989,28 +2091,39 @@ def hep_create_dag():
 
     run_next_if_necessary_task = run_next_if_necessary()
     check_for_blocking_workflows_task = check_for_blocking_workflows()
+    discard_older_wfs_w_same_source_task = ShortCircuitBranchOperator(
+        task_id="discard_older_wfs_w_same_source",
+        python_callable=_discard_older_wfs_w_same_source,
+    )
 
     (
-        check_env()
-        >> get_workflow_data()
-        >> set_schema()
+        restore_and_get_workflow_data()
+        >> set_schema_and_flags()
         >> validate_record()
+        >> notify_if_submission()
         >> set_workflow_status_to_running()
-        >> discard_older_wfs_w_same_source()
-        >> [check_for_blocking_workflows_task, run_next_if_necessary_task]
+        >> discard_older_wfs_w_same_source_task
+        >> [check_for_blocking_workflows_task, save_and_complete_workflow_task]
     )
 
     check_for_blocking_workflows_task >> check_for_exact_matches_task
 
     postprocessing_group = postprocessing()
-    should_proceed_to_core_selection_task = should_proceed_to_core_selection()
+    should_proceed_to_core_selection_task = ShortCircuitBranchOperator(
+        task_id="should_proceed_to_core_selection",
+        python_callable=_should_proceed_to_core_selection,
+    )
+    is_record_accepted_task = ShortCircuitBranchOperator(
+        task_id="is_record_accepted",
+        python_callable=_is_record_accepted,
+        trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
+    )
     notify_and_close_not_accepted_task = notify_and_close_not_accepted()
 
     (
         preprocessing_group
-        >> notify_if_submission()
         >> halt_for_approval_if_new_or_reject_if_not_relevant()
-        >> is_record_accepted()
+        >> is_record_accepted_task
         >> [postprocessing_group, notify_and_close_not_accepted_task]
     )
     (

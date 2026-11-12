@@ -1,13 +1,20 @@
 import copy
+import json
 from io import BytesIO
-from unittest import mock
 from unittest.mock import Mock, patch
 from urllib.parse import urlparse
 
 import pytest
-from airflow.exceptions import AirflowException, AirflowFailException
 from airflow.models import DagBag
+from airflow.sdk.exceptions import (
+    AirflowException,
+    AirflowFailException,
+)
 from botocore.exceptions import ClientError
+from hooks.backoffice.workflow_management_hook import HEP, WorkflowManagementHook
+from hooks.inspirehep.inspire_http_record_management_hook import (
+    InspireHTTPRecordManagementHook,
+)
 from include.utils import s3, workflows
 from include.utils.constants import (
     DECISION_AUTO_ACCEPT_CORE,
@@ -18,14 +25,18 @@ from include.utils.constants import (
     DECISION_HEP_ACCEPT_CORE,
     DECISION_HEP_REJECT,
     HEP_CREATE,
+    HEP_PUBLISHER_CREATE,
+    HEP_PUBLISHER_UPDATE,
     HEP_UPDATE,
     LITERATURE_PID_TYPE,
     STATUS_APPROVAL,
     STATUS_APPROVAL_CORE_SELECTION,
     STATUS_APPROVAL_FUZZY_MATCHING,
     STATUS_COMPLETED,
+    STATUS_ERROR_MULTIPLE_EXACT_MATCHES,
     STATUS_MISSING_SUBJECT_FIELDS,
     STATUS_RUNNING,
+    TICKET_HEP_CURATION,
     TICKET_HEP_CURATION_CORE,
     TICKET_HEP_SUBMISSION,
 )
@@ -35,11 +46,6 @@ from inspire_utils.query import ordered
 from tenacity import Future, RetryError
 
 from tests.test_utils import (
-    function_test,
-    get_inspire_http_record,
-    get_lit_workflow_task,
-    initialize_s3_store,
-    set_lit_workflow_task,
     task_test,
 )
 
@@ -88,31 +94,23 @@ def higgs_ontology(tmpdir):
     return str(ontology)
 
 
-@pytest.mark.usefixtures("_s3_store", "_inspire_http_record_management_hook")
+@pytest.mark.usefixtures("hep_env")
 class Test_HEPCreateDAG:
     dag = dagbag.get_dag("hep_create_dag")
     context = {
         "dag_run": {"run_id": "test_run"},
-        "ti": {"xcom_push": lambda key, value: None},
+        "ti": Mock(xcom_push=Mock(), xcom_pull=None),
         "params": {"workflow_id": "00000000-0000-0000-0000-000000001111"},
     }
 
+    wf_hook = WorkflowManagementHook(HEP)
+
+    inspire_hook = InspireHTTPRecordManagementHook()
+
     workflow_id = context["params"]["workflow_id"]
 
-    def test_check_env(self):
-        task = self.dag.get_task("check_env")
-
-        with mock.patch.dict("os.environ", AIRFLOW_VAR_ENVIRONMENT="DEV"):
-            task.execute(context={})
-
-        with (
-            mock.patch.dict("os.environ", AIRFLOW_VAR_ENVIRONMENT="PROD"),
-            pytest.raises(AirflowException),
-        ):
-            task.execute(context={})
-
     @pytest.mark.vcr
-    def test_set_schema(self):
+    def test_set_schema_and_flags(self):
         workflow_data = {
             "id": self.workflow_id,
             "data": {
@@ -135,17 +133,33 @@ class Test_HEPCreateDAG:
         }
 
         self.s3_store.write_workflow(workflow_data)
-        task_test("hep_create_dag", "set_schema", dag_params=self.context["params"])
+
+        task_test(self.dag, "set_schema_and_flags", self.context)
         workflow_result = self.s3_store.read_workflow(workflow_id=self.workflow_id)
 
         assert "$schema" in workflow_result["data"]
+        assert self.s3_store.read_object(f"{self.workflow_id}/flags.json") == {}
 
-    @pytest.mark.vcr
-    def test_get_workflow_data(self):
-        res = task_test(
-            "hep_create_dag", "get_workflow_data", dag_params=self.context["params"]
-        )
+    @patch(
+        "hooks.backoffice.workflow_management_hook.WorkflowManagementHook.restore_workflow"
+    )
+    def test_restore_and_get_workflow_data(self, mock_restore_workflow):
+        restored_workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "titles": [{"title": "Restored title"}],
+                "_collections": ["Literature"],
+                "document_type": ["article"],
+            },
+            "workflow_type": HEP_CREATE,
+            "status": STATUS_RUNNING,
+        }
+        mock_restore_workflow.return_value = restored_workflow_data
+
+        res = task_test(self.dag, "restore_and_get_workflow_data", self.context)
         assert res == f"{self.workflow_id}/workflow.json"
+        mock_restore_workflow.assert_called_once_with(self.workflow_id)
+        assert self.s3_store.read_workflow(self.workflow_id) == restored_workflow_data
 
     @patch(
         "include.utils.opensearch.find_matching_workflows",
@@ -193,14 +207,11 @@ class Test_HEPCreateDAG:
             },
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "discard_older_wfs_w_same_source",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        result = task_test(self.dag, "discard_older_wfs_w_same_source", self.context)
 
-        assert "check_for_blocking_workflows" in result["followed"]
+        assert result == "check_for_blocking_workflows"
+        matching_statuses = mock_find_matching_workflows.call_args.args[1]
+        assert STATUS_APPROVAL_CORE_SELECTION not in matching_statuses
 
     @patch(
         "include.utils.opensearch.find_matching_workflows",
@@ -246,16 +257,10 @@ class Test_HEPCreateDAG:
             },
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "discard_older_wfs_w_same_source",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
-        assert "run_next_if_necessary" in result["followed"]
-        workflow_result = get_lit_workflow_task(self.workflow_id)
+        result = task_test(self.dag, "discard_older_wfs_w_same_source", self.context)
+        assert result == "save_and_complete_workflow"
+        workflow_result = self.wf_hook.get_workflow(self.workflow_id)
 
-        assert workflow_result["status"] == STATUS_COMPLETED
         assert workflows.get_decision(workflow_result["decisions"], DECISION_DISCARD)
 
     @patch(
@@ -301,11 +306,58 @@ class Test_HEPCreateDAG:
         )
 
         with pytest.raises(AirflowFailException):
-            task_test(
-                "hep_create_dag",
-                "discard_older_wfs_w_same_source",
-                dag_params=self.context["params"],
-            )
+            task_test(self.dag, "discard_older_wfs_w_same_source", self.context)
+
+    @patch(
+        "include.utils.opensearch.find_matching_workflows",
+        return_value=[
+            {
+                "id": "non_submission_match",
+                "data": {
+                    "acquisition_source": {
+                        "method": "hepcrawl",
+                        "source": "arXiv",
+                    },
+                },
+                "_created_at": "2025-11-01T00:00:00.000Z",
+            }
+        ],
+    )
+    def test_discard_older_wfs_w_same_source_ignores_non_submission_matches(
+        self, mock_find_matching_workflows
+    ):
+        self.s3_store.write_workflow(
+            {
+                "id": self.workflow_id,
+                "data": {
+                    "acquisition_source": {
+                        "method": "submitter",
+                        "source": "submitter",
+                    },
+                },
+                "_created_at": "2025-11-02T00:00:00.000Z",
+            },
+        )
+
+        result = task_test(self.dag, "discard_older_wfs_w_same_source", self.context)
+
+        assert result == "check_for_blocking_workflows"
+
+    @pytest.mark.vcr
+    def test_discard_older_wfs_w_same_source_missing_subject_fields(self):
+        self.s3_store.write_workflow(
+            {
+                "id": self.workflow_id,
+                "data": {
+                    "dois": [
+                        {
+                            "value": "10.1103/fc8j-tb8k",
+                        }
+                    ],
+                },
+            },
+        )
+        assert not task_test(self.dag, "check_for_blocking_workflows", self.context)
 
     @pytest.mark.vcr
     def test_check_for_blocking_workflows_block_arxivid(self):
@@ -321,12 +373,7 @@ class Test_HEPCreateDAG:
                 },
             },
         )
-
-        assert not task_test(
-            "hep_create_dag",
-            "check_for_blocking_workflows",
-            dag_params=self.context["params"],
-        )
+        assert not task_test(self.dag, "check_for_blocking_workflows", self.context)
 
     @pytest.mark.vcr
     def test_check_for_blocking_workflows_block_doi(self):
@@ -342,11 +389,7 @@ class Test_HEPCreateDAG:
                 },
             },
         )
-        assert not task_test(
-            "hep_create_dag",
-            "check_for_blocking_workflows",
-            dag_params=self.context["params"],
-        )
+        assert not task_test(self.dag, "check_for_blocking_workflows", self.context)
 
     @pytest.mark.vcr
     def test_check_for_blocking_workflows_continue(self):
@@ -362,12 +405,8 @@ class Test_HEPCreateDAG:
                 },
             },
         )
-        assert task_test(
-            "hep_create_dag",
-            "check_for_blocking_workflows",
-            dag_params=self.context["params"],
-        )
-        assert get_lit_workflow_task(self.workflow_id)["status"] == STATUS_RUNNING
+        assert task_test(self.dag, "check_for_blocking_workflows", self.context)
+        assert self.wf_hook.get_workflow(self.workflow_id)["status"] == STATUS_RUNNING
 
     @pytest.mark.vcr
     def test_check_for_exact_matches_no_match(self):
@@ -380,41 +419,11 @@ class Test_HEPCreateDAG:
             },
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "check_for_exact_matches",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        result = task_test(self.dag, "check_for_exact_matches", self.context)
 
-        assert "check_for_fuzzy_matches" in result["followed"]
+        assert result == "check_for_fuzzy_matches"
 
     def test_check_auto_approve_is_submission(self):
-        workflow_data = {
-            "id": self.workflow_id,
-            "data": {
-                "titles": [{"title": "A title"}],
-                "acquisition_source": {"method": "submitter"},
-            },
-        }
-
-        self.s3_store.write_workflow(workflow_data)
-
-        task_test(
-            "hep_create_dag",
-            "check_auto_approve",
-            dag_params=self.context["params"],
-        )
-
-        result = self.s3_store.get_flag(
-            "auto-approved",
-            self.workflow_id,
-        )
-
-        assert result is False
-
-    @pytest.mark.vcr
-    def test_check_auto_approve_is_auto_approved_and_core_is_true(self):
         workflow_data = {
             "id": self.workflow_id,
             "data": {
@@ -432,19 +441,46 @@ class Test_HEPCreateDAG:
                 ],
             },
         }
+
+        self.s3_store.write_workflow(workflow_data)
+
+        task_test(self.dag, "check_auto_approve", self.context)
+
+        result = self.s3_store.get_flag(
+            "auto-approved",
+            self.workflow_id,
+        )
+
+        assert result is False
+
+    @pytest.mark.vcr
+    def test_check_auto_approve_is_auto_approved_and_core_is_true(self):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "titles": [{"title": "A title"}],
+                "acquisition_source": {"method": "hepcrawl", "source": "arXiv"},
+                "arxiv_eprints": [
+                    {
+                        "categories": [
+                            "hep-ph",
+                            "astro-ph.CO",
+                            "gr-qc",
+                        ],
+                        "value": "1609.03939",
+                    },
+                ],
+            },
+        }
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
         self.s3_store.write_workflow(workflow_data)
-        task_test(
-            "hep_create_dag",
-            "check_auto_approve",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "check_auto_approve", self.context)
         result = self.s3_store.read_workflow(self.workflow_id)
 
         assert result["core"] is True
         assert self.s3_store.get_flag("auto-approved", self.workflow_id) is True
 
-        workflow = get_lit_workflow_task(self.workflow_id)
+        workflow = self.wf_hook.get_workflow(self.workflow_id)
         assert workflows.get_decision(
             workflow.get("decisions"), DECISION_AUTO_ACCEPT_CORE
         )
@@ -454,7 +490,7 @@ class Test_HEPCreateDAG:
             "id": self.workflow_id,
             "data": {
                 "titles": [{"title": "A title"}],
-                "acquisition_source": {"method": "submitter"},
+                "acquisition_source": {"method": "hepcrawl", "source": "arXiv"},
                 "arxiv_eprints": [
                     {
                         "categories": [
@@ -472,11 +508,7 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "check_auto_approve",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "check_auto_approve", self.context)
 
         result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -494,6 +526,7 @@ class Test_HEPCreateDAG:
                     "source": "arXiv",
                 },
             },
+            "_created_at": "2025-04-02T00:00:00.000Z",
         }
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags(
@@ -501,15 +534,42 @@ class Test_HEPCreateDAG:
             self.workflow_id,
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "check_if_previously_rejected",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
-        workflow = get_lit_workflow_task(self.workflow_id)
+        result = task_test(self.dag, "check_if_previously_rejected", self.context)
+        workflow = self.wf_hook.get_workflow(self.workflow_id)
 
-        assert "save_and_complete_workflow" in result["followed"]
+        assert result == "save_and_complete_workflow"
+        assert workflows.get_decision(workflow.get("decisions"), DECISION_AUTO_REJECT)
+
+    @pytest.mark.vcr
+    @patch(
+        "include.utils.workflows.has_previously_rejected_wf_in_backoffice_w_same_source",
+        return_value=False,
+    )
+    def test_check_if_previously_rejected_true_arxiv_hack(
+        self, mock_has_previously_rejected
+    ):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "titles": [{"title": "A title"}],
+                "arxiv_eprints": [{"value": "2504.01123"}],
+                "acquisition_source": {
+                    "source": "arXiv",
+                    "method": "hepcrawl",
+                },
+            },
+            "_created_at": "2026-06-02T00:00:00.000Z",
+        }
+        self.s3_store.write_workflow(workflow_data)
+        self.s3_store.set_flags(
+            {"is-update": False, "auto-approved": False},
+            self.workflow_id,
+        )
+
+        result = task_test(self.dag, "check_if_previously_rejected", self.context)
+        workflow = self.wf_hook.get_workflow(self.workflow_id)
+
+        assert result == "save_and_complete_workflow"
         assert workflows.get_decision(workflow.get("decisions"), DECISION_AUTO_REJECT)
 
     @pytest.mark.vcr
@@ -523,6 +583,7 @@ class Test_HEPCreateDAG:
                     "source": "custom_source",
                 },
             },
+            "_created_at": "2026-05-04T00:00:00.000Z",
         }
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags(
@@ -530,32 +591,39 @@ class Test_HEPCreateDAG:
             self.workflow_id,
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "check_if_previously_rejected",
-            dag_params=self.context["params"],
-        )
+        result = task_test(self.dag, "check_if_previously_rejected", self.context)
         assert result == "preprocessing"
 
-    @pytest.mark.vcr
-    def test_check_for_exact_matches_one_match(self):
-        self.s3_store.write_workflow(
-            {
-                "id": self.workflow_id,
-                "data": {
-                    "arxiv_eprints": [{"value": "1801.07224"}],
-                },
+    @patch(
+        "include.utils.workflows.has_previously_rejected_wf_in_backoffice_w_same_source",
+        return_value=True,
+    )
+    @patch(
+        "hooks.backoffice.workflow_management_hook.WorkflowManagementHook.add_decision"
+    )
+    def test_check_if_previously_rejected_does_not_reject_duplicate_submissions(
+        self, mock_add_decision, mock_has_previously_rejected
+    ):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "titles": [{"title": "A submission"}],
+                "arxiv_eprints": [{"value": "2504.01123"}],
+                "acquisition_source": {"method": "submitter"},
             },
+            "_created_at": "2025-04-02T00:00:00.000Z",
+        }
+        self.s3_store.write_workflow(workflow_data)
+        self.s3_store.set_flags(
+            {"is-update": False, "auto-approved": False},
+            self.workflow_id,
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "check_for_exact_matches",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        result = task_test(self.dag, "check_if_previously_rejected", self.context)
 
-        assert "stop_if_existing_submission_notify_and_close" in result["followed"]
+        assert result == "preprocessing"
+        mock_has_previously_rejected.assert_called_once_with(workflow_data)
+        mock_add_decision.assert_not_called()
 
     @pytest.mark.vcr
     def test_check_for_exact_matches_one_match_has_match(self):
@@ -568,14 +636,15 @@ class Test_HEPCreateDAG:
             },
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "check_for_exact_matches",
-            dag_params=self.context["params"],
-            xcom_key="match",
-        )
+        self.context["ti"].xcom_push.reset_mock()
+        result = task_test(self.dag, "check_for_exact_matches", self.context)
+        workflow = self.s3_store.read_workflow(self.workflow_id)
+        backoffice_workflow = self.wf_hook.get_workflow(self.workflow_id)
 
-        assert result == 1649231
+        assert result == "stop_if_existing_submission_notify_and_close"
+        assert workflow["matches"]["exact"] == [1649231]
+        assert backoffice_workflow["matches"]["exact"] == [1649231]
+        self.context["ti"].xcom_push.assert_called_once_with(key="match", value=1649231)
 
     @pytest.mark.vcr
     def test_check_for_exact_matches_multi_match(self):
@@ -595,11 +664,11 @@ class Test_HEPCreateDAG:
         )
 
         with pytest.raises(AirflowException):
-            task_test(
-                "hep_create_dag",
-                "check_for_exact_matches",
-                dag_params=self.context["params"],
-            )
+            task_test(self.dag, "check_for_exact_matches", self.context)
+
+        workflow = self.s3_store.read_workflow(self.workflow_id)
+        assert workflow["status"] == STATUS_ERROR_MULTIPLE_EXACT_MATCHES
+        assert workflow["matches"]["exact"] == [1415120, 1383683]
 
     @pytest.mark.vcr
     def test_check_for_fuzzy_matches_matches(self):
@@ -618,11 +687,7 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
-        result = task_test(
-            dag_id="hep_create_dag",
-            task_id="check_for_fuzzy_matches",
-            dag_params=self.context["params"],
-        )
+        result = task_test(self.dag, "check_for_fuzzy_matches", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -641,57 +706,49 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
-        result = task_test(
-            dag_id="hep_create_dag",
-            task_id="check_for_fuzzy_matches",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        result = task_test(self.dag, "check_for_fuzzy_matches", self.context)
 
-        assert result == {"followed": ["stop_if_existing_submission_notify_and_close"]}
+        assert result == "stop_if_existing_submission_notify_and_close"
 
     @pytest.mark.vcr
     def test_await_decision_fuzzy_match_best_match(self):
-        assert task_test(
-            dag_id="hep_create_dag",
-            task_id="await_decision_fuzzy_match",
-            dag_params=self.context["params"],
-        )
-        assert get_lit_workflow_task(self.workflow_id)["status"] == STATUS_RUNNING
+        assert task_test(self.dag, "await_decision_fuzzy_match", self.context)
+        assert self.wf_hook.get_workflow(self.workflow_id)["status"] == STATUS_RUNNING
 
     @pytest.mark.vcr
     def test_await_decision_fuzzy_match_best_match_no_decision(self):
         workflow_id = "6e84fd0b-8d0b-4147-9aee-c28a4f787b0d"
 
-        set_lit_workflow_task(status_name=STATUS_RUNNING, workflow_id=workflow_id)
+        self.wf_hook.set_workflow_status(STATUS_RUNNING, workflow_id)
 
+        context_params = {"workflow_id": workflow_id}
         assert not task_test(
-            dag_id="hep_create_dag",
-            task_id="await_decision_fuzzy_match",
-            dag_params={"workflow_id": workflow_id},
+            self.dag,
+            "await_decision_fuzzy_match",
+            self.context,
+            context_params=context_params,
         )
         assert (
-            get_lit_workflow_task(workflow_id)["status"]
+            self.wf_hook.get_workflow(workflow_id)["status"]
             == STATUS_APPROVAL_FUZZY_MATCHING
         )
 
     @pytest.mark.vcr
     def test_await_decision_fuzzy_match_best_match_has_xcom_match(self):
-        result = task_test(
-            dag_id="hep_create_dag",
-            task_id="await_decision_fuzzy_match",
-            dag_params=self.context["params"],
-            xcom_key="match",
+        self.context["ti"].xcom_push.reset_mock()
+        assert task_test(self.dag, "await_decision_fuzzy_match", self.context)
+        self.context["ti"].xcom_push.assert_called_once_with(
+            key="match", value="paper1"
         )
-
-        assert result == "paper1"
 
     @pytest.mark.vcr
     def test_await_decision_fuzzy_match_none(self):
+        context_params = {"workflow_id": "66961888-a628-46b7-b807-4deae3478adc"}
         assert task_test(
-            dag_id="hep_create_dag",
-            task_id="await_decision_fuzzy_match",
-            dag_params={"workflow_id": "66961888-a628-46b7-b807-4deae3478adc"},
+            self.dag,
+            "await_decision_fuzzy_match",
+            self.context,
+            context_params=context_params,
         )
 
     def test_stop_if_existing_submission_notify_and_close_continue(self):
@@ -706,37 +763,38 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
 
         result = task_test(
-            "hep_create_dag",
-            "stop_if_existing_submission_notify_and_close",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
+            self.dag, "stop_if_existing_submission_notify_and_close", self.context
         )
 
-        assert "check_auto_approve" in result["followed"]
+        assert result == "check_auto_approve"
 
     @pytest.mark.vcr
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_stop_if_existing_submission_notify_and_close_stop(self):
         workflow_id = "4100e6f4-1bd6-4bbe-b0b4-864c6c2cbef2"
-        workflow_data = get_lit_workflow_task(workflow_id)
+        workflow_data = self.wf_hook.get_workflow(workflow_id)
         self.s3_store.set_flags({"is-update": True}, workflow_id)
         self.s3_store.write_workflow(workflow_data)
 
+        context_params = {"workflow_id": workflow_id}
+
         task_test(
-            "hep_create_dag",
+            self.dag,
             "notify_if_submission",
-            dag_params={"workflow_id": workflow_id},
+            self.context,
+            context_params=context_params,
         )
 
-        self.s3_store.write_workflow(get_lit_workflow_task(workflow_id))
+        self.s3_store.write_workflow(self.wf_hook.get_workflow(workflow_id))
 
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "stop_if_existing_submission_notify_and_close",
-            dag_params={"workflow_id": workflow_id},
-            xcom_key="skipmixin_key",
+            self.context,
+            context_params=context_params,
         )
 
-        assert "save_and_complete_workflow" in result["followed"]
+        assert result == "save_and_complete_workflow"
 
     @pytest.mark.vcr
     def test_normalize_collaborations(self):
@@ -749,11 +807,7 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.normalize_collaborations",
-            dag_params={"workflow_id": self.workflow_id},
-        )
+        task_test(self.dag, "preprocessing.normalize_collaborations", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
         accelerator_experiments = workflow_result["data"]["accelerator_experiments"]
@@ -775,11 +829,7 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.extract_journal_info",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.extract_journal_info", self.context)
 
         updated = self.s3_store.read_workflow(self.workflow_id)
         assert "refextract" in updated
@@ -819,11 +869,7 @@ class Test_HEPCreateDAG:
                 },
             },
         )
-        res = task_test(
-            "hep_create_dag",
-            "preprocessing.arxiv_package_download",
-            dag_params=self.context["params"],
-        )
+        res = task_test(self.dag, "preprocessing.arxiv_package_download", self.context)
         assert res == f"{self.workflow_id}/2508.17630.tar.gz"
 
     def test_arxiv_author_list_with_missing_tarball(self):
@@ -856,10 +902,10 @@ class Test_HEPCreateDAG:
         validate(workflow_data["data"]["arxiv_eprints"], eprints_subschema)
 
         task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.arxiv_author_list",
+            self.dag,
+            "preprocessing.arxiv_author_list",
+            self.context,
             params={"tarball_key": f"{self.workflow_id}/notfound"},
-            dag_params=self.context["params"],
         )
 
     def test_arxiv_author_list_handles_no_author_list(self, datadir):
@@ -885,10 +931,10 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.arxiv_author_list",
+            self.dag,
+            "preprocessing.arxiv_author_list",
+            self.context,
             params={"tarball_key": tarball_key},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -914,10 +960,10 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.arxiv_author_list",
+            self.dag,
+            "preprocessing.arxiv_author_list",
+            self.context,
             params={"tarball_key": tarball_key},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -951,10 +997,10 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.arxiv_author_list",
+            self.dag,
+            "preprocessing.arxiv_author_list",
+            self.context,
             params={"tarball_key": tarball_key},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -996,10 +1042,10 @@ class Test_HEPCreateDAG:
         validate(data["arxiv_eprints"], eprints_subschema)
 
         task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.arxiv_author_list",
+            self.dag,
+            "preprocessing.arxiv_author_list",
+            self.context,
             params={"tarball_key": tarball_key},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -1063,10 +1109,10 @@ class Test_HEPCreateDAG:
         ]
         validate(expected_authors, authors_subschema)
         task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.arxiv_author_list",
+            self.dag,
+            "preprocessing.arxiv_author_list",
+            self.context,
             params={"tarball_key": tarball_key},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -1088,14 +1134,9 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        res = task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.check_is_arxiv_paper",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        res = task_test(self.dag, "preprocessing.check_is_arxiv_paper", self.context)
 
-        assert "preprocessing.populate_arxiv_document" in res["followed"]
+        assert res == "preprocessing.populate_arxiv_document"
 
     def test_check_is_not_arxiv_paper(self):
         workflow_data = {
@@ -1112,14 +1153,9 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        res = task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.check_is_arxiv_paper",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        res = task_test(self.dag, "preprocessing.check_is_arxiv_paper", self.context)
 
-        assert "preprocessing.populate_submission_document" in res["followed"]
+        assert res == "preprocessing.populate_submission_document"
 
     @pytest.mark.vcr
     def test_populate_journal_coverage(self):
@@ -1137,11 +1173,7 @@ class Test_HEPCreateDAG:
         }
 
         self.s3_store.write_workflow(workflow_data)
-        task_test(
-            "hep_create_dag",
-            "preprocessing.populate_journal_coverage",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.populate_journal_coverage", self.context)
 
         result = self.s3_store.read_workflow(self.workflow_id)
         assert "partial" in result["journal_coverage"]
@@ -1167,11 +1199,7 @@ class Test_HEPCreateDAG:
         }
 
         self.s3_store.write_workflow(workflow_data)
-        task_test(
-            "hep_create_dag",
-            "preprocessing.populate_journal_coverage",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.populate_journal_coverage", self.context)
 
         result = self.s3_store.read_workflow(self.workflow_id)
         assert "full" in result["journal_coverage"]
@@ -1187,19 +1215,22 @@ class Test_HEPCreateDAG:
         workflow_data = {"id": self.workflow_id, "data": {}}
 
         self.s3_store.write_workflow(workflow_data)
+
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.arxiv_plot_extract",
+            self.context,
             params={"tarball_key": tarball_key},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
         plots = workflow_result["data"]["figures"]
         assert len(plots) == 20
-        for plot in plots:
+        for index, plot in enumerate(plots):
             assert plot["key"].endswith(".png")
+            assert plot["filename"].startswith(f"{index}_")
+            assert plot["key"] == f"{self.workflow_id}/plots/{plot['filename']}"
 
     def test_arxiv_plot_extract_populates_files_with_plots(self, datadir):
         schema = load_schema("hep")
@@ -1230,10 +1261,10 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.arxiv_plot_extract",
+            self.context,
             params={"tarball_key": tarball_key},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -1287,10 +1318,10 @@ class Test_HEPCreateDAG:
         for _ in range(2):
             assert (
                 task_test(
-                    "hep_create_dag",
+                    self.dag,
                     "preprocessing.arxiv_plot_extract",
+                    self.context,
                     params={"tarball_key": tarball_key},
-                    dag_params=self.context["params"],
                 )
                 is None
             )
@@ -1346,10 +1377,10 @@ class Test_HEPCreateDAG:
         assert validate(workflow_data["data"]["arxiv_eprints"], subschema) is None
         self.s3_store.write_workflow(workflow_data)
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.arxiv_plot_extract",
+            self.context,
             params={"tarball_key": tarball_key},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -1380,10 +1411,10 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.arxiv_plot_extract",
+            self.context,
             params={"tarball_key": tarball_key},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -1411,10 +1442,10 @@ class Test_HEPCreateDAG:
 
         with pytest.raises(ClientError, match="Not Found"):
             task_test(
-                "hep_create_dag",
+                self.dag,
                 "preprocessing.arxiv_plot_extract",
+                self.context,
                 params={"tarball_key": tarball_key},
-                dag_params=self.context["params"],
             )
 
     @pytest.mark.vcr
@@ -1442,11 +1473,7 @@ class Test_HEPCreateDAG:
 
         assert validate(workflow["data"]["acquisition_source"], subschema) is None
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.populate_submission_document",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.populate_submission_document", self.context)
 
         expected = [
             {
@@ -1487,17 +1514,8 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow)
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.populate_submission_document",
-            dag_params=self.context["params"],
-        )
-
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.populate_submission_document",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.populate_submission_document", self.context)
+        task_test(self.dag, "preprocessing.populate_submission_document", self.context)
 
         expected = [
             {
@@ -1537,11 +1555,7 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow)
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.populate_submission_document",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.populate_submission_document", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -1567,17 +1581,7 @@ class Test_HEPCreateDAG:
         }
         assert validate(workflow["data"]["acquisition_source"], subschema) is None
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.populate_submission_document",
-            dag_params=self.context["params"],
-        )
-
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.populate_submission_document",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.populate_submission_document", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
         assert "documents" not in workflow_result["data"]
@@ -1603,11 +1607,7 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.download_documents",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.download_documents", self.context)
 
         result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -1645,11 +1645,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         with pytest.raises(RetryError):
-            task_test(
-                "hep_create_dag",
-                "preprocessing.download_documents",
-                dag_params=self.context["params"],
-            )
+            task_test(self.dag, "preprocessing.download_documents", self.context)
 
     @pytest.mark.vcr
     def test_download_documents_with_multiple_documents(self):
@@ -1679,11 +1675,7 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.download_documents",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.download_documents", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -1706,10 +1698,9 @@ class Test_HEPCreateDAG:
             )
 
     def test_download_documents_from_publisher(self):
-        s3_publisher_store = s3.S3JsonStore("s3_elsevier_conn")
+        s3_publisher_store = s3.S3JsonStore("s3_publisher_conn")
         doi_file = "10.1016/j.vacuum.2026.115222.xml"
 
-        initialize_s3_store(s3_publisher_store)
         s3_publisher_store.hook.load_string(
             "<xml>test</xml>",
             f"packages/{doi_file}",
@@ -1730,11 +1721,7 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.download_documents",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.download_documents", self.context)
 
         assert self.s3_store.hook.check_for_key(
             f"{self.workflow_id}/documents/{doi_file}"
@@ -1770,11 +1757,7 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.download_documents",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.download_documents", self.context)
         assert self.s3_store.hook.check_for_key(
             f"{self.workflow_id}/documents/{filename}"
         )
@@ -1817,11 +1800,7 @@ class Test_HEPCreateDAG:
         }
 
         self.s3_store.write_workflow(workflow_data)
-        task_test(
-            "hep_create_dag",
-            "preprocessing.count_reference_coreness",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.count_reference_coreness", self.context)
 
         result = self.s3_store.read_workflow(self.workflow_id)
         assert result["reference_count"]["core"] == 2
@@ -1837,9 +1816,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         assert not task_test(
-            "hep_create_dag",
-            "preprocessing.normalize_journal_titles",
-            dag_params=self.context["params"],
+            self.dag, "preprocessing.normalize_journal_titles", self.context
         )
 
         updated_data = self.s3_store.read_workflow(self.workflow_id)
@@ -1869,12 +1846,7 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.populate_arxiv_document",
-            params=None,
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.populate_arxiv_document", self.context)
 
         workflow_data = self.s3_store.read_workflow(self.workflow_id)
 
@@ -1915,22 +1887,13 @@ class Test_HEPCreateDAG:
         assert validate(workflow_data["data"]["arxiv_eprints"], subschema) is None
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.populate_arxiv_document",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.populate_arxiv_document", self.context)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.populate_arxiv_document",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.populate_arxiv_document", self.context)
 
         workflow_data = self.s3_store.read_workflow(self.workflow_id)
         assert len(workflow_data["data"]["documents"]) == 1
 
-    @pytest.mark.vcr
     def test_populate_arxiv_document_logs_on_pdf_not_existing(self):
         schema = load_schema("hep")
         subschema = schema["properties"]["arxiv_eprints"]
@@ -1953,14 +1916,8 @@ class Test_HEPCreateDAG:
 
         assert validate(workflow_data["data"]["arxiv_eprints"], subschema) is None
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.populate_arxiv_document",
-            dag_params=self.context["params"],
-        )
-
-        workflow_data = self.s3_store.read_workflow(self.workflow_id)
-        assert "documents" not in workflow_data["data"]
+        with pytest.raises(RetryError):
+            task_test(self.dag, "preprocessing.populate_arxiv_document", self.context)
 
     @pytest.mark.vcr
     def test_normalize_journal_titles_with_data(self):
@@ -1980,9 +1937,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         assert not task_test(
-            "hep_create_dag",
-            "preprocessing.normalize_journal_titles",
-            dag_params=self.context["params"],
+            self.dag, "preprocessing.normalize_journal_titles", self.context
         )
 
         updated_data = self.s3_store.read_workflow(self.workflow_id)
@@ -2055,11 +2010,7 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.refextract",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.refextract", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -2087,11 +2038,7 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.refextract",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.refextract", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -2109,11 +2056,7 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.refextract",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.refextract", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -2125,51 +2068,13 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.refextract",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "preprocessing.refextract", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
         assert "references" not in workflow_result["data"]
 
-    @patch(
-        "include.inspire.refextract_utils.match_references_hep",
-        return_value=[
-            {
-                "reference": {"misc": ["is given by (17), i.e., R\u0302PP"]},
-                "raw_refs": [
-                    {
-                        "schema": "text",
-                        "value": "is given by (17), i.e., R\u0302PP",
-                        "source": "arXiv",
-                    }
-                ],
-            },
-            {
-                "raw_refs": [
-                    {
-                        "schema": "text",
-                        "value": "\u0000\u0013 \u0000\u001a\u0000\u0018\u0000\u0013",
-                        "source": "arXiv",
-                    }
-                ]
-            },
-            {
-                "reference": {"misc": ["7LPH6WHSt"]},
-                "raw_refs": [
-                    {
-                        "schema": "text",
-                        "value": "\u00007\u0000S\u0000\u0003t",
-                        "source": "arXiv",
-                    }
-                ],
-            },
-        ],
-    )
     @pytest.mark.vcr
-    def test_refextract_invalid_characters(self, mock_match_references_hep, datadir):
+    def test_refextract_invalid_characters(self, datadir):
         filename = "1802.08709.pdf"
         self.s3_store.hook.load_file(
             datadir / filename,
@@ -2187,11 +2092,50 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.refextract",
-            dag_params=self.context["params"],
+        mock_match_references_hep = Mock(
+            return_value=[
+                {
+                    "reference": {"misc": ["is given by (17), i.e., R\u0302PP"]},
+                    "raw_refs": [
+                        {
+                            "schema": "text",
+                            "value": "is given by (17), i.e., R\u0302PP",
+                            "source": "arXiv",
+                        }
+                    ],
+                },
+                {
+                    "raw_refs": [
+                        {
+                            "schema": "text",
+                            "value": "\u0000\u0013 \u0000\u001a\u0000"
+                            "\u0018\u0000\u0013",
+                            "source": "arXiv",
+                        }
+                    ]
+                },
+                {
+                    "reference": {"misc": ["7LPH6WHSt"]},
+                    "raw_refs": [
+                        {
+                            "schema": "text",
+                            "value": "\u00007\u0000S\u0000\u0003t",
+                            "source": "arXiv",
+                        }
+                    ],
+                },
+            ]
         )
+        refextract_task = self.dag.get_task("preprocessing.refextract")
+        with patch.dict(
+            refextract_task.python_callable.__globals__,
+            {"match_references_hep": mock_match_references_hep},
+        ):
+            task_test(
+                self.dag,
+                "preprocessing.refextract",
+                self.context,
+            )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -2221,18 +2165,15 @@ class Test_HEPCreateDAG:
 
         expected_fulltext_keywords = [{"number": 1, "keyword": "Higgs particle"}]
 
-        task_test(
-            "hep_create_dag",
-            "preprocessing.classify_paper",
-            params={
-                "taxonomy": higgs_ontology,
-                "only_core_tags": False,
-                "spires": True,
-                "with_author_keywords": True,
-                "no_cache": True,
-            },
-            dag_params=self.context["params"],
-        )
+        params = {
+            "taxonomy": higgs_ontology,
+            "only_core_tags": False,
+            "spires": True,
+            "with_author_keywords": True,
+            "no_cache": True,
+        }
+
+        task_test(self.dag, "preprocessing.classify_paper", self.context, params=params)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -2270,7 +2211,10 @@ class Test_HEPCreateDAG:
                 ],
                 "author_keywords": [],
                 "composite_keywords": [],
-                "single_keywords": [{"keyword": "Higgs particle", "number": 1}],
+                "single_keywords": [
+                    {"keyword": "Higgs particle", "number": 1},
+                    {"keyword": "supersymmetry", "number": 1},
+                ],
                 "field_codes": [],
                 "acronyms": [],
                 "filtered_core_keywords": [{"keyword": "supersymmetry", "number": 1}],
@@ -2279,8 +2223,9 @@ class Test_HEPCreateDAG:
         }
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.classify_paper",
+            self.context,
             params={
                 "taxonomy": higgs_ontology,
                 "only_core_tags": False,
@@ -2288,7 +2233,6 @@ class Test_HEPCreateDAG:
                 "with_author_keywords": True,
                 "no_cache": True,
             },
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -2320,17 +2264,19 @@ class Test_HEPCreateDAG:
 
         expected = [{"number": 1, "keyword": "Higgs particle"}]
 
+        params = {
+            "taxonomy": higgs_ontology,
+            "only_core_tags": False,
+            "spires": True,
+            "with_author_keywords": True,
+            "no_cache": True,
+        }
+
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.classify_paper",
-            params={
-                "taxonomy": higgs_ontology,
-                "only_core_tags": False,
-                "spires": True,
-                "with_author_keywords": True,
-                "no_cache": True,
-            },
-            dag_params=self.context["params"],
+            context=self.context,
+            params=params,
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -2362,8 +2308,9 @@ class Test_HEPCreateDAG:
         )
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.classify_paper",
+            self.context,
             params={
                 "taxonomy": higgs_ontology,
                 "only_core_tags": False,
@@ -2371,7 +2318,6 @@ class Test_HEPCreateDAG:
                 "with_author_keywords": True,
                 "no_cache": True,
             },
-            dag_params=self.context["params"],
         )
 
     def test_classify_paper_with_fulltext_and_data(self, tmpdir, higgs_ontology):
@@ -2407,8 +2353,9 @@ class Test_HEPCreateDAG:
         expected_keywords = [{"number": 1, "keyword": "Core Keyword"}]
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.classify_paper",
+            self.context,
             params={
                 "taxonomy": higgs_ontology,
                 "only_core_tags": False,
@@ -2416,7 +2363,6 @@ class Test_HEPCreateDAG:
                 "with_author_keywords": True,
                 "no_cache": True,
             },
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -2450,11 +2396,7 @@ class Test_HEPCreateDAG:
             replace=True,
         )
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.extract_authors_from_pdf",
-            dag_params={"workflow_id": self.workflow_id},
-        )
+        task_test(self.dag, "preprocessing.extract_authors_from_pdf", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -2484,11 +2426,7 @@ class Test_HEPCreateDAG:
             replace=True,
         )
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.extract_authors_from_pdf",
-            dag_params={"workflow_id": self.workflow_id},
-        )
+        task_test(self.dag, "preprocessing.extract_authors_from_pdf", self.context)
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
         assert len(workflow_result["data"]["authors"]) == 1
 
@@ -2515,11 +2453,7 @@ class Test_HEPCreateDAG:
             replace=True,
         )
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.extract_authors_from_pdf",
-            dag_params={"workflow_id": self.workflow_id},
-        )
+        task_test(self.dag, "preprocessing.extract_authors_from_pdf", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -2581,11 +2515,7 @@ class Test_HEPCreateDAG:
             },
         ]
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.extract_authors_from_pdf",
-            dag_params={"workflow_id": self.workflow_id},
-        )
+        task_test(self.dag, "preprocessing.extract_authors_from_pdf", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -2615,11 +2545,7 @@ class Test_HEPCreateDAG:
             replace=True,
         )
 
-        task_test(
-            dag_id="hep_create_dag",
-            task_id="preprocessing.extract_authors_from_pdf",
-            dag_params={"workflow_id": self.workflow_id},
-        )
+        task_test(self.dag, "preprocessing.extract_authors_from_pdf", self.context)
 
     def test_guess_coreness(self):
         workflow_data = {
@@ -2639,12 +2565,11 @@ class Test_HEPCreateDAG:
             },
         }
         self.s3_store.write_workflow(workflow_data)
-
-        task_test(
-            "hep_create_dag",
-            "preprocessing.guess_coreness",
-            dag_params=self.context["params"],
+        self.s3_store.set_flags(
+            {"is-update": False, "auto-approved": False}, self.workflow_id
         )
+
+        task_test(self.dag, "preprocessing.guess_coreness", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
         relevance_prediction = workflow_result["relevance_prediction"]
@@ -2662,15 +2587,121 @@ class Test_HEPCreateDAG:
     def test_guess_coreness_fail(self, mock_predict_coreness):
         workflow_data = {"id": self.workflow_id, "data": {}}
         self.s3_store.write_workflow(workflow_data)
+        self.s3_store.set_flags(
+            {"is-update": False, "auto-approved": False}, self.workflow_id
+        )
 
         with pytest.raises(Exception, match="Classifier failure"):
-            task_test(
-                "hep_create_dag",
-                "preprocessing.guess_coreness",
-                dag_params=self.context["params"],
-            )
+            task_test(self.dag, "preprocessing.guess_coreness", self.context)
+
+    @pytest.mark.parametrize(
+        "flags",
+        [
+            {"is-update": False, "auto-approved": True},
+            {"is-update": True, "auto-approved": False},
+        ],
+    )
+    @patch("inspire_classifier.Classifier.predict_coreness")
+    def test_guess_coreness_skipped_for_auto_accepted_core_or_update(
+        self, mock_predict_coreness, flags
+    ):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "arxiv_eprints": [{"value": "2501.00001", "categories": ["hep-th"]}]
+            },
+        }
+        self.s3_store.write_workflow(workflow_data)
+        self.s3_store.set_flags(flags, self.workflow_id)
+
+        task_test(self.dag, "preprocessing.guess_coreness", self.context)
+
+        mock_predict_coreness.assert_not_called()
+        workflow_result = self.s3_store.read_workflow(self.workflow_id)
+        assert "relevance_prediction" not in workflow_result
+
+    @patch(
+        "hooks.backoffice.workflow_management_hook.WorkflowManagementHook.add_decision"
+    )
+    def test_check_guess_coreness_rejection_rejected(self, mock_add_decision):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {"acquisition_source": {"source": "arXiv"}},
+            "relevance_prediction": {"decision": "Rejected"},
+        }
+        self.s3_store.write_workflow(workflow_data)
+        self.s3_store.set_flags(
+            {"is-update": False, "auto-approved": False}, self.workflow_id
+        )
+
+        result = task_test(
+            self.dag, "preprocessing.check_guess_coreness_rejection", self.context
+        )
+
+        assert result == "save_and_complete_workflow"
+        mock_add_decision.assert_called_once_with(
+            workflow_id=self.workflow_id,
+            decision_data={"action": DECISION_AUTO_REJECT},
+        )
+
+    @pytest.mark.parametrize(
+        "workflow_data",
+        [
+            {
+                "data": {"acquisition_source": {"method": "submitter"}},
+                "relevance_prediction": {"decision": "Rejected"},
+            },
+            {
+                "data": {"acquisition_source": {"source": "arXiv"}},
+                "journal_coverage": "full",
+                "relevance_prediction": {"decision": "Rejected"},
+            },
+            {
+                "data": {
+                    "acquisition_source": {"source": "arXiv"},
+                    "report_numbers": [{"value": "FERMILAB-PUB-24-001-T"}],
+                },
+                "relevance_prediction": {"decision": "Rejected"},
+            },
+            {
+                "data": {"acquisition_source": {"source": "arXiv"}},
+                "relevance_prediction": {"decision": "CORE"},
+            },
+            {
+                "data": {"acquisition_source": {"source": "arXiv"}},
+                "relevance_prediction": {"decision": "Non-CORE"},
+            },
+            {"data": {"acquisition_source": {"source": "arXiv"}}},
+        ],
+        ids=[
+            "rejected_submission",
+            "rejected_full_journal_coverage",
+            "rejected_hidden_record",
+            "core",
+            "non_core",
+            "no_prediction",
+        ],
+    )
+    @patch(
+        "hooks.backoffice.workflow_management_hook.WorkflowManagementHook.add_decision"
+    )
+    def test_check_guess_coreness_rejection_continues(
+        self, mock_add_decision, workflow_data
+    ):
+        self.s3_store.write_workflow({"id": self.workflow_id, **workflow_data})
+        self.s3_store.set_flags(
+            {"is-update": False, "auto-approved": False}, self.workflow_id
+        )
+
+        result = task_test(
+            self.dag, "preprocessing.check_guess_coreness_rejection", self.context
+        )
+
+        assert result == "preprocessing.refextract"
+        mock_add_decision.assert_not_called()
 
     @pytest.mark.vcr
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_notify_if_submission(self):
         workflow_data = {
             "id": self.workflow_id,
@@ -2687,12 +2718,13 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "notify_if_submission",
-            dag_params=self.context["params"],
+            self.context,
+            context_params={"workflow_id": self.workflow_id},
         )
 
-        workflow = get_lit_workflow_task(self.workflow_id)
+        workflow = self.wf_hook.get_workflow(self.workflow_id)
 
         assert get_ticket_by_type(workflow, TICKET_HEP_SUBMISSION)
 
@@ -2710,16 +2742,18 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "notify_if_submission",
-            dag_params=self.context["params"],
+            self.context,
+            context_params={"workflow_id": workflow_id},
         )
 
-        workflow = get_lit_workflow_task(workflow_id)
+        workflow = self.wf_hook.get_workflow(workflow_id)
 
         assert not get_ticket_by_type(workflow, TICKET_HEP_SUBMISSION)
 
     @pytest.mark.vcr
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_notify_if_submission_ticket_already_exists(self):
         workflow_id = "7b617859-cb4f-4526-aa85-ec5291dc141b"
         workflow_data = {
@@ -2732,25 +2766,30 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
+        context_params = {"workflow_id": workflow_id}
         task_test(
-            "hep_create_dag",
+            self.dag,
             "notify_if_submission",
-            dag_params={"workflow_id": workflow_id},
+            context=self.context,
+            context_params=context_params,
         )
 
-        workflow = get_lit_workflow_task(workflow_id)
+        workflow = self.wf_hook.get_workflow(workflow_id)
 
         assert get_ticket_by_type(workflow, TICKET_HEP_SUBMISSION)
 
     def test_get_approved_match_none(self):
+        def _xcom_pull(*args, **kwargs):
+            return None
+
+        self.context["ti"].xcom_pull = _xcom_pull
         assert not task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.get_approved_match",
-            dag_params=self.context["params"],
+            self.context,
         )
 
-    @patch("airflow.models.taskinstance.TaskInstance.xcom_pull")
-    def test_get_approved_match_exists(self, mock_xcom_pull):
+    def test_get_approved_match_exists(self):
         def _xcom_pull(*args, **kwargs):
             if (
                 kwargs.get("task_ids") == "check_for_exact_matches"
@@ -2761,17 +2800,16 @@ class Test_HEPCreateDAG:
                 return "paper17"
             return None
 
-        mock_xcom_pull.side_effect = _xcom_pull
+        self.context["ti"].xcom_pull = _xcom_pull
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.get_approved_match",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         assert result == "paper17"
 
-    @patch("airflow.models.taskinstance.TaskInstance.xcom_pull")
-    def test_get_approved_match_fuzzy_exists(self, mock_xcom_pull):
+    def test_get_approved_match_fuzzy_exists(self):
         def _xcom_pull(**kwargs):
             return (
                 None
@@ -2779,11 +2817,11 @@ class Test_HEPCreateDAG:
                 else "paper17"
             )
 
-        mock_xcom_pull.side_effect = _xcom_pull
+        self.context["ti"].xcom_pull = _xcom_pull
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.get_approved_match",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         assert result == "paper17"
@@ -2794,60 +2832,90 @@ class Test_HEPCreateDAG:
             {"id": self.workflow_id, "workflow_type": HEP_CREATE},
         )
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.check_is_update",
+            self.context,
             params={"match_approved_id": 7},
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
         )
         assert (
-            "halt_for_approval_if_new_or_reject_if_not_relevant.merge_articles"
-            in result["followed"]
+            result
+            == "halt_for_approval_if_new_or_reject_if_not_relevant.merge_articles"
         )
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
         assert workflow_result["workflow_type"] == HEP_UPDATE
 
-        workflow_backoffice = get_lit_workflow_task(self.workflow_id)
+        workflow_backoffice = self.wf_hook.get_workflow(self.workflow_id)
         assert workflow_backoffice["workflow_type"] == HEP_UPDATE
+
+    @pytest.mark.vcr
+    def test_check_is_update_merge_for_publisher_workflow(self):
+        self.s3_store.write_workflow(
+            {"id": self.workflow_id, "workflow_type": HEP_PUBLISHER_CREATE},
+        )
+        result = task_test(
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.check_is_update",
+            self.context,
+            params={"match_approved_id": 7},
+        )
+        assert (
+            result
+            == "halt_for_approval_if_new_or_reject_if_not_relevant.merge_articles"
+        )
+        workflow_result = self.s3_store.read_workflow(self.workflow_id)
+        assert workflow_result["workflow_type"] == HEP_PUBLISHER_UPDATE
+
+        workflow_backoffice = self.wf_hook.get_workflow(self.workflow_id)
+        assert workflow_backoffice["workflow_type"] == HEP_PUBLISHER_UPDATE
+
+    @pytest.mark.vcr
+    def test_check_is_update_merge_for_restarted_publisher_workflow(self):
+        self.s3_store.write_workflow(
+            {"id": self.workflow_id, "workflow_type": HEP_PUBLISHER_UPDATE},
+        )
+        result = task_test(
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.check_is_update",
+            self.context,
+            params={"match_approved_id": 7},
+        )
+        assert (
+            result
+            == "halt_for_approval_if_new_or_reject_if_not_relevant.merge_articles"
+        )
+        workflow_result = self.s3_store.read_workflow(self.workflow_id)
+        assert workflow_result["workflow_type"] == HEP_PUBLISHER_UPDATE
+
+        workflow_backoffice = self.wf_hook.get_workflow(self.workflow_id)
+        assert workflow_backoffice["workflow_type"] == HEP_PUBLISHER_UPDATE
 
     def test_check_is_update_none(self):
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.check_is_update",
+            self.context,
             params={"match_approved_id": None},
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
         )
         assert (
-            "halt_for_approval_if_new_or_reject_if_not_relevant.update_inspire_categories"
-            in result["followed"]
+            result == "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "update_inspire_categories"
         )
 
     def test_is_core_true(self):
         self.s3_store.write_workflow(
             {"id": self.workflow_id, "data": {"core": True}},
         )
-        result = task_test(
-            "hep_create_dag",
-            "core_selection.is_core",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
-        assert "core_selection.normalize_author_affiliations" in result["followed"]
+        result = task_test(self.dag, "core_selection.is_core", self.context)
+        assert result == "core_selection.normalize_author_affiliations"
 
     def test_is_core_false(self):
         self.s3_store.write_workflow(
             {"id": self.workflow_id, "data": {"core": False}},
         )
-        result = task_test(
-            "hep_create_dag",
-            "core_selection.is_core",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        result = task_test(self.dag, "core_selection.is_core", self.context)
         assert (
-            "core_selection.remove_inspire_categories_derived_from_core_arxiv_categories"
-            in result["followed"]
+            result == "core_selection."
+            "remove_inspire_categories_derived_from_core_arxiv_categories"
         )
 
     @pytest.mark.vcr
@@ -2870,10 +2938,10 @@ class Test_HEPCreateDAG:
             },
         )
         task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.merge_articles",
+            self.context,
             params={"matched_control_number": 1649231},
-            dag_params=self.context["params"],
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -2883,30 +2951,157 @@ class Test_HEPCreateDAG:
         assert "merge_details" in workflow_result
         assert "conflicts" in workflow_result["merge_details"]
 
-        backoffice_workflow = get_lit_workflow_task(self.workflow_id)
+        backoffice_workflow = self.wf_hook.get_workflow(self.workflow_id)
 
         assert workflow_result["data"] == backoffice_workflow["data"]
         assert workflow_result["merge_details"] == backoffice_workflow["merge_details"]
+
+    @patch(
+        "hooks.inspirehep.inspire_http_record_management_hook.InspireHTTPRecordManagementHook.get_record"
+    )
+    @patch("include.utils.workflows.read_wf_record_source")
+    def test_merge_articles_casts_string_matched_control_number_before_merge(
+        self, mock_read_wf_record_source, mock_get_record
+    ):
+        matched_control_number = 3085103
+        head_record = {
+            "$schema": "https://inspirebeta.net/schemas/records/hep.json",
+            "control_number": matched_control_number,
+            "titles": [{"title": "Arxiv title", "source": "arXiv"}],
+            "authors": [{"full_name": "Bajnok, Zoltan"}],
+            "arxiv_eprints": [{"value": "2511.16338"}],
+            "document_type": ["article"],
+            "_collections": ["Literature"],
+            "acquisition_source": {
+                "method": "hepcrawl",
+                "source": "arXiv",
+                "datetime": "2025-11-22T04:01:06.529589",
+                "submission_number": "11046094",
+            },
+        }
+        update_record = {
+            "$schema": "https://inspirebeta.net/schemas/records/hep.json",
+            "titles": [{"title": "Publisher title", "source": "Elsevier B.V."}],
+            "authors": [{"full_name": "Bajnok, Zoltan"}],
+            "dois": [
+                {
+                    "value": "10.1016/j.nuclphysb.2026.117481",
+                    "source": "Elsevier B.V.",
+                    "material": "publication",
+                }
+            ],
+            "document_type": ["article"],
+            "_collections": ["Literature"],
+            "acquisition_source": {
+                "method": "hepcrawl",
+                "source": "Elsevier",
+                "datetime": "2026-05-20T15:22:32.367696",
+                "submission_number": "manual__2026-05-20T15:22:20.788590+00:00",
+            },
+        }
+
+        self.s3_store.write_workflow(
+            {
+                "id": self.workflow_id,
+                "data": update_record,
+                "workflow_type": HEP_PUBLISHER_CREATE,
+            },
+        )
+
+        mock_get_record.return_value = {
+            "metadata": head_record,
+            "uuid": "1234",
+            "revision_id": 1,
+        }
+        mock_read_wf_record_source.return_value = {}
+
+        task_test(
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.merge_articles",
+            self.context,
+            params={"matched_control_number": str(matched_control_number)},
+        )
+
+        workflow_result = self.s3_store.read_workflow(self.workflow_id)
+
+        assert workflow_result["data"]["control_number"] == matched_control_number
+        assert workflow_result["data"]["acquisition_source"]["source"] == "Elsevier"
+
+    @pytest.mark.vcr
+    @patch(
+        "hooks.inspirehep.inspire_http_record_management_hook.InspireHTTPRecordManagementHook.get_record"
+    )
+    @patch("include.utils.workflows.read_wf_record_source")
+    def test_merge_articles_control_number_fix(
+        self, mock_read_wf_record_source, mock_get_record
+    ):
+        matched_control_number = 1649231
+        record_data = {
+            "titles": [
+                {"title": "New title"},
+            ],
+            "authors": [{"full_name": "Blumaaaaaaa, T."}],
+            "arxiv_eprints": [{"value": "1801.07224"}],
+            "document_type": [
+                "article",
+            ],
+            "_collections": ["Literature"],
+        }
+
+        self.s3_store.write_workflow(
+            {
+                "id": self.workflow_id,
+                "data": record_data,
+                "workflow_type": HEP_CREATE,
+            }
+        )
+
+        record_data["control_number"] = matched_control_number
+
+        mock_get_record.return_value = {
+            "metadata": record_data,
+            "uuid": "1234",
+            "revision_id": 1,
+        }
+        mock_read_wf_record_source.return_value = {"json": record_data}
+
+        task_test(
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.merge_articles",
+            self.context,
+            params={"matched_control_number": matched_control_number},
+        )
+
+        workflow_result = self.s3_store.read_workflow(self.workflow_id)
+
+        assert workflow_result["data"]["control_number"] == matched_control_number
 
     @pytest.mark.vcr
     def test_await_merge_conflicts_resolved_no_conflicts(self):
         workflow_id = "7b617859-cb4f-4526-aa85-ec5291dc141b"
 
+        context_params = {"workflow_id": workflow_id}
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.await_merge_conflicts_resolved",
-            dag_params={"workflow_id": workflow_id},
+            context=self.context,
+            context_params=context_params,
         )
 
         assert result
         assert self.s3_store.get_flag("approved", workflow_id)
+        workflow_result = self.s3_store.read_workflow(workflow_id)
+        assert workflow_result["id"] == workflow_id
+        assert workflow_result["data"]["titles"]
 
     @pytest.mark.vcr
     def test_await_merge_conflicts_resolved_w_conflicts_no_decision(self):
+        context_params = {"workflow_id": "7c6b56bd-6166-4fee-ad6f-5b99b7d37b7e"}
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.await_merge_conflicts_resolved",
-            dag_params={"workflow_id": "7c6b56bd-6166-4fee-ad6f-5b99b7d37b7e"},
+            context=self.context,
+            context_params=context_params,
         )
 
         assert not result
@@ -2915,10 +3110,12 @@ class Test_HEPCreateDAG:
     def test_await_merge_conflicts_resolved_w_conflicts_and_decision(self):
         workflow_id = "f9fc9d83-fd28-450e-bfde-d1ed07dc87f5"
 
+        context_params = {"workflow_id": workflow_id}
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.await_merge_conflicts_resolved",
-            dag_params={"workflow_id": workflow_id},
+            context=self.context,
+            context_params=context_params,
         )
 
         assert result
@@ -2937,9 +3134,9 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.update_inspire_categories",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -2966,9 +3163,9 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.update_inspire_categories",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -2983,50 +3180,80 @@ class Test_HEPCreateDAG:
             {"id": self.workflow_id},
         )
         self.s3_store.set_flags({"approved": True}, self.workflow_id)
-        result = task_test(
-            "hep_create_dag",
-            "is_record_accepted",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
-        assert "postprocessing.set_core_if_not_update" in result["followed"]
+        result = task_test(self.dag, "is_record_accepted", self.context)
+        assert result == "postprocessing.set_core_if_not_update"
 
     def test_is_record_accepted_false(self):
         self.s3_store.write_workflow(
             {"id": self.workflow_id, "flags": {"approved": False}},
         )
         self.s3_store.set_flags({"approved": False}, self.workflow_id)
-        result = task_test(
-            "hep_create_dag",
-            "is_record_accepted",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        result = task_test(self.dag, "is_record_accepted", self.context)
 
-        assert "notify_and_close_not_accepted" in result["followed"]
+        assert result == "notify_and_close_not_accepted"
 
     @pytest.mark.vcr
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_notify_and_close_not_accepted(self):
         workflow_id = "7c6b56bd-6166-4fee-ad6f-5b99b7d37b7e"
 
-        workflow_data = get_lit_workflow_task(workflow_id)
+        workflow_data = self.wf_hook.get_workflow(workflow_id)
         self.s3_store.write_workflow(workflow_data)
 
+        context_params = {"workflow_id": workflow_id}
         task_test(
-            "hep_create_dag",
+            self.dag,
             "notify_if_submission",
-            dag_params={"workflow_id": workflow_id},
+            context=self.context,
+            context_params=context_params,
         )
 
         self.s3_store.write_workflow(
-            get_lit_workflow_task(workflow_id),
+            self.wf_hook.get_workflow(workflow_id),
         )
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "notify_and_close_not_accepted",
-            dag_params={"workflow_id": workflow_id},
+            context=self.context,
+            context_params=context_params,
         )
+
+    @pytest.mark.vcr
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
+    def test_notify_and_close_not_accepted_with_rejection_message(self, vcr_cassette):
+        workflow_id = "a2fccc44-4c2f-41c9-b0bb-82c5d977a39c"
+
+        workflow_data = self.wf_hook.get_workflow(workflow_id)
+        self.s3_store.write_workflow(workflow_data)
+
+        context_params = {"workflow_id": workflow_id}
+        task_test(
+            self.dag,
+            "notify_if_submission",
+            context=self.context,
+            context_params=context_params,
+        )
+
+        self.s3_store.write_workflow(
+            self.wf_hook.get_workflow(workflow_id),
+        )
+
+        task_test(
+            self.dag,
+            "notify_and_close_not_accepted",
+            context=self.context,
+            context_params=context_params,
+        )
+
+        resolve_request = next(
+            req
+            for req in vcr_cassette.requests
+            if req.uri.endswith("/api/tickets/resolve")
+        )
+        request_body = json.loads(resolve_request.body)
+
+        assert request_body["message"] == "testing rejection with reason"
 
     def test_set_core_if_not_update_and_auto_approve(self):
         workflow_data = {
@@ -3040,11 +3267,7 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
-        task_test(
-            "hep_create_dag",
-            "postprocessing.set_core_if_not_update",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "postprocessing.set_core_if_not_update", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -3073,11 +3296,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "postprocessing.set_core_if_not_update",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "postprocessing.set_core_if_not_update", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -3096,9 +3315,7 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({"is-update": True}, self.workflow_id)
 
         assert not task_test(
-            "hep_create_dag",
-            "postprocessing.set_core_if_not_update",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.set_core_if_not_update", self.context
         )
 
     def test_set_core_if_not_update_and_hep_accept(self):
@@ -3124,11 +3341,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "postprocessing.set_core_if_not_update",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "postprocessing.set_core_if_not_update", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -3159,9 +3372,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "postprocessing.set_refereed_and_fix_document_type",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.set_refereed_and_fix_document_type", self.context
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -3196,9 +3407,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "postprocessing.set_refereed_and_fix_document_type",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.set_refereed_and_fix_document_type", self.context
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -3233,9 +3442,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "postprocessing.set_refereed_and_fix_document_type",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.set_refereed_and_fix_document_type", self.context
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -3273,9 +3480,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "postprocessing.normalize_author_affiliations",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.normalize_author_affiliations", self.context
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -3319,9 +3524,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "postprocessing.normalize_author_affiliations",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.normalize_author_affiliations", self.context
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -3357,9 +3560,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "postprocessing.normalize_author_affiliations",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.normalize_author_affiliations", self.context
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -3392,9 +3593,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "postprocessing.normalize_author_affiliations",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.normalize_author_affiliations", self.context
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -3433,13 +3632,9 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "save_and_complete_workflow",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "save_and_complete_workflow", self.context)
 
-        workflow = get_lit_workflow_task(self.workflow_id)
+        workflow = self.wf_hook.get_workflow(self.workflow_id)
         assert workflow["status"] == STATUS_COMPLETED
         assert workflow_data["data"] == workflow["data"]
 
@@ -3466,9 +3661,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "postprocessing.link_institutions_with_affiliations",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.link_institutions_with_affiliations", self.context
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
@@ -3493,14 +3686,94 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "postprocessing.link_institutions_with_affiliations",
-            dag_params=self.context["params"],
+            self.dag, "postprocessing.link_institutions_with_affiliations", self.context
         )
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
         assert "authors" not in workflow_result["data"]
+
+    def test_add_fermilab_collection_for_accepted_record(self):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "titles": [{"title": "test fermilab report"}],
+                "document_type": ["article"],
+                "report_numbers": [{"value": "FERMILAB-PUB-25-0393-PPD"}],
+                "_collections": ["Literature"],
+            },
+            "workflow_type": HEP_CREATE,
+            "status": STATUS_RUNNING,
+        }
+        self.s3_store.write_workflow(workflow_data)
+
+        task_test(self.dag, "postprocessing.add_fermilab_collection", self.context)
+
+        workflow_result = self.s3_store.read_workflow(self.workflow_id)
+
+        assert workflow_result["data"]["_collections"] == ["Literature", "Fermilab"]
+
+    def test_add_fermilab_collection_is_not_duplicated(self):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "titles": [{"title": "test fermilab report"}],
+                "document_type": ["article"],
+                "report_numbers": [{"value": "FERMILAB-PUB-25-0393-PPD"}],
+                "_collections": ["Literature", "Fermilab"],
+            },
+            "workflow_type": HEP_CREATE,
+            "status": STATUS_RUNNING,
+        }
+        self.s3_store.write_workflow(workflow_data)
+
+        task_test(self.dag, "postprocessing.add_fermilab_collection", self.context)
+
+        workflow_result = self.s3_store.read_workflow(self.workflow_id)
+
+        assert workflow_result["data"]["_collections"] == ["Literature", "Fermilab"]
+
+    def test_add_fermilab_collection_without_fermilab_report_number(self):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "titles": [{"title": "test non fermilab report"}],
+                "document_type": ["article"],
+                "report_numbers": [
+                    {"value": "CERN-2019"},
+                    {"value": "DESY-FERMILAB-1923"},
+                ],
+                "_collections": ["Literature"],
+            },
+            "workflow_type": HEP_CREATE,
+            "status": STATUS_RUNNING,
+        }
+        self.s3_store.write_workflow(workflow_data)
+
+        task_test(self.dag, "postprocessing.add_fermilab_collection", self.context)
+
+        workflow_result = self.s3_store.read_workflow(self.workflow_id)
+
+        assert workflow_result["data"]["_collections"] == ["Literature"]
+
+    def test_add_fermilab_collection_without_report_numbers(self):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "titles": [{"title": "test no report numbers"}],
+                "document_type": ["article"],
+                "_collections": ["Literature"],
+            },
+            "workflow_type": HEP_CREATE,
+            "status": STATUS_RUNNING,
+        }
+        self.s3_store.write_workflow(workflow_data)
+
+        task_test(self.dag, "postprocessing.add_fermilab_collection", self.context)
+
+        workflow_result = self.s3_store.read_workflow(self.workflow_id)
+
+        assert workflow_result["data"]["_collections"] == ["Literature"]
 
     def test_is_record_relevant_submission(self):
         workflow_data = {
@@ -3515,14 +3788,14 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.is_record_relevant",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         assert (
             result == "halt_for_approval_if_new_or_reject_if_not_relevant."
-            "await_decision_approval"
+            "save_workflow_before_approval"
         )
 
     def test_is_record_relevant_full_journal_coverage(self):
@@ -3539,14 +3812,14 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.is_record_relevant",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         assert (
             result == "halt_for_approval_if_new_or_reject_if_not_relevant."
-            "await_decision_approval"
+            "save_workflow_before_approval"
         )
 
     def test_is_record_relevant_auto_approved(self):
@@ -3564,16 +3837,17 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({"auto-approved": True}, self.workflow_id)
 
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.is_record_relevant",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         assert (
             result == "halt_for_approval_if_new_or_reject_if_not_relevant."
-            "await_decision_approval"
+            "save_workflow_before_approval"
         )
 
+    @pytest.mark.vcr
     def test_is_record_relevant_auto_rejected(self):
         workflow_data = {
             "id": self.workflow_id,
@@ -3598,22 +3872,29 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({"auto-approved": False}, self.workflow_id)
 
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.is_record_relevant",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
+            self.context,
         )
 
         assert (
-            "halt_for_approval_if_new_or_reject_if_not_relevant.should_replace_collection_to_hidden"
-            in result["followed"]
+            result == "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "should_replace_collection_to_hidden"
         )
 
-    def test_is_record_relevant_rejected_with_core_keywords(self):
+        workflow = self.wf_hook.get_workflow(self.workflow_id)
+        assert workflows.get_decision(workflow.get("decisions"), DECISION_AUTO_REJECT)
+
+    @patch(
+        "hooks.backoffice.workflow_management_hook.WorkflowManagementHook.add_decision"
+    )
+    def test_is_record_relevant_rejected_without_classifier_results(
+        self, mock_add_decision
+    ):
         workflow_data = {
             "id": self.workflow_id,
             "data": {
-                "titles": [{"title": "test rejected with keywords"}],
+                "titles": [{"title": "test rejected early"}],
                 "acquisition_source": {
                     "method": "hepcrawl",
                 },
@@ -3622,25 +3903,23 @@ class Test_HEPCreateDAG:
             "relevance_prediction": {
                 "decision": "Rejected",
             },
-            "classifier_results": {
-                "fulltext_used": True,
-                "complete_output": {
-                    "core_keywords": [{"keyword": "Higgs particle"}],
-                },
-            },
         }
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"auto-approved": False}, self.workflow_id)
 
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.is_record_relevant",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         assert (
             result == "halt_for_approval_if_new_or_reject_if_not_relevant."
-            "await_decision_approval"
+            "should_replace_collection_to_hidden"
+        )
+        mock_add_decision.assert_called_once_with(
+            workflow_id=self.workflow_id,
+            decision_data={"action": DECISION_AUTO_REJECT},
         )
 
     def test_is_record_relevant_missing_classification_results(self):
@@ -3658,14 +3937,14 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({"auto-approved": False}, self.workflow_id)
 
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.is_record_relevant",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         assert (
             result == "halt_for_approval_if_new_or_reject_if_not_relevant."
-            "await_decision_approval"
+            "save_workflow_before_approval"
         )
 
     def test_is_record_relevant_non_rejected_decision(self):
@@ -3692,18 +3971,19 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({"auto-approved": False}, self.workflow_id)
 
         result = task_test(
-            "hep_create_dag",
+            self.dag,
             "halt_for_approval_if_new_or_reject_if_not_relevant.is_record_relevant",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         assert (
             result == "halt_for_approval_if_new_or_reject_if_not_relevant."
-            "await_decision_approval"
+            "save_workflow_before_approval"
         )
 
     @patch(
-        "hooks.backoffice.workflow_management_hook.WorkflowManagementHook.set_workflow_status"
+        "hooks.backoffice.workflow_management_hook.WorkflowManagementHook."
+        "set_workflow_status"
     )
     @patch(
         "hooks.backoffice.workflow_management_hook.WorkflowManagementHook.get_workflow",
@@ -3717,9 +3997,10 @@ class Test_HEPCreateDAG:
         self, mock_get_workflow, mock_set_workflow_status
     ):
         assert not task_test(
-            dag_id="hep_create_dag",
-            task_id="halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
-            dag_params=self.context["params"],
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "await_decision_approval",
+            self.context,
         )
 
         mock_get_workflow.assert_called_once_with(self.workflow_id)
@@ -3728,7 +4009,8 @@ class Test_HEPCreateDAG:
         )
 
     @patch(
-        "hooks.backoffice.workflow_management_hook.WorkflowManagementHook.set_workflow_status"
+        "hooks.backoffice.workflow_management_hook.WorkflowManagementHook."
+        "set_workflow_status"
     )
     @patch(
         "hooks.backoffice.workflow_management_hook.WorkflowManagementHook.get_workflow",
@@ -3742,9 +4024,9 @@ class Test_HEPCreateDAG:
         self, mock_get_workflow, mock_set_workflow_status
     ):
         assert not task_test(
-            dag_id="hep_create_dag",
-            task_id="halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
-            dag_params=self.context["params"],
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
+            self.context,
         )
 
         mock_get_workflow.assert_called_once_with(self.workflow_id)
@@ -3755,22 +4037,26 @@ class Test_HEPCreateDAG:
     @pytest.mark.vcr
     def test_await_decision_approval_accept(self):
         workflow_id = "66961888-a628-46b7-b807-4deae3478adc"
+        context_params = {"workflow_id": workflow_id}
         assert task_test(
-            dag_id="hep_create_dag",
-            task_id="halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
-            dag_params={"workflow_id": workflow_id},
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
+            context=self.context,
+            context_params=context_params,
         )
 
         assert self.s3_store.get_flag("approved", workflow_id) is True
-        assert get_lit_workflow_task(workflow_id)["status"] == STATUS_RUNNING
+        assert self.wf_hook.get_workflow(workflow_id)["status"] == STATUS_RUNNING
 
     @pytest.mark.vcr
     def test_await_decision_approval_core(self):
         workflow_id = "6e84fd0b-8d0b-4147-9aee-c28a4f787b0d"
+        context_params = {"workflow_id": workflow_id}
         assert task_test(
-            dag_id="hep_create_dag",
-            task_id="halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
-            dag_params={"workflow_id": workflow_id},
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
+            context=self.context,
+            context_params=context_params,
         )
 
         assert self.s3_store.get_flag("approved", workflow_id) is True
@@ -3778,14 +4064,17 @@ class Test_HEPCreateDAG:
     @pytest.mark.vcr
     def test_await_decision_approval_reject(self):
         workflow_id = "07c5a66c-1e5b-4da6-823c-871caf43e073"
+
+        context_params = {"workflow_id": workflow_id}
         assert task_test(
-            dag_id="hep_create_dag",
-            task_id="halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
-            dag_params={"workflow_id": workflow_id},
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
+            context=self.context,
+            context_params=context_params,
         )
 
         assert self.s3_store.get_flag("approved", workflow_id) is False
-        assert get_lit_workflow_task(workflow_id)["status"] == STATUS_RUNNING
+        assert self.wf_hook.get_workflow(workflow_id)["status"] == STATUS_RUNNING
 
     def test_replace_collection_to_hidden_sets_proper_hidden_collections_on_metadata(
         self,
@@ -3821,9 +4110,10 @@ class Test_HEPCreateDAG:
 
         expected_collections = ["CDS Hidden", "Fermilab"]
         task_test(
-            "hep_create_dag",
-            "halt_for_approval_if_new_or_reject_if_not_relevant.replace_collection_to_hidden",
-            dag_params=self.context["params"],
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "replace_collection_to_hidden",
+            self.context,
         )
 
         workflow_data = self.s3_store.read_workflow(self.workflow_id)
@@ -3845,9 +4135,10 @@ class Test_HEPCreateDAG:
         expected_collections = ["CDS Hidden", "Fermilab"]
 
         task_test(
-            "hep_create_dag",
-            "halt_for_approval_if_new_or_reject_if_not_relevant.replace_collection_to_hidden",
-            dag_params=self.context["params"],
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "replace_collection_to_hidden",
+            self.context,
         )
 
         workflow_data = self.s3_store.read_workflow(self.workflow_id)
@@ -3879,9 +4170,10 @@ class Test_HEPCreateDAG:
         expected_collections = ["CDS Hidden", "Fermilab"]
 
         task_test(
-            "hep_create_dag",
-            "halt_for_approval_if_new_or_reject_if_not_relevant.replace_collection_to_hidden",
-            dag_params=self.context["params"],
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "replace_collection_to_hidden",
+            self.context,
         )
 
         workflow_data = self.s3_store.read_workflow(self.workflow_id)
@@ -3914,9 +4206,10 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
-            "halt_for_approval_if_new_or_reject_if_not_relevant.replace_collection_to_hidden",
-            dag_params=self.context["params"],
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "replace_collection_to_hidden",
+            self.context,
         )
 
         expected_collections = ["HAL Hidden"]
@@ -3949,17 +4242,16 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         result = task_test(
-            "hep_create_dag",
-            "halt_for_approval_if_new_or_reject_if_not_relevant.should_replace_collection_to_hidden",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "should_replace_collection_to_hidden",
+            self.context,
         )
         assert (
-            "halt_for_approval_if_new_or_reject_if_not_relevant.replace_collection_to_hidden"
-            in result["followed"]
+            result == "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "replace_collection_to_hidden"
         )
 
-    @pytest.mark.vcr
     def test_should_replace_collection_false(
         self,
     ):
@@ -3972,19 +4264,13 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         result = task_test(
-            "hep_create_dag",
-            "halt_for_approval_if_new_or_reject_if_not_relevant.should_replace_collection_to_hidden",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "should_replace_collection_to_hidden",
+            self.context,
         )
 
-        assert (
-            "halt_for_approval_if_new_or_reject_if_not_relevant.halt_end"
-            in result["followed"]
-        )
-
-        workflow = get_lit_workflow_task(self.workflow_id)
-        assert workflows.get_decision(workflow.get("decisions"), DECISION_AUTO_REJECT)
+        assert result == "halt_for_approval_if_new_or_reject_if_not_relevant.halt_end"
 
     @pytest.mark.vcr
     def test_should_replace_collection_false_does_not_replace_decision(
@@ -4008,40 +4294,42 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
+        context_params = {"workflow_id": workflow_id}
         result = task_test(
-            "hep_create_dag",
-            "halt_for_approval_if_new_or_reject_if_not_relevant.should_replace_collection_to_hidden",
-            dag_params={"workflow_id": workflow_id},
-            xcom_key="skipmixin_key",
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant."
+            "should_replace_collection_to_hidden",
+            context=self.context,
+            context_params=context_params,
         )
 
-        assert (
-            "halt_for_approval_if_new_or_reject_if_not_relevant.halt_end"
-            in result["followed"]
-        )
+        assert result == "halt_for_approval_if_new_or_reject_if_not_relevant.halt_end"
 
-        workflow = get_lit_workflow_task(workflow_id)
+        workflow = self.wf_hook.get_workflow(workflow_id)
         assert workflows.get_decision(workflow.get("decisions"), DECISION_HEP_REJECT)
 
     @pytest.mark.vcr
     def test_notify_and_close_accepted(self):
         workflow_id = "f9fc9d83-fd28-450e-bfde-d1ed07dc87f5"
 
-        workflow_data = get_lit_workflow_task(workflow_id)
+        workflow_data = self.wf_hook.get_workflow(workflow_id)
         self.s3_store.write_workflow(workflow_data)
 
+        context_params = {"workflow_id": workflow_id}
         task_test(
-            "hep_create_dag",
+            self.dag,
             "notify_if_submission",
-            dag_params={"workflow_id": workflow_id},
+            context=self.context,
+            context_params=context_params,
         )
 
         self.s3_store.write_workflow(self.s3_store.read_workflow(workflow_id))
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "notify_and_close_accepted",
-            dag_params={"workflow_id": workflow_id},
+            context=self.context,
+            context_params=context_params,
         )
 
     @patch("hooks.inspirehep.inspire_http_hook.InspireHttpHook.create_ticket")
@@ -4055,24 +4343,47 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": True}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "notify_curator_if_needed",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "notify_curator_if_needed", self.context)
+        assert mock_create_ticket.call_count == 0
+
+    @patch("hooks.inspirehep.inspire_http_hook.InspireHttpHook.create_ticket")
+    def test_notify_curator_if_needed_ticket_exists(self, mock_create_ticket):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "titles": [{"title": "test"}],
+                "acquisition_source": {
+                    "method": "hepcrawl",
+                    "source": "arXiv",
+                },
+            },
+            "ticket": {
+                "ticket_id": "123",
+                "ticket_type": TICKET_HEP_CURATION,
+            },
+        }
+        self.s3_store.write_workflow(workflow_data)
+        self.s3_store.set_flags({"is-update": False}, self.workflow_id)
+
+        task_test(self.dag, "notify_curator_if_needed", self.context)
         assert mock_create_ticket.call_count == 0
 
     @patch("include.utils.workflows.get_fulltext", return_value="france")
     @patch("hooks.inspirehep.inspire_http_hook.InspireHttpHook.create_ticket")
     @patch(
-        "hooks.backoffice.workflow_ticket_management_hook.LiteratureWorkflowTicketManagementHook.create_ticket_entry"
+        "hooks.backoffice.workflow_ticket_management_hook."
+        "BaseWorkflowTicketManagementHook.create_ticket_entry"
     )
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_notify_curator_if_needed_needed_france_fulltext(
         self, mock_create_ticket_entry, mock_create_ticket, mock_get_fulltext
     ):
+        mock_create_ticket.return_value.json.return_value = {"ticket_id": "123"}
+
         workflow_data = {
             "id": self.workflow_id,
             "data": {
+                "control_number": 3183703,
                 "acquisition_source": {
                     "method": "hepcrawl",
                     "source": "arXiv",
@@ -4083,19 +4394,22 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "notify_curator_if_needed",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "notify_curator_if_needed", self.context)
         mock_create_ticket.assert_called_once()
-        mock_create_ticket_entry.assert_called_once()
+        assert mock_create_ticket.call_args.args[-1] == 3183703
+        mock_create_ticket_entry.assert_called_once_with(
+            workflow_id=self.workflow_id,
+            ticket_type=TICKET_HEP_CURATION,
+            ticket_id=mock_create_ticket.return_value.json.return_value["ticket_id"],
+        )
 
     @patch("include.utils.workflows.get_fulltext", return_value="germany")
     @patch("hooks.inspirehep.inspire_http_hook.InspireHttpHook.create_ticket")
     @patch(
-        "hooks.backoffice.workflow_ticket_management_hook.LiteratureWorkflowTicketManagementHook.create_ticket_entry"
+        "hooks.backoffice.workflow_ticket_management_hook."
+        "BaseWorkflowTicketManagementHook.create_ticket_entry"
     )
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_notify_curator_if_needed_germany_fulltext(
         self, mock_create_ticket_entry, mock_create_ticket, mock_get_fulltext
     ):
@@ -4113,22 +4427,22 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "notify_curator_if_needed",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "notify_curator_if_needed", self.context)
 
         assert mock_create_ticket.call_count == 2
         assert mock_create_ticket_entry.call_count == 2
 
     @patch("hooks.inspirehep.inspire_http_hook.InspireHttpHook.create_ticket")
     @patch(
-        "hooks.backoffice.workflow_ticket_management_hook.LiteratureWorkflowTicketManagementHook.create_ticket_entry"
+        "hooks.backoffice.workflow_ticket_management_hook."
+        "BaseWorkflowTicketManagementHook.create_ticket_entry"
     )
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_notify_curator_if_needed_raw_affiliations_france(
         self, mock_create_ticket_entry, mock_create_ticket
     ):
+        mock_create_ticket.return_value.json.return_value = {"ticket_id": "123"}
+
         workflow_data = {
             "id": self.workflow_id,
             "data": {
@@ -4147,18 +4461,20 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "notify_curator_if_needed",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "notify_curator_if_needed", self.context)
         mock_create_ticket.assert_called_once()
-        mock_create_ticket_entry.assert_called_once()
+        mock_create_ticket_entry.assert_called_once_with(
+            workflow_id=self.workflow_id,
+            ticket_type=TICKET_HEP_CURATION,
+            ticket_id=mock_create_ticket.return_value.json.return_value["ticket_id"],
+        )
 
     @patch("hooks.inspirehep.inspire_http_hook.InspireHttpHook.create_ticket")
     @patch(
-        "hooks.backoffice.workflow_ticket_management_hook.LiteratureWorkflowTicketManagementHook.create_ticket_entry"
+        "hooks.backoffice.workflow_ticket_management_hook."
+        "BaseWorkflowTicketManagementHook.create_ticket_entry"
     )
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_notify_curator_if_needed_raw_affiliations_uk(
         self, mock_create_ticket_entry, mock_create_ticket
     ):
@@ -4181,26 +4497,27 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "notify_curator_if_needed",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "notify_curator_if_needed", self.context)
         assert mock_create_ticket.call_count == 2
         assert mock_create_ticket_entry.call_count == 2
 
     @pytest.mark.vcr
     @patch("hooks.inspirehep.inspire_http_hook.InspireHttpHook.create_ticket")
     @patch(
-        "hooks.backoffice.workflow_ticket_management_hook.LiteratureWorkflowTicketManagementHook.create_ticket_entry"
+        "hooks.backoffice.workflow_ticket_management_hook."
+        "BaseWorkflowTicketManagementHook.create_ticket_entry"
     )
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_notify_curator_if_needed_submitter_or_arxiv(
         self, mock_create_ticket_entry, mock_create_ticket
     ):
+        mock_create_ticket.return_value.json.return_value = {"ticket_id": "123"}
+
         workflow_data = {
             "id": self.workflow_id,
             "data": {
                 "core": True,
+                "control_number": 3183703,
                 "acquisition_source": {
                     "method": "submitter",
                     "source": "submitter",
@@ -4210,13 +4527,14 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "notify_curator_if_needed",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "notify_curator_if_needed", self.context)
         mock_create_ticket.assert_called_once()
-        mock_create_ticket_entry.assert_called_once()
+        assert mock_create_ticket.call_args.args[-1] == 3183703
+        mock_create_ticket_entry.assert_called_once_with(
+            workflow_id=self.workflow_id,
+            ticket_type=TICKET_HEP_CURATION_CORE,
+            ticket_id=mock_create_ticket.return_value.json.return_value["ticket_id"],
+        )
 
     def test_should_proceed_to_core_selection_true(self):
         workflow_data = {
@@ -4234,11 +4552,7 @@ class Test_HEPCreateDAG:
             self.workflow_id,
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "should_proceed_to_core_selection",
-            dag_params=self.context["params"],
-        )
+        result = task_test(self.dag, "should_proceed_to_core_selection", self.context)
 
         assert result == "save_workflow"
 
@@ -4256,11 +4570,7 @@ class Test_HEPCreateDAG:
             {"auto-approved": True, "is-update": False},
             self.workflow_id,
         )
-        result = task_test(
-            "hep_create_dag",
-            "should_proceed_to_core_selection",
-            dag_params=self.context["params"],
-        )
+        result = task_test(self.dag, "should_proceed_to_core_selection", self.context)
 
         assert result == "save_workflow"
 
@@ -4280,14 +4590,9 @@ class Test_HEPCreateDAG:
             self.workflow_id,
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "should_proceed_to_core_selection",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        result = task_test(self.dag, "should_proceed_to_core_selection", self.context)
 
-        assert "save_and_complete_workflow" in result["followed"]
+        assert result == "save_and_complete_workflow"
 
     def test_should_proceed_to_core_selection_false_if_update(self):
         workflow_data = {
@@ -4305,14 +4610,9 @@ class Test_HEPCreateDAG:
             self.workflow_id,
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "should_proceed_to_core_selection",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        result = task_test(self.dag, "should_proceed_to_core_selection", self.context)
 
-        assert "save_and_complete_workflow" in result["followed"]
+        assert result == "save_and_complete_workflow"
 
     def test_should_proceed_to_core_selection_false_if_not_auto_approved(self):
         workflow_data = {
@@ -4330,52 +4630,50 @@ class Test_HEPCreateDAG:
             self.workflow_id,
         )
 
-        result = task_test(
-            "hep_create_dag",
-            "should_proceed_to_core_selection",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
-        )
+        result = task_test(self.dag, "should_proceed_to_core_selection", self.context)
 
-        assert "save_and_complete_workflow" in result["followed"]
+        assert result == "save_and_complete_workflow"
 
     @pytest.mark.vcr
     def test_await_decision_core_selection_approval_no_decision(self):
-        set_lit_workflow_task(status_name=STATUS_RUNNING, workflow_id=self.workflow_id)
+        self.wf_hook.set_workflow_status(STATUS_RUNNING, self.workflow_id)
 
         assert not task_test(
-            dag_id="hep_create_dag",
-            task_id="core_selection.await_decision_core_selection_approval",
-            dag_params=self.context["params"],
+            self.dag,
+            "core_selection.await_decision_core_selection_approval",
+            self.context,
         )
 
-        workflow = get_lit_workflow_task(self.workflow_id)
+        workflow = self.wf_hook.get_workflow(self.workflow_id)
         assert workflow["status"] == STATUS_APPROVAL_CORE_SELECTION
 
     @pytest.mark.vcr
     def test_await_decision_core_selection_approval_decision(self):
         workflow_id = "07c5a66c-1e5b-4da6-823c-871caf43e073"
+        context_params = {"workflow_id": workflow_id}
         assert task_test(
-            dag_id="hep_create_dag",
-            task_id="core_selection.await_decision_core_selection_approval",
-            dag_params={"workflow_id": workflow_id},
+            self.dag,
+            "core_selection.await_decision_core_selection_approval",
+            context=self.context,
+            context_params=context_params,
         )
 
         workflow_result = self.s3_store.read_workflow(workflow_id)
 
         assert len(workflow_result["decisions"]) > 1
-        assert get_lit_workflow_task(workflow_id)["status"] == STATUS_RUNNING
+        assert self.wf_hook.get_workflow(workflow_id)["status"] == STATUS_RUNNING
 
         workflow_id = "66961888-a628-46b7-b807-4deae3478adc"
+        context_params = {"workflow_id": workflow_id}
         assert task_test(
-            dag_id="hep_create_dag",
-            task_id="core_selection.await_decision_core_selection_approval",
-            dag_params={"workflow_id": workflow_id},
+            self.dag,
+            "core_selection.await_decision_core_selection_approval",
+            context=self.context,
+            context_params=context_params,
         )
-
         workflow_result = self.s3_store.read_workflow(workflow_id)
         assert len(workflow_result["decisions"]) > 1
-        assert get_lit_workflow_task(workflow_id)["status"] == STATUS_RUNNING
+        assert self.wf_hook.get_workflow(workflow_id)["status"] == STATUS_RUNNING
 
     def test_remove_inspire_categories_derived_from_core_arxiv_categories(
         self,
@@ -4412,9 +4710,9 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "core_selection.remove_inspire_categories_derived_from_core_arxiv_categories",
-            dag_params=self.context["params"],
+            self.context,
         )
 
         schema = load_schema("hep")
@@ -4433,11 +4731,96 @@ class Test_HEPCreateDAG:
         )
         assert validate(workflow_inspire_categories, subschema) is None
 
+    def test_remove_core_derived_inspire_categories_keeps_shared_term(self):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "_collections": ["Literature"],
+                "titles": [{"title": "A title"}],
+                "document_type": ["report"],
+                "arxiv_eprints": [
+                    {
+                        # both astro-ph categories classify to Astrophysics
+                        "categories": ["hep-ph", "astro-ph.HE", "astro-ph.CO"],
+                        "value": "2207.01633",
+                    }
+                ],
+                "inspire_categories": [
+                    {"source": "arxiv", "term": "Phenomenology-HEP"},
+                    {"source": "arxiv", "term": "Astrophysics"},
+                    {"source": "user", "term": "Other"},
+                ],
+            },
+        }
+        self.s3_store.write_workflow(workflow_data)
+
+        task_test(
+            self.dag,
+            "core_selection.remove_inspire_categories_derived_from_core_arxiv_categories",
+            self.context,
+        )
+
+        schema = load_schema("hep")
+        subschema = schema["properties"]["inspire_categories"]
+
+        workflow_data = self.s3_store.read_workflow(self.workflow_id)
+        expected_inspire_categories = [
+            {"source": "user", "term": "Other"},
+            {"source": "arxiv", "term": "Astrophysics"},
+        ]
+        workflow_inspire_categories = workflow_data["data"]["inspire_categories"]
+        assert ordered(workflow_inspire_categories) == ordered(
+            expected_inspire_categories
+        )
+        assert validate(workflow_inspire_categories, subschema) is None
+
+    def test_remove_core_derived_inspire_categories_keeps_unlisted_category(self):
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "_collections": ["Literature"],
+                "titles": [{"title": "A title"}],
+                "document_type": ["report"],
+                "arxiv_eprints": [
+                    {
+                        # math.AG is neither core nor a fully harvested
+                        # non-core category
+                        "categories": ["math.AG", "hep-th", "math-ph"],
+                        "value": "2608.00462",
+                    }
+                ],
+                "inspire_categories": [
+                    {"source": "arxiv", "term": "Math and Math Physics"},
+                    {"source": "arxiv", "term": "Theory-HEP"},
+                ],
+            },
+        }
+        self.s3_store.write_workflow(workflow_data)
+
+        task_test(
+            self.dag,
+            "core_selection.remove_inspire_categories_derived_from_core_arxiv_categories",
+            self.context,
+        )
+
+        schema = load_schema("hep")
+        subschema = schema["properties"]["inspire_categories"]
+
+        workflow_data = self.s3_store.read_workflow(self.workflow_id)
+        expected_inspire_categories = [
+            {"source": "arxiv", "term": "Math and Math Physics"},
+        ]
+        workflow_inspire_categories = workflow_data["data"]["inspire_categories"]
+        assert ordered(workflow_inspire_categories) == ordered(
+            expected_inspire_categories
+        )
+        assert validate(workflow_inspire_categories, subschema) is None
+
     @pytest.mark.vcr
     def test_is_fresh_data_true(self):
         control_number = 44707
 
-        record = get_inspire_http_record(LITERATURE_PID_TYPE, control_number)
+        record = self.inspire_hook.get_record(LITERATURE_PID_TYPE, control_number)
         head_version_id = record["revision_id"]
 
         workflow_data = {
@@ -4453,20 +4836,13 @@ class Test_HEPCreateDAG:
             self.workflow_id,
         )
 
-        assert (
-            task_test(
-                "hep_create_dag",
-                "is_fresh_data",
-                dag_params=self.context["params"],
-            )
-            is None
-        )
+        assert task_test(self.dag, "is_fresh_data", self.context) is None
 
     @pytest.mark.vcr
     def test_is_fresh_data_false(self):
         control_number = 44707
 
-        record = get_inspire_http_record(LITERATURE_PID_TYPE, control_number)
+        record = self.inspire_hook.get_record(LITERATURE_PID_TYPE, control_number)
         head_version_id = record["revision_id"]
 
         workflow_data = {
@@ -4480,11 +4856,7 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({"is-update": True}, self.workflow_id)
 
         with pytest.raises(AirflowFailException, match="Working with stale data"):
-            task_test(
-                "hep_create_dag",
-                "is_fresh_data",
-                dag_params=self.context["params"],
-            )
+            task_test(self.dag, "is_fresh_data", self.context)
 
     @pytest.mark.vcr
     def test_is_fresh_data_returns_true_if_is_update_is_falsy(self):
@@ -4494,14 +4866,7 @@ class Test_HEPCreateDAG:
             {"is-update": False},
             self.workflow_id,
         )
-        assert (
-            task_test(
-                "hep_create_dag",
-                "is_fresh_data",
-                dag_params=self.context["params"],
-            )
-            is None
-        )
+        assert task_test(self.dag, "is_fresh_data", self.context) is None
 
     def test_is_fresh_data_returns_true_if_head_version_id_is_none(self):
         workflow_data = {
@@ -4513,16 +4878,10 @@ class Test_HEPCreateDAG:
             {"is-update": True},
             self.workflow_id,
         )
-        assert (
-            task_test(
-                "hep_create_dag",
-                "is_fresh_data",
-                dag_params=self.context["params"],
-            )
-            is None
-        )
+        assert task_test(self.dag, "is_fresh_data", self.context) is None
 
     @pytest.mark.vcr
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
     def test_create_curation_core_ticket(self):
         workflow_data = {
             "id": self.workflow_id,
@@ -4534,19 +4893,42 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "core_selection.create_curation_core_ticket",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "core_selection.create_curation_core_ticket", self.context)
 
-        workflow = get_lit_workflow_task(self.workflow_id)
+        workflow = self.wf_hook.get_workflow(self.workflow_id)
 
         assert get_ticket_by_type(workflow, TICKET_HEP_CURATION_CORE)
 
+    @patch("hooks.inspirehep.inspire_http_hook.InspireHttpHook.create_ticket")
+    @patch(
+        "hooks.backoffice.workflow_ticket_management_hook."
+        "BaseWorkflowTicketManagementHook.create_ticket_entry"
+    )
+    @patch.dict("os.environ", {"AIRFLOW_VAR_ENVIRONMENT": "prod"})
+    def test_create_curation_core_ticket_passes_recid(
+        self, mock_create_ticket_entry, mock_create_ticket
+    ):
+        mock_create_ticket.return_value.json.return_value = {"ticket_id": "123"}
+
+        workflow_data = {
+            "id": self.workflow_id,
+            "data": {
+                "control_number": 3183703,
+                "titles": [{"title": "test create curation core ticket"}],
+                "acquisition_source": {"method": "hepcrawl", "source": "arXiv"},
+                "_collections": ["Literature"],
+            },
+        }
+        self.s3_store.write_workflow(workflow_data)
+
+        task_test(self.dag, "core_selection.create_curation_core_ticket", self.context)
+
+        mock_create_ticket.assert_called_once()
+        assert mock_create_ticket.call_args.args[-1] == 3183703
+
     @pytest.mark.vcr
     def test_store_root_new_record(self):
-        record = get_inspire_http_record(LITERATURE_PID_TYPE, 99999)
+        record = self.inspire_hook.get_record(LITERATURE_PID_TYPE, 99999)
         head_uuid = record["uuid"]
 
         root = {"version": "original", "acquisition_source": {"source": "arXiv"}}
@@ -4564,15 +4946,11 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.write_workflow(preserverd_root_entry, filename="root.json")
 
-        task_test(
-            "hep_create_dag",
-            "store_root",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "store_root", self.context)
 
     @pytest.mark.vcr
     def test_store_root_update_record(self):
-        record = get_inspire_http_record(LITERATURE_PID_TYPE, 44707)
+        record = self.inspire_hook.get_record(LITERATURE_PID_TYPE, 44707)
         head_uuid = record["uuid"]
 
         root = {"version": "original", "acquisition_source": {"source": "arXiv"}}
@@ -4588,16 +4966,9 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.write_workflow(preserved_root_entry, filename="root.json")
 
-        task_test(
-            "hep_create_dag",
-            "store_root",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "store_root", self.context)
 
-        root_entry = function_test(
-            workflows.read_wf_record_source,
-            params={"record_uuid": head_uuid, "source_name": "arxiv"},
-        )
+        root_entry = workflows.read_wf_record_source(head_uuid, "arxiv")
 
         assert root_entry["json"] == root
 
@@ -4609,16 +4980,9 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(preserved_root_entry, filename="root.json")
 
-        task_test(
-            "hep_create_dag",
-            "store_root",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "store_root", self.context)
 
-        root_entry = function_test(
-            workflows.read_wf_record_source,
-            params={"record_uuid": head_uuid, "source_name": "arxiv"},
-        )
+        root_entry = workflows.read_wf_record_source(head_uuid, "arxiv")
 
         assert root_entry["json"] == root
 
@@ -4637,11 +5001,7 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": False}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "store_record",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "store_record", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -4649,7 +5009,7 @@ class Test_HEPCreateDAG:
 
     @pytest.mark.vcr
     def test_store_record_update(self):
-        initial_record_data = get_inspire_http_record(LITERATURE_PID_TYPE, 10000)
+        initial_record_data = self.inspire_hook.get_record(LITERATURE_PID_TYPE, 10000)
 
         workflow_data = {
             "data": copy.deepcopy(initial_record_data["metadata"]),
@@ -4665,13 +5025,9 @@ class Test_HEPCreateDAG:
         self.s3_store.write_workflow(workflow_data)
         self.s3_store.set_flags({"is-update": True}, self.workflow_id)
 
-        task_test(
-            "hep_create_dag",
-            "store_record",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "store_record", self.context)
 
-        record_data = get_inspire_http_record(LITERATURE_PID_TYPE, 10000)
+        record_data = self.inspire_hook.get_record(LITERATURE_PID_TYPE, 10000)
 
         assert (
             len(record_data["metadata"]["titles"])
@@ -4710,15 +5066,11 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({}, self.workflow_id)
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "store_record",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "store_record", self.context)
 
     @pytest.mark.vcr
     def test_store_record_update_no_control_number(self):
-        initial_record_data = get_inspire_http_record(LITERATURE_PID_TYPE, 10000)
+        initial_record_data = self.inspire_hook.get_record(LITERATURE_PID_TYPE, 10000)
 
         workflow_data = {
             "id": self.workflow_id,
@@ -4737,9 +5089,7 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({"is-update": True}, self.workflow_id)
 
         with pytest.raises(ValueError, match="Control number is missing"):
-            task_test(
-                "hep_create_dag", "store_record", dag_params=self.context["params"]
-            )
+            task_test(self.dag, "store_record", self.context)
 
     @pytest.mark.parametrize(
         ("decision", "is_core"),
@@ -4758,11 +5108,7 @@ class Test_HEPCreateDAG:
 
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "core_selection.load_record_from_hep",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "core_selection.load_record_from_hep", self.context)
 
         workflow_result = self.s3_store.read_workflow(self.workflow_id)
 
@@ -4773,25 +5119,21 @@ class Test_HEPCreateDAG:
         self.s3_store.set_flags({"auto-approved": True}, self.workflow_id)
 
         result = task_test(
-            dag_id="hep_create_dag",
-            task_id="halt_for_approval_if_new_or_reject_if_not_relevant.check_is_auto_approved",
-            dag_params=self.context["params"],
-            xcom_key="skipmixin_key",
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.check_is_auto_approved",
+            self.context,
         )
 
-        assert (
-            "halt_for_approval_if_new_or_reject_if_not_relevant.halt_end"
-            in result["followed"]
-        )
+        assert result == "halt_for_approval_if_new_or_reject_if_not_relevant.halt_end"
         assert self.s3_store.get_flag("approved", self.workflow_id) is True
 
     def test_check_is_auto_approved_false(self):
         self.s3_store.set_flags({"auto-approved": False}, self.workflow_id)
 
         result = task_test(
-            dag_id="hep_create_dag",
-            task_id="halt_for_approval_if_new_or_reject_if_not_relevant.check_is_auto_approved",
-            dag_params=self.context["params"],
+            self.dag,
+            "halt_for_approval_if_new_or_reject_if_not_relevant.check_is_auto_approved",
+            self.context,
         )
 
         assert (
@@ -4802,21 +5144,17 @@ class Test_HEPCreateDAG:
 
     @pytest.mark.vcr
     def test_validate_record_no_error(self):
-        task_test(
-            "hep_create_dag",
-            "postprocessing.validate_record",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "postprocessing.validate_record", self.context)
 
     @pytest.mark.vcr
     def test_validate_record_raises_and_stops(self):
-        workflow_id = "f98f33b2-39c6-47bc-b8a5-45dc91953caa"
-
+        context_params = {"workflow_id": "f98f33b2-39c6-47bc-b8a5-45dc91953caa"}
         with pytest.raises(AirflowFailException) as excinfo:
             task_test(
-                "hep_create_dag",
+                self.dag,
                 "postprocessing.validate_record",
-                dag_params={"workflow_id": workflow_id},
+                context=self.context,
+                context_params=context_params,
             )
 
         assert "Validation failed" in str(excinfo.value)
@@ -4874,13 +5212,11 @@ class Test_HEPCreateDAG:
         }
         self.s3_store.write_workflow(workflow_data)
 
-        task_test(
-            "hep_create_dag",
-            "run_next_if_necessary",
-            dag_params=self.context["params"],
-        )
+        task_test(self.dag, "run_next_if_necessary", self.context)
 
         block_workflow_mock.assert_called_once_with(
             "to_block", "Blocked by workflow to_restart"
         )
         restart_workflow_mock.assert_called_once_with("to_restart")
+        matching_statuses = find_matching_workflows_mock.call_args.args[1]
+        assert STATUS_APPROVAL_CORE_SELECTION not in matching_statuses

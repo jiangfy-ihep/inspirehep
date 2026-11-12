@@ -19,7 +19,7 @@ AIRFLOW_HEADERS = (
 logger = logging.getLogger(__name__)
 
 
-def trigger_airflow_dag(dag_id, workflow_id, extra_data=None, workflow=None):
+def trigger_airflow_dag(dag_id, workflow_id, **kwargs):
     """Triggers an airflow dag.
 
     :param dag_id: name of the dag to run
@@ -33,19 +33,12 @@ def trigger_airflow_dag(dag_id, workflow_id, extra_data=None, workflow=None):
         "conf": {"workflow_id": str(workflow_id)},
     }
 
-    if extra_data:
-        data["conf"]["data"] = extra_data
-    if workflow:
-        data["conf"]["workflow"] = workflow
+    for key, value in kwargs.items():
+        data["conf"][key] = value
 
     url = f"{AIRFLOW_BASE_URL}/api/v2/dags/{dag_id}/dagRuns"
 
-    logger.info(
-        "Triggering DAG %s with data: %s and %s",
-        dag_id,
-        data,
-        url,
-    )
+    logger.info("Triggering DAG %s with id %s", dag_id, str(workflow_id))
     response = requests.post(
         url,
         data=json.dumps(data, cls=DjangoJSONEncoder),
@@ -69,6 +62,7 @@ def clear_airflow_dag_tasks(dag_id, workflow_id, tasks=None):
         "only_failed": False,
         "reset_dag_runs": True,
         "include_downstream": True,
+        "run_on_latest_version": True,
     }
 
     if tasks:
@@ -166,16 +160,12 @@ def restart_failed_tasks(workflow_id, workflow_type):
         "dag_run_id": str(workflow_id),
         "reset_dag_runs": True,
         "only_failed": True,
+        "run_on_latest_version": True,
     }
 
     url = f"{AIRFLOW_BASE_URL}/api/v2/dags/{dag_id}/clearTaskInstances"
 
-    logger.info(
-        "Clearing Failed Tasks of DAG %s with data: %s and %s",
-        dag_id,
-        data,
-        url,
-    )
+    logger.info("Clearing Failed Tasks of DAG %s with id %s", dag_id, str(workflow_id))
     response = requests.post(
         url,
         json=data,
@@ -240,11 +230,7 @@ def delete_workflow_dag(dag_id, workflow_id):
     """
 
     url = f"{AIRFLOW_BASE_URL}/api/v2/dags/{dag_id}/dagRuns/{str(workflow_id)}"
-    logger.info(
-        "Deleting dag Failed Tasks of DAG %s with no data and %s",
-        dag_id,
-        url,
-    )
+    logger.info("Deleting DAG %s with id %s", dag_id, str(workflow_id))
     response = requests.delete(url, headers=AIRFLOW_HEADERS)
     response.raise_for_status()
     return response.content, response.status_code
@@ -276,7 +262,7 @@ def restart_workflow_dags(workflow_id, workflow_type, params=None, workflow=None
         WORKFLOW_DAGS[workflow_type].initialize,
         str(workflow_id),
         workflow=conf.get("workflow"),
-        extra_data=conf.get("data"),
+        data=conf.get("data"),
     )
 
 

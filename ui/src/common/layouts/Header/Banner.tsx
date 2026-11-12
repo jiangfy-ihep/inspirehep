@@ -1,36 +1,36 @@
-import React, { useCallback } from 'react';
-import SanitizedHTML from 'react-sanitized-html';
+import { useCallback } from 'react';
 import classNames from 'classnames';
 import { Alert, Button } from 'antd';
 import { Map } from 'immutable';
+import SanitizedHTML from '../../components/SanitizedHTML';
 
 const ALLOWED_ATTRIBUTES_BY_TAG = { a: ['href', 'target', 'rel'] };
 const ALLOWED_HTML_TAGS = ['a', 'p', 'em', 'strong'];
 
 export interface BannerProps {
-  type: 'error' | 'warning' | 'info' | 'success' | undefined;
-  closable: boolean;
+  type?: 'error' | 'warning' | 'info' | 'success';
+  closable?: boolean;
   message: string;
-  action: {
+  action?: {
     name: string;
     href: string;
   };
   onClose: Function;
   id: string;
-  center: boolean;
+  center?: boolean;
   closedBannersById: Map<string, number>;
   currentPathname: string;
-  pathnameRegexp: RegExp;
+  pathnameRegexp?: RegExp;
 }
 
 function Banner({
-  type,
-  closable,
+  type = 'info',
+  closable = true,
   message,
   action,
   onClose,
   id,
-  center,
+  center = false,
   closedBannersById,
   currentPathname,
   pathnameRegexp,
@@ -48,10 +48,9 @@ function Banner({
       type={type}
       banner
       className={classNames({ tc: center })}
-      closable={closable}
-      afterClose={afterClose}
+      closable={closable ? { afterClose } : false}
       showIcon={false}
-      message={
+      title={
         <span>
           <SanitizedHTML
             className={classNames('di', { mr3: Boolean(action) })}
@@ -69,11 +68,5 @@ function Banner({
     />
   ) : null;
 }
-
-Banner.defaultProps = {
-  type: 'info',
-  closable: true,
-  center: false,
-};
 
 export default Banner;

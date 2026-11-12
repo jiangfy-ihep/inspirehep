@@ -1,7 +1,6 @@
 /* eslint-disable no-underscore-dangle */
-import { push } from 'connected-react-router';
+import { push } from 'redux-first-history';
 import { Action, ActionCreator } from 'redux';
-import { RootStateOrAny } from 'react-redux';
 import axios from 'axios';
 
 import { httpErrorToActionPayload } from '../common/utils';
@@ -12,7 +11,6 @@ import {
   BACKOFFICE_SEARCH_REQUEST,
   BACKOFFICE_SEARCH_ERROR,
   BACKOFFICE_SEARCH_SUCCESS,
-  BACKOFFICE_SEARCH_QUERY_UPDATE,
   BACKOFFICE_AUTHOR_ERROR,
   BACKOFFICE_AUTHOR_REQUEST,
   BACKOFFICE_AUTHOR_SUCCESS,
@@ -41,6 +39,9 @@ import {
   BACKOFFICE_LITERATURE_REQUEST,
   BACKOFFICE_LITERATURE_SUCCESS,
   BACKOFFICE_LITERATURE_ERROR,
+  BACKOFFICE_UPDATE_LITERATURE_REQUEST,
+  BACKOFFICE_UPDATE_LITERATURE_SUCCESS,
+  BACKOFFICE_UPDATE_LITERATURE_ERROR,
 } from './actionTypes';
 import {
   BACKOFFICE_API,
@@ -48,7 +49,7 @@ import {
   BACKOFFICE,
   BACKOFFICE_LOGIN,
 } from '../common/routes';
-import { Credentials } from '../types';
+import { Credentials, RootState } from '../types';
 import storage from '../common/storage';
 import {
   notifyLoginError,
@@ -58,12 +59,11 @@ import {
   notifyDeleteError,
 } from '../backoffice/notifications';
 import { refreshToken } from '../backoffice/utils/utils';
-import { getConfigFor } from '../common/config';
 import { AUTHORS_PID_TYPE, LITERATURE_PID_TYPE } from '../common/constants';
-import { WorkflowActions } from '../backoffice/constants';
+import { Subject, WorkflowActions } from '../backoffice/constants';
 
 // withCredentials is needed for ORCID login with sessionId cookie
-const httpClient = axios.create({ withCredentials: true });
+export const httpClient = axios.create({ withCredentials: true });
 
 // Request interceptor for API calls
 httpClient.interceptors.request.use(
@@ -176,7 +176,7 @@ export function backofficeLogout(): (
 
       dispatch(backofficeLogoutSuccess());
       dispatch(push(BACKOFFICE_LOGIN));
-    } catch (error) {
+    } catch {
       dispatch(backofficeLogoutSuccess());
     }
   };
@@ -185,13 +185,13 @@ export function backofficeLogout(): (
 // DASHBOARD ACTIONS
 function fetchAuthorsDashboardInfo(): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny
+  getState: () => RootState
 ) => Promise<void> {
   return async (dispatch) => {
     dispatch({ type: BACKOFFICE_AUTHORS_DASHBOARD_REQUEST });
     try {
       const response = await httpClient.get(
-        `${BACKOFFICE_API}/workflows/authors/search`
+        `${BACKOFFICE_API}/workflows/authors/search/`
       );
       dispatch({
         type: BACKOFFICE_AUTHORS_DASHBOARD_SUCCESS,
@@ -205,13 +205,13 @@ function fetchAuthorsDashboardInfo(): (
 
 function fetchLiteratureDashboardInfo(): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny
+  getState: () => RootState
 ) => Promise<void> {
   return async (dispatch) => {
     dispatch({ type: BACKOFFICE_LITERATURE_DASHBOARD_REQUEST });
     try {
       const response = await httpClient.get(
-        `${BACKOFFICE_API}/workflows/${LITERATURE_PID_TYPE}/search`
+        `${BACKOFFICE_API}/workflows/${LITERATURE_PID_TYPE}/search/`
       );
       dispatch({
         type: BACKOFFICE_LITERATURE_DASHBOARD_SUCCESS,
@@ -244,35 +244,13 @@ function searchError(errorPayload: { error: Error }) {
   };
 }
 
-function updateQuery(data: any) {
-  return {
-    type: BACKOFFICE_SEARCH_QUERY_UPDATE,
-    payload: data,
-  };
-}
-
 function resetQuery() {
   return {
     type: BACKOFFICE_SEARCH_QUERY_RESET,
   };
 }
 
-type QueryParams = {
-  page: number;
-  size?: number;
-  ordering?: string;
-  [key: string]: any;
-};
-
-export function searchQueryUpdate(
-  query: QueryParams
-): (dispatch: ActionCreator<Action>) => Promise<void> {
-  return async (dispatch) => {
-    dispatch(updateQuery(query));
-  };
-}
-
-export function searchQueryReset(): (
+function searchQueryReset(): (
   dispatch: ActionCreator<Action>
 ) => Promise<void> {
   return async (dispatch) => {
@@ -284,7 +262,7 @@ export function fetchSearchResults(
   namespace: string
 ): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny
+  getState: () => RootState
 ) => Promise<void> {
   return async (dispatch, getState) => {
     dispatch(searching());
@@ -333,7 +311,7 @@ export function fetchAuthor(
 ): (dispatch: ActionCreator<Action>) => Promise<void> {
   return async (dispatch) => {
     dispatch(fetchingAuthor());
-    const resolveQuery = `${BACKOFFICE_API}/workflows/authors/${id}`;
+    const resolveQuery = `${BACKOFFICE_API}/workflows/authors/${id}/`;
 
     try {
       const response = await httpClient.get(`${resolveQuery}`);
@@ -371,7 +349,7 @@ export function fetchLiteratureRecord(
 ): (dispatch: ActionCreator<Action>) => Promise<void> {
   return async (dispatch) => {
     dispatch(fetchingLiteratureRecord());
-    const resolveQuery = `${BACKOFFICE_API}/workflows/${LITERATURE_PID_TYPE}/${id}`;
+    const resolveQuery = `${BACKOFFICE_API}/workflows/${LITERATURE_PID_TYPE}/${id}/`;
 
     try {
       const response = await httpClient.get(`${resolveQuery}`);
@@ -383,7 +361,56 @@ export function fetchLiteratureRecord(
   };
 }
 
-// DECISSION ACTIONS
+function updatingLiteratureAction(type: string, id: string) {
+  return {
+    type: BACKOFFICE_UPDATE_LITERATURE_REQUEST,
+    payload: { type, id },
+  };
+}
+
+function updateLiteratureActionSuccess() {
+  return {
+    type: BACKOFFICE_UPDATE_LITERATURE_SUCCESS,
+  };
+}
+
+function updateLiteratureActionError(errorPayload: { error: Error }) {
+  return {
+    type: BACKOFFICE_UPDATE_LITERATURE_ERROR,
+    payload: { ...errorPayload },
+  };
+}
+
+export function updateLiteratureAction(
+  id: string,
+  payload: {
+    data: { inspire_categories: Subject[] };
+  }
+): (dispatch: ActionCreator<Action>) => Promise<void> {
+  return async (dispatch) => {
+    dispatch(updatingLiteratureAction(WorkflowActions.UPDATE, id));
+    try {
+      const response = await httpClient.patch(
+        `${BACKOFFICE_API}/workflows/${LITERATURE_PID_TYPE}/${id}/`,
+        payload
+      );
+
+      dispatch(updateLiteratureActionSuccess());
+      notifyActionSuccess(WorkflowActions.UPDATE);
+      dispatch(fetchLiteratureRecordSuccess(response.data));
+    } catch (err) {
+      const { error } = httpErrorToActionPayload(err);
+      notifyActionError(
+        (typeof error?.error === 'string'
+          ? error?.error
+          : error?.error?.detail) || 'An error occurred'
+      );
+      dispatch(updateLiteratureActionError(error));
+    }
+  };
+}
+
+// DECISION ACTIONS
 function resolvingAction(type: string, id: string, decision: string) {
   return {
     type: BACKOFFICE_RESOLVE_ACTION_REQUEST,
@@ -616,24 +643,18 @@ export function restartCurrentWorkflowAction(
 
 // DELETE ACTIONS
 
-export const deletingWorkflow = () => {
-  return {
-    type: BACKOFFICE_DELETE_REQUEST,
-  };
-};
+const deletingWorkflow = () => ({
+  type: BACKOFFICE_DELETE_REQUEST,
+});
 
-export const deleteWorkflowSuccess = () => {
-  return {
-    type: BACKOFFICE_DELETE_SUCCESS,
-  };
-};
+const deleteWorkflowSuccess = () => ({
+  type: BACKOFFICE_DELETE_SUCCESS,
+});
 
-export const deleteWorkflowError = (errorPayload: { error: Error }) => {
-  return {
-    type: BACKOFFICE_DELETE_ERROR,
-    payload: { ...errorPayload },
-  };
-};
+const deleteWorkflowError = (errorPayload: { error: Error }) => ({
+  type: BACKOFFICE_DELETE_ERROR,
+  payload: { ...errorPayload },
+});
 
 export function deleteWorkflow(
   namespace: string,
@@ -682,9 +703,8 @@ export function isUserLoggedInToBackoffice(): (
       if (response.status === 200) {
         dispatch(searchQueryReset());
         dispatch(fetchAuthorsDashboardInfo());
-        if (getConfigFor('BACKOFFICE_LITERATURE_FEATURE_FLAG')) {
-          dispatch(fetchLiteratureDashboardInfo());
-        }
+        dispatch(fetchLiteratureDashboardInfo());
+
         dispatch(backofficeLoginSuccess());
       }
     } catch (err) {

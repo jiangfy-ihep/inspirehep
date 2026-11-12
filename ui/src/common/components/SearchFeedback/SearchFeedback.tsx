@@ -1,4 +1,4 @@
-import React, { useState, CSSProperties, MouseEventHandler } from 'react';
+import { useState, CSSProperties, MouseEventHandler } from 'react';
 import { Card, Modal, Form, Input, message, Typography } from 'antd';
 import { useForm, useWatch } from 'antd/lib/form/Form';
 import { getClientId, trackEvent } from '../../../tracker';
@@ -35,7 +35,7 @@ const SearchFeedback = ({
       setFeedbackModalVisible(false);
       form.resetFields();
       trackEvent('Feedback modal', 'Submit', `Comment: ${values.question}`);
-    } catch (error) {
+    } catch {
       message.error({
         content:
           'An error occurred while submitting your feedback. Please try again later.',
@@ -100,7 +100,7 @@ const SearchFeedback = ({
           cursor: 'pointer',
           ...style,
         }}
-        bodyStyle={{ padding: 12 }}
+        styles={{ body: { padding: 12 } }}
         onClick={(event) => {
           setFeedbackModalVisible(true);
           if (onClick) onClick(event); // Necessary for matomo tracking

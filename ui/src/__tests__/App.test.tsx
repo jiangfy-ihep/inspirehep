@@ -1,17 +1,16 @@
-import React from 'react';
-import { within } from '@testing-library/react';
+import { within, screen, waitFor } from '@testing-library/react';
 import { fromJS, List } from 'immutable';
-import Loadable from 'react-loadable';
+import { vi } from 'vitest';
 
 import { getStore, mockActionCreator } from '../fixtures/store';
 import { renderWithProviders } from '../fixtures/render';
 import App from '../App';
 import { setUserCategoryFromRoles } from '../tracker';
 import { userSignUp, fetchLoggedInUser } from '../actions/user';
-import { BACKOFFICE } from '../common/routes';
+import { AUTHORLIST_TOOL, BACKOFFICE, EDITOR } from '../common/routes';
 
-jest.mock('../tracker');
-jest.mock('../actions/user');
+vi.mock('../tracker');
+vi.mock('../actions/user');
 mockActionCreator(userSignUp);
 mockActionCreator(fetchLoggedInUser);
 
@@ -20,7 +19,7 @@ describe('App', () => {
     (setUserCategoryFromRoles as jest.Mock).mockClear();
   });
 
-  it('calls to set user category with roles on render', () => {
+  it('calls to set user category with roles on render', async () => {
     const store = getStore({
       user: fromJS({
         loggedIn: true,
@@ -32,12 +31,14 @@ describe('App', () => {
 
     renderWithProviders(<App />, { store });
 
-    expect(setUserCategoryFromRoles).toHaveBeenLastCalledWith(
-      List(['cataloger'])
+    await waitFor(() =>
+      expect(setUserCategoryFromRoles).toHaveBeenLastCalledWith(
+        List(['cataloger'])
+      )
     );
   });
 
-  it('dispatches fetchLoggedInUser on render', () => {
+  it('dispatches fetchLoggedInUser on render', async () => {
     const store = getStore();
     renderWithProviders(<App />, { store });
     const expectedActions = [
@@ -46,48 +47,7 @@ describe('App', () => {
         payload: [],
       },
     ];
-    expect(store.getActions()).toEqual(expectedActions);
-  });
-
-  it('navigates to Holdingpen when /holdingpen if logged in', async () => {
-    const store = getStore({
-      user: fromJS({
-        loggedIn: true,
-        data: {
-          roles: ['user'],
-        },
-      }),
-    });
-    const { getByTestId } = renderWithProviders(<App />, {
-      store,
-      route: '/holdingpen',
-    });
-    await Loadable.preloadAll();
-
-    const app = getByTestId('app');
-    const holdingpen = within(app).getByTestId('holdingpen');
-
-    expect(holdingpen).toBeInTheDocument();
-  });
-
-  it('does not navigate to Holdingpen when /holdingpen if not logged in', async () => {
-    const store = getStore({
-      user: fromJS({
-        loggedIn: false,
-        data: {
-          roles: [],
-        },
-      }),
-    });
-    const { getByTestId } = renderWithProviders(<App />, {
-      store,
-      route: '/holdingpen',
-    });
-    await Loadable.preloadAll();
-    const app = getByTestId('app');
-    const holdingpen = within(app).queryByTestId('holdingpen');
-
-    expect(holdingpen).not.toBeInTheDocument();
+    await waitFor(() => expect(store.getActions()).toEqual(expectedActions));
   });
 
   it('navigates to Backoffice when /backoffice if superuser logged in', async () => {
@@ -99,14 +59,12 @@ describe('App', () => {
         },
       }),
     });
-    const { getByTestId } = renderWithProviders(<App />, {
+    renderWithProviders(<App />, {
       store,
       route: BACKOFFICE,
     });
-    await Loadable.preloadAll();
-
-    const app = getByTestId('app');
-    const backoffice = within(app).getByTestId('backoffice');
+    const app = await screen.findByTestId('app');
+    const backoffice = await within(app).findByTestId('backoffice');
 
     expect(backoffice).toBeInTheDocument();
   });
@@ -120,49 +78,50 @@ describe('App', () => {
         },
       }),
     });
-    const { getByTestId } = renderWithProviders(<App />, {
+    renderWithProviders(<App />, {
       store,
       route: BACKOFFICE,
     });
-    await Loadable.preloadAll();
-    const app = getByTestId('app');
+    const app = await screen.findByTestId('app');
     const backoffice = within(app).queryByTestId('backoffice');
 
     expect(backoffice).not.toBeInTheDocument();
   });
 
-  it('navigates to User when /user', () => {
-    const { getByTestId } = renderWithProviders(<App />, { route: '/user' });
+  it('navigates to User when /user', async () => {
+    const { getByTestId } = renderWithProviders(<App />, {
+      route: '/user',
+    });
     const app = getByTestId('app');
-    const user = within(app).getByTestId('user');
+    const user = await within(app).findByTestId('user');
 
     expect(user).toBeInTheDocument();
   });
 
-  it('navigates to Literature when /literature', () => {
+  it('navigates to Literature when /literature', async () => {
     const { getByTestId } = renderWithProviders(<App />, {
       route: '/literature',
     });
     const app = getByTestId('app');
-    const literature = within(app).getByTestId('literature');
+    const literature = await within(app).findByTestId('literature');
 
     expect(literature).toBeInTheDocument();
   });
 
-  it('navigates to Authors when /authors', () => {
+  it('navigates to Authors when /authors', async () => {
     const { getByTestId } = renderWithProviders(<App />, { route: '/authors' });
     const app = getByTestId('app');
-    const authors = within(app).getByTestId('authors');
+    const authors = await within(app).findByTestId('authors');
 
     expect(authors).toBeInTheDocument();
   });
 
-  it('navigates to Conferences when /conferences', () => {
+  it('navigates to Conferences when /conferences', async () => {
     const { getByTestId } = renderWithProviders(<App />, {
       route: '/conferences',
     });
     const app = getByTestId('app');
-    const conferences = within(app).getByTestId('conferences');
+    const conferences = await within(app).findByTestId('conferences');
 
     expect(conferences).toBeInTheDocument();
   });
@@ -176,13 +135,12 @@ describe('App', () => {
         },
       }),
     });
-    const { getByTestId } = renderWithProviders(<App />, {
+    renderWithProviders(<App />, {
       store,
       route: '/submissions',
     });
-    await Loadable.preloadAll();
-    const app = getByTestId('app');
-    const submissions = within(app).getByTestId('submissions');
+    const app = await screen.findByTestId('app');
+    const submissions = await within(app).findByTestId('submissions');
 
     expect(submissions).toBeInTheDocument();
   });
@@ -196,69 +154,143 @@ describe('App', () => {
         },
       }),
     });
-    const { getByTestId } = renderWithProviders(<App />, {
+    renderWithProviders(<App />, {
       store,
       route: '/submissions',
     });
-    await Loadable.preloadAll();
-
-    const app = getByTestId('app');
+    const app = await screen.findByTestId('app');
     const submissions = within(app).queryByTestId('submissions');
 
     expect(submissions).not.toBeInTheDocument();
   });
 
-  it('navigates to Home when /', () => {
+  it('navigates to Home when /', async () => {
     const { getByTestId } = renderWithProviders(<App />, { route: '/' });
     const app = getByTestId('app');
-    const home = within(app).getByTestId('home');
+    const home = await within(app).findByTestId('home');
 
     expect(home).toBeInTheDocument();
   });
 
-  it('navigates to Errors when /errors', () => {
+  it('navigates to Errors when /errors', async () => {
     const { getByTestId } = renderWithProviders(<App />, { route: '/errors' });
     const app = getByTestId('app');
-    const errors = within(app).getByTestId('errors');
+    const errors = await within(app).findByTestId('errors');
 
     expect(errors).toBeInTheDocument();
   });
 
-  it('redirects to Errors when /anythingElse', () => {
+  it('redirects to Errors when /anythingElse', async () => {
     const { getByTestId } = renderWithProviders(<App />, {
       route: '/anythingElse',
     });
     const app = getByTestId('app');
-    const errors = within(app).getByTestId('errors');
+    const errors = await within(app).findByTestId('errors');
 
     expect(errors).toBeInTheDocument();
   });
 
-  it('navigates to Jobs when /jobs', () => {
+  it('navigates to Jobs when /jobs', async () => {
     const { getByTestId } = renderWithProviders(<App />, { route: '/jobs' });
     const app = getByTestId('app');
-    const jobs = within(app).getByTestId('jobs');
+    const jobs = await within(app).findByTestId('jobs');
 
     expect(jobs).toBeInTheDocument();
   });
 
-  it('navigates to BibliographyGenerator when /bibliography-generator', () => {
+  it('navigates to BibliographyGenerator when /bibliography-generator', async () => {
     const { getByTestId } = renderWithProviders(<App />, {
       route: '/bibliography-generator',
     });
     const app = getByTestId('app');
-    const bibliography = within(app).getByTestId('bibliography');
+    const bibliography = await within(app).findByTestId('bibliography');
 
     expect(bibliography).toBeInTheDocument();
   });
 
-  it('navigates to Journals when /journals', () => {
+  it('navigates to Journals when /journals', async () => {
     const { getByTestId } = renderWithProviders(<App />, {
       route: '/journals',
     });
     const app = getByTestId('app');
-    const journals = within(app).getByTestId('journals');
+    const journals = await within(app).findByTestId('journals');
 
     expect(journals).toBeInTheDocument();
+  });
+
+  it('navigates to Editor when /new-editor if superuser logged in', async () => {
+    const store = getStore({
+      user: fromJS({
+        loggedIn: true,
+        data: {
+          roles: ['superuser'],
+        },
+      }),
+    });
+    renderWithProviders(<App />, {
+      store,
+      route: EDITOR,
+    });
+    const app = await screen.findByTestId('app');
+    const editor = await within(app).findByTestId('editor');
+
+    expect(editor).toBeInTheDocument();
+  });
+
+  it('does not navigate to Editor when /new-editor if not logged in', async () => {
+    const store = getStore({
+      user: fromJS({
+        loggedIn: false,
+        data: {
+          roles: [],
+        },
+      }),
+    });
+    renderWithProviders(<App />, {
+      store,
+      route: EDITOR,
+    });
+    const app = await screen.findByTestId('app');
+    const editor = within(app).queryByTestId('editor');
+
+    expect(editor).not.toBeInTheDocument();
+  });
+
+  it('navigates to AuthorlistTool when /authorlist-tool if superuser logged in', async () => {
+    const store = getStore({
+      user: fromJS({
+        loggedIn: true,
+        data: {
+          roles: ['superuser'],
+        },
+      }),
+    });
+    renderWithProviders(<App />, {
+      store,
+      route: AUTHORLIST_TOOL,
+    });
+    const app = await screen.findByTestId('app');
+    const authorlistTool = await within(app).findByTestId('authorlist-tool');
+
+    expect(authorlistTool).toBeInTheDocument();
+  });
+
+  it('does not navigate to AuthorlistTool when /authorlist-tool if not logged in', async () => {
+    const store = getStore({
+      user: fromJS({
+        loggedIn: false,
+        data: {
+          roles: [],
+        },
+      }),
+    });
+    renderWithProviders(<App />, {
+      store,
+      route: AUTHORLIST_TOOL,
+    });
+    const app = await screen.findByTestId('app');
+    const authorlistTool = within(app).queryByTestId('authorlist-tool');
+
+    expect(authorlistTool).not.toBeInTheDocument();
   });
 });

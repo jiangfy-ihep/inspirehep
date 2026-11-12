@@ -9,10 +9,10 @@ interface ParentRecordInfoProps {
   parentRecord: Map<string, any>;
 }
 
-const renderBook = (data: Map<string, any>): JSX.Element[] =>
+const renderBook = (data: Map<string, any>): React.JSX.Element[] =>
   data
     .entrySeq()
-    .map(([key, item]: [string, Map<string, any>], index: number) => (
+    .map(([_key, item]: [string, Map<string, any>], index: number) => (
       <React.Fragment key={item.get('title')}>
         <Link
           to={`${LITERATURE}/${getRecordIdFromRef(

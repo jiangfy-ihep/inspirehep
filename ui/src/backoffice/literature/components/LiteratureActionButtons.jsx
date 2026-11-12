@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { LiteratureHepSelectionButtons } from './LiteratureHepSelectionButtons';
 import { LiteratureCoreSelectionButtons } from './LiteratureCoreSelectionButtons';
 import { LiteratureMissingSubjectFieldsSelectionButtons } from './LiteratureMissingSubjectFieldsSelectionButtons';
@@ -10,14 +10,22 @@ const LiteratureActionButtons = ({
   handleResolveAction,
   workflowId = null,
   isFullCoverage = false,
-  isBatch = false,
   isSubmitted = false,
+  shouldShowSubmissionModal = false,
+  submissionContext = undefined,
+  hasInspireCategories = true,
+  disableActions = false,
 }) => {
   const [hasSubmittedDecision, setHasSubmittedDecision] = useState(false);
 
-  const handleResolveAndHide = (action) => {
+  const handleResolveAndHide = (action, value) => {
     setHasSubmittedDecision(true);
-    handleResolveAction(action);
+    if (value === undefined) {
+      handleResolveAction(action);
+      return;
+    }
+
+    handleResolveAction(action, value);
   };
 
   if (isSubmitted || hasSubmittedDecision) {
@@ -29,7 +37,7 @@ const LiteratureActionButtons = ({
       return (
         <LiteratureCoreSelectionButtons
           handleResolveAction={handleResolveAndHide}
-          isBatch={isBatch}
+          disableActions={disableActions}
         />
       );
 
@@ -38,7 +46,9 @@ const LiteratureActionButtons = ({
         <LiteratureHepSelectionButtons
           handleResolveAction={handleResolveAndHide}
           isFullCoverage={isFullCoverage}
-          isBatch={isBatch}
+          shouldShowSubmissionModal={shouldShowSubmissionModal}
+          submissionContext={submissionContext}
+          disableActions={disableActions}
         />
       );
 
@@ -46,11 +56,18 @@ const LiteratureActionButtons = ({
       return (
         <LiteratureMissingSubjectFieldsSelectionButtons
           handleResolveAction={handleResolveAndHide}
-          isBatch={isBatch}
+          hasInspireCategories={hasInspireCategories}
+          isFullCoverage={isFullCoverage}
+          disableActions={disableActions}
         />
       );
     case WorkflowStatuses.APPROVAL_MERGE:
-      return <LiteratureMergeSelectionButtons workflowId={workflowId} />;
+      return (
+        <LiteratureMergeSelectionButtons
+          workflowId={workflowId}
+          disableActions={disableActions}
+        />
+      );
 
     default:
       return null;

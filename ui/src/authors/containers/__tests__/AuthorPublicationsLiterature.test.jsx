@@ -1,4 +1,3 @@
-import React from 'react';
 import { fromJS } from 'immutable';
 
 import { getStore } from '../../../fixtures/store';
@@ -8,9 +7,11 @@ import { AUTHOR_PUBLICATIONS_NS } from '../../../search/constants';
 import { initialState } from '../../../reducers/authors';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('../../../literature/containers/LiteratureSearchContainer', () =>
-  jest.fn(() => <div data-testid="literature-publications-search-container" />)
-);
+vi.mock('../../../literature/containers/LiteratureSearchContainer', () => ({
+  default: jest.fn(() => (
+    <div data-testid="literature-publications-search-container" />
+  )),
+}));
 
 describe('AuthorPublicationsContainer with LiteratureSearchContainer mocked', () => {
   it('passes all props to LiteratureSearchContainer', () => {
@@ -41,7 +42,7 @@ describe('AuthorPublicationsContainer with LiteratureSearchContainer mocked', ()
         },
         numberOfSelected: 0,
       }),
-      {}
+      undefined
     );
   });
 });

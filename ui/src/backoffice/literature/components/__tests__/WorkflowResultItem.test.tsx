@@ -1,5 +1,5 @@
-import React from 'react';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { fromJS } from 'immutable';
 
 import { renderWithProviders } from '../../../../fixtures/render';
@@ -43,6 +43,7 @@ describe('WorkflowResultItem component for Literature', () => {
         handleResolveAction={handleResolveAction}
         shouldShowSelectionCheckbox
         onSelectionChange={handleSelectionChange}
+        page="test"
       />,
       {
         route: BACKOFFICE_LITERATURE_SEARCH,
@@ -96,7 +97,7 @@ describe('WorkflowResultItem component for Literature', () => {
     });
 
     const { rerender } = renderWithProviders(
-      <WorkflowResultItem item={itemWithDetails} />,
+      <WorkflowResultItem item={itemWithDetails} page="test" />,
       {
         route: BACKOFFICE_LITERATURE_SEARCH,
       }
@@ -109,10 +110,86 @@ describe('WorkflowResultItem component for Literature', () => {
     expect(screen.getByText(/First note/i)).toBeInTheDocument();
     expect(screen.getByText(/Second note/i)).toBeInTheDocument();
 
-    rerender(<WorkflowResultItem item={itemWithoutPublicationDisplay} />);
+    rerender(
+      <WorkflowResultItem item={itemWithoutPublicationDisplay} page="test" />
+    );
 
     expect(screen.queryByText('JHEP')).not.toBeInTheDocument();
     expect(screen.queryByText(/Number of Pages/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Public notes/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the resolve conflicts button for approval merge workflows', () => {
+    const item = fromJS({
+      id: 'workflow-1',
+      workflow_type: WorkflowTypes.HEP_CREATE,
+      status: WorkflowStatuses.APPROVAL_MERGE,
+      data: fromJS({
+        titles: fromJS([{ title: 'Merge candidate title' }]),
+        inspire_categories: fromJS([{ term: 'hep-ph' }]),
+      }),
+    });
+
+    renderWithProviders(<WorkflowResultItem item={item} page="test" />, {
+      route: BACKOFFICE_LITERATURE_SEARCH,
+    });
+
+    const resolveConflictsButton = screen.getByRole('link', {
+      name: /Resolve conflicts/i,
+    });
+
+    expect(resolveConflictsButton).toBeInTheDocument();
+    expect(resolveConflictsButton).toHaveAttribute(
+      'href',
+      '/editor/backoffice/literature/workflow-1'
+    );
+  });
+
+  it('submits rejection reason through modal for submission workflows', async () => {
+    const handleResolveAction = jest.fn();
+    const user = userEvent.setup();
+    const item = fromJS({
+      id: 'submission-1',
+      workflow_type: WorkflowTypes.HEP_SUBMISSION,
+      status: WorkflowStatuses.APPROVAL,
+      data: {
+        titles: [{ title: 'Submission title' }],
+        acquisition_source: {
+          email: 'submitter@example.org',
+          datetime: '2025-01-07T16:29:31.315971',
+          source: 'submitter',
+        },
+      },
+    });
+
+    renderWithProviders(
+      <WorkflowResultItem
+        item={item}
+        handleResolveAction={handleResolveAction}
+        shouldShowSubmissionModal
+        submissionContext={{
+          email: 'submitter@example.org',
+          title: 'Submission title',
+        }}
+        page="test"
+      />,
+      {
+        route: BACKOFFICE_LITERATURE_SEARCH,
+      }
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Reason for rejection' });
+    await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
+
+    expect(handleResolveAction).toHaveBeenCalledWith(
+      WorkflowDecisions.HEP_REJECT,
+      expect.stringContaining('submitter@example.org')
+    );
+    expect(handleResolveAction).toHaveBeenCalledWith(
+      WorkflowDecisions.HEP_REJECT,
+      expect.stringContaining('Submission title')
+    );
   });
 });

@@ -1,14 +1,4 @@
 {
-  "inspire_connection_qa": {
-    "conn_type": "http",
-    "description": "",
-    "login": "",
-    "password": null,
-    "host": "https://inspirebeta.net",
-    "port": null,
-    "schema": "",
-    "extra": ""
-  },
   "inspire_connection": {
     "conn_type": "http",
     "description": "",
@@ -17,7 +7,10 @@
     "host": "http://host.docker.internal:8080",
     "port": null,
     "schema": "",
-    "extra": ""
+    "extra": {
+      "Authorization": "Bearer CHANGE_ME",
+      "Accept": "application/vnd+inspire.record.raw+json"
+    }
   },
   "hepdata_connection": {
     "conn_type": "http",
@@ -26,18 +19,7 @@
     "password": null,
     "host": "https://www.hepdata.net",
     "port": null,
-    "schema": "",
-    "extra": ""
-  },
-  "inspire_db_connection": {
-    "conn_type": "postgres",
-    "description": "",
-    "login": "inspire",
-    "password": "inspire",
-    "host": "localhost",
-    "port": 5433,
-    "schema": "inspire",
-    "extra": "{}"
+    "schema": ""
   },
   "backoffice_conn": {
     "conn_type": "http",
@@ -47,7 +29,11 @@
     "host": "http://host.docker.internal:8001",
     "port": null,
     "schema": "",
-    "extra": ""
+    "extra": {
+      "Authorization": "Token 2e04111a61e8f5ba6ecec52af21bbb9e81732085",
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    }
   },
   "cds_connection": {
     "conn_type": "http",
@@ -56,8 +42,7 @@
     "password": null,
     "host": "https://cds.cern.ch",
     "port": null,
-    "schema": "",
-    "extra": ""
+    "schema": ""
   },
   "cds_rdm_connection": {
     "conn_type": "http",
@@ -66,18 +51,25 @@
     "password": null,
     "host": "https://repository.cern",
     "port": null,
-    "schema": "",
-    "extra": ""
+    "schema": ""
   },
   "arxiv_oaipmh_connection": {
     "conn_type": "http",
-    "description": "Used for arxiv harvestin",
+    "description": "Used for arxiv harvesting",
     "login": "",
     "password": null,
     "host": "https://oaipmh.arxiv.org/oai",
     "port": null,
-    "schema": "",
-    "extra": ""
+    "schema": ""
+  },
+  "cds_oaipmh_connection": {
+    "conn_type": "http",
+    "description": "Used for cds harvesting",
+    "login": "",
+    "password": null,
+    "host": "https://cds.cern.ch/oai2d",
+    "port": null,
+    "schema": ""
   },
     "opensearch_connection": {
     "conn_type": "opensearch",
@@ -92,27 +84,26 @@
     "password": null,
     "host": "https://arxiv.org",
     "port": null,
-    "schema": "",
-    "extra": ""
+    "schema": ""
   },
   "s3_conn": {
     "conn_type": "aws",
     "description": "Used for arxiv harvesting temporary storage",
     "login": "airflow",
     "password": "airflow-inspire",
-    "host": "s3",
-    "port": 9000,
-    "schema": "",
+    "host": null,
+    "port": null,
+    "schema": null,
     "extra": {"endpoint_url":"http://s3:9000","service_config":{"s3": {"bucket_name": "data-store"}}}
   },
-  "s3_elsevier_conn": {
+  "s3_publisher_conn": {
     "conn_type": "aws",
-    "description": "Used for elsevier harvesting storage",
+    "description": "Used for publishers harvesting storage",
     "login": "airflow",
     "password": "airflow-inspire",
-    "host": "s3",
-    "port": 9000,
-    "schema": "",
+    "host": null,
+    "port": null,
+    "schema": null,
     "extra": {"endpoint_url":"http://s3:9000","service_config":{"s3": {"bucket_name": "elsevier-store"}}}
   },
   "ieee_ftp": {
@@ -122,8 +113,7 @@
     "password": "change_me",
     "host": "ftpnew.ieee.org",
     "port": null,
-    "schema": null,
-    "extra": null
+    "schema": null
   },
   "grobid_connection": {
     "conn_type": "http",
@@ -132,8 +122,7 @@
     "password": null,
     "host": "https://grobid.inspirebeta.net",
     "port": null,
-    "schema": "",
-    "extra": ""
+    "schema": ""
   },
   "elsevier_consyn_conn": {
     "conn_type": "http",
@@ -144,5 +133,17 @@
     "port": null,
     "schema": "",
     "extra": {"x-els-api-key": "CHANGE_ME"}
+  },
+  "aps_conn": {
+    "conn_type": "http",
+    "description": "APS harvest connection",
+    "login": "",
+    "password": null,
+    "host": "http://harvest.aps.org",
+    "port": null,
+    "schema": "",
+    "extra": {
+      "Authorization": "Bearer CHANGE_ME"
+    }
   }
 }

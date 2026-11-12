@@ -1,5 +1,8 @@
 from django.db import models
 
+FACET_SIZE_MEDIUM = 20
+FACET_SIZE_LARGE = 300
+
 HEP_TICKET_TYPES = (
     ("hep_create_curation", "HEP create curation"),
     ("hep_create_curation_core", "HEP create curation core"),
@@ -34,13 +37,23 @@ class HepStatusChoices(models.TextChoices):
     MISSING_SUBJECT_FIELDS = "missing_subject_fields", "Missing subject fields"
 
 
+ERROR_STATUSES = [
+    HepStatusChoices.ERROR,
+    HepStatusChoices.ERROR_VALIDATION,
+    HepStatusChoices.ERROR_MULTIPLE_EXACT_MATCHES,
+]
+
+
 HEP_DEFAULT_STATUS_CHOICE = HepStatusChoices.PROCESSING
 
 
 class HepWorkflowType(models.TextChoices):
     HEP_CREATE = "HEP_CREATE", "HEP create"
+    HEP_PUBLISHER_CREATE = "HEP_PUBLISHER_CREATE", "HEP publisher create"
+    HEP_PUBLISHER_UPDATE = "HEP_PUBLISHER_UPDATE", "HEP publisher update"
     HEP_SUBMISSION = "HEP_SUBMISSION", "HEP submission"
     HEP_UPDATE = "HEP_UPDATE", "HEP update"
+    HEP_MANUAL_MERGE = "HEP_MANUAL_MERGE", "HEP manual merge"
 
 
 HEP_DEFAULT_WORKFLOW_TYPE = HepWorkflowType.HEP_CREATE
@@ -89,9 +102,25 @@ class HepResolutions(models.TextChoices):
         "missing_subject_fields",
         "halt_for_approval_if_new_or_reject_if_not_relevant.await_decision_approval",
     )
+    withdrawn = (
+        "withdrawn",
+        "",
+    )
+    manual_merge_approve = (
+        "manual_merge_approve",
+        "await_merge_conflicts_resolved",
+    )
 
 
 HEP_DECISION_CHOICES = HepResolutions.choices
+
+HEP_EXCLUSIVE_RESOLUTIONS = (
+    HepResolutions.hep_accept,
+    HepResolutions.hep_accept_core,
+    HepResolutions.hep_reject,
+    HepResolutions.core_selection_accept,
+    HepResolutions.core_selection_accept_core,
+)
 
 
 class HepJournalCoverage(models.TextChoices):
@@ -101,3 +130,7 @@ class HepJournalCoverage(models.TextChoices):
 
 class HepCreateDags(models.TextChoices):
     initialize = "hep_create_dag", "initialize"
+
+
+class HepManualMergeDags(models.TextChoices):
+    initialize = "hep_manual_merge_dag", "initialize"

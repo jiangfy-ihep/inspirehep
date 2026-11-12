@@ -1,6 +1,6 @@
 import { Action, ActionCreator } from 'redux';
-import { RootStateOrAny } from 'react-redux';
 import { notification } from 'antd';
+import { RootState } from '../types';
 
 import { HttpClientWrapper } from '../common/http';
 import {
@@ -32,8 +32,8 @@ function changeEmailAddressError(error: { error: Error }) {
 
 function notifyEmailChangeSuccesss() {
   notification.success({
-    message: 'Success',
-    duration: null,
+    title: 'Success',
+    duration: false,
     description: 'Email address changed successfully!',
   });
 }
@@ -44,7 +44,7 @@ export function changeEmailAddress({
   email: string;
 }): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {

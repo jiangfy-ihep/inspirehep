@@ -1,6 +1,11 @@
-import React, { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import moment from 'moment';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
 import { DatePicker, Row } from 'antd';
 
 import {
@@ -8,48 +13,54 @@ import {
   DATE_RANGE_FORMAT,
 } from '../constants';
 
+dayjs.extend(utc);
+dayjs.extend(isSameOrAfter);
+dayjs.extend(isSameOrBefore);
+dayjs.extend(customParseFormat);
+
 function DateRangeFilter({ onChange, range = '' }) {
   const [startDate = '', endDate = ''] = useMemo(
     () => range.split(RANGE_AGGREGATION_SELECTION_SEPARATOR),
     [range]
   );
 
-  const startDateMoment = useMemo(
-    () => (startDate ? moment.utc(startDate, DATE_RANGE_FORMAT) : null),
+  const startDateDayjs = useMemo(
+    () => (startDate ? dayjs.utc(startDate, DATE_RANGE_FORMAT) : null),
     [startDate]
   );
 
-  const endDateMoment = useMemo(
-    () => (endDate ? moment.utc(endDate, DATE_RANGE_FORMAT) : null),
+  const endDateDayjs = useMemo(
+    () => (endDate ? dayjs.utc(endDate, DATE_RANGE_FORMAT) : null),
     [endDate]
   );
 
   const isLaterThanEndDate = useCallback(
-    (dateAsMoment) => {
-      if (!dateAsMoment || !endDateMoment) {
+    (dateAsDayjs) => {
+      if (!dateAsDayjs || !endDateDayjs) {
         return false;
       }
-      return dateAsMoment.isSameOrAfter(endDateMoment);
+      return dateAsDayjs.isSameOrAfter(endDateDayjs);
     },
-    [endDateMoment]
+    [endDateDayjs]
   );
 
   const isEarlierThanStartDate = useCallback(
-    (dateAsMoment) => {
-      if (!dateAsMoment || !startDateMoment) {
+    (dateAsDayjs) => {
+      if (!dateAsDayjs || !startDateDayjs) {
         return false;
       }
-      return dateAsMoment.isSameOrBefore(startDateMoment);
+      return dateAsDayjs.isSameOrBefore(startDateDayjs);
     },
-    [startDateMoment]
+    [startDateDayjs]
   );
 
   const onStartDateChange = useCallback(
     (_, dateString) => {
-      const willHaveAnySelectedDate = dateString || endDate;
+      const newStartDate = dateString || '';
+      const willHaveAnySelectedDate = newStartDate || endDate;
       onChange(
         willHaveAnySelectedDate
-          ? `${dateString}${RANGE_AGGREGATION_SELECTION_SEPARATOR}${endDate}`
+          ? `${newStartDate}${RANGE_AGGREGATION_SELECTION_SEPARATOR}${endDate}`
           : undefined
       );
     },
@@ -58,10 +69,11 @@ function DateRangeFilter({ onChange, range = '' }) {
 
   const onEndDateChange = useCallback(
     (_, dateString) => {
-      const willHaveAnySelectedDate = dateString || startDate;
+      const newEndDate = dateString || '';
+      const willHaveAnySelectedDate = newEndDate || startDate;
       onChange(
         willHaveAnySelectedDate
-          ? `${startDate}${RANGE_AGGREGATION_SELECTION_SEPARATOR}${dateString}`
+          ? `${startDate}${RANGE_AGGREGATION_SELECTION_SEPARATOR}${newEndDate}`
           : undefined
       );
     },
@@ -73,24 +85,22 @@ function DateRangeFilter({ onChange, range = '' }) {
       <Row className="mb1">From:</Row>
       <Row className="mb2">
         <DatePicker
-          data-test-id="start-date-picker"
           data-testid="start-date-picker"
           format={DATE_RANGE_FORMAT}
           className="w-100"
           onChange={onStartDateChange}
-          value={startDateMoment}
+          value={startDateDayjs}
           disabledDate={isLaterThanEndDate}
         />
       </Row>
       <Row className="mb1">To:</Row>
       <Row>
         <DatePicker
-          data-test-id="end-date-picker"
           data-testid="end-date-picker"
           format={DATE_RANGE_FORMAT}
           onChange={onEndDateChange}
           className="w-100"
-          value={endDateMoment}
+          value={endDateDayjs}
           disabledDate={isEarlierThanStartDate}
         />
       </Row>

@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Breadcrumb, Input } from 'antd';
 import { HomeOutlined } from '@ant-design/icons';
 import { Action, ActionCreator } from 'redux';
-import { connect, RootStateOrAny } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
+import { RootState } from '../../../../types';
 import { searchQueryUpdate } from '../../../../actions/search';
 import './Breadcrumbs.less';
 import { BACKOFFICE } from '../../../../common/routes';
@@ -39,30 +40,39 @@ const Breadcrumbs = ({
   const shouldWrapTitle2WithLatex =
     namespace === BACKOFFICE_LITERATURE_SEARCH_NS && !!title2;
 
-  return (
-    <div className="flex items-center justify-between mt3 mb2">
-      <Breadcrumb separator=">">
-        <Breadcrumb.Item>
-          <a href="/">
-            <HomeOutlined className="mr2" /> Inspirehep
-          </a>
-        </Breadcrumb.Item>
-        <Breadcrumb.Item>
-          <a href={BACKOFFICE}>Backoffice</a>
-        </Breadcrumb.Item>
-        <Breadcrumb.Item>
-          <a href={`${BACKOFFICE}/${href1}`}>{title1}</a>
-        </Breadcrumb.Item>
-        {title2 && (
-          <Breadcrumb.Item>
-            {shouldWrapTitle2WithLatex ? (
+  const breadcrumbItems = [
+    {
+      href: '/',
+      title: (
+        <>
+          <HomeOutlined className="mr2" /> Inspirehep
+        </>
+      ),
+    },
+    {
+      href: BACKOFFICE,
+      title: 'Backoffice',
+    },
+    {
+      href: `${BACKOFFICE}/${href1}`,
+      title: title1,
+    },
+    ...(title2
+      ? [
+          {
+            title: shouldWrapTitle2WithLatex ? (
               <Latex>{title2}</Latex>
             ) : (
-              <p>{title2}</p>
-            )}
-          </Breadcrumb.Item>
-        )}
-      </Breadcrumb>
+              <p className="mv0">{title2}</p>
+            ),
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div className="flex items-center justify-between mt3 mb2">
+      <Breadcrumb separator=">" items={breadcrumbItems} />
       {!dashboardPage && (
         <Search
           enterButton
@@ -83,7 +93,7 @@ const Breadcrumbs = ({
 };
 
 const stateToProps = (
-  state: RootStateOrAny,
+  state: RootState,
   { namespace }: { namespace: string }
 ) => ({
   query: state.search.getIn(['namespaces', namespace, 'query', 'q']),

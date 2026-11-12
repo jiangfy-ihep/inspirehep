@@ -2,8 +2,7 @@
 function isStorageAvailable() {
   let storage;
   try {
-    // eslint-disable-next-line dot-notation
-    storage = window['localStorage'];
+    storage = window.localStorage;
     const test = '__test__';
     storage.setItem(test, test);
     storage.removeItem(test);
@@ -11,9 +10,7 @@ function isStorageAvailable() {
   } catch (e) {
     return (
       e instanceof DOMException &&
-      (e.code === 22 ||
-        e.code === 1014 ||
-        e.name === 'QuotaExceededError' ||
+      (e.name === 'QuotaExceededError' ||
         e.name === 'NS_ERROR_DOM_QUOTA_REACHED') &&
       storage &&
       storage.length !== 0
@@ -25,7 +22,6 @@ const storage = {
   isAvailable: isStorageAvailable(),
 
   getSync(key: string) {
-    // eslint-disable-next-line react/no-this-in-sfc
     if (this.isAvailable) {
       const rawValue = localStorage.getItem(key);
       if (rawValue !== null) {
@@ -39,7 +35,7 @@ const storage = {
     return this.getSync(key);
   },
 
-  async set(key: string, value: string | string[] | number) {
+  async set(key: string, value: string | string[] | number | boolean) {
     if (this.isAvailable) {
       localStorage.setItem(key, JSON.stringify(value));
     }

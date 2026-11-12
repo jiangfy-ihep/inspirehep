@@ -1,4 +1,3 @@
-import React from 'react';
 import { screen } from '@testing-library/react';
 import { fromJS } from 'immutable';
 import { getStore } from '../../../fixtures/store';
@@ -6,36 +5,28 @@ import { renderWithProviders } from '../../../fixtures/render';
 import SearchPageContainer from '../SearchPageContainer';
 import { LITERATURE_NS } from '../../../search/constants';
 
-jest.mock(
-  '../LiteratureSearchContainer',
-  () =>
-    function MockLiteratureSearchContainer(props) {
-      return (
-        <div data-testid="literature-search-container">
-          <div data-testid="assign-view-context">
-            {String(props.assignView)}
-          </div>
-          <div data-testid="number-of-selected">{props.numberOfSelected}</div>
-        </div>
-      );
-    }
-);
+vi.mock('../LiteratureSearchContainer', () => ({
+  default: function MockLiteratureSearchContainer(props) {
+    return (
+      <div data-testid="literature-search-container">
+        <div data-testid="assign-view-context">{String(props.assignView)}</div>
+        <div data-testid="number-of-selected">{props.numberOfSelected}</div>
+      </div>
+    );
+  },
+}));
 
-jest.mock(
-  '../AssignConferencesDrawerContainer',
-  () =>
-    function MockAssignConferencesDrawerContainer() {
-      return <div data-testid="assign-conferences-drawer" />;
-    }
-);
+vi.mock('../AssignConferencesDrawerContainer', () => ({
+  default: function MockAssignConferencesDrawerContainer() {
+    return <div data-testid="assign-conferences-drawer" />;
+  },
+}));
 
-jest.mock(
-  '../ToolActionContainer',
-  () =>
-    function MockToolActionContainer() {
-      return <div data-testid="tool-action-container" />;
-    }
-);
+vi.mock('../ToolActionContainer', () => ({
+  default: function MockToolActionContainer() {
+    return <div data-testid="tool-action-container" />;
+  },
+}));
 
 describe('SearchPageContainer Container', () => {
   it('renders with assignView true when cataloger is logged in', () => {
@@ -129,5 +120,43 @@ describe('SearchPageContainer Container', () => {
     expect(
       screen.queryByTestId('literature-search-container')
     ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['streaming', { loading: true, query: 'the higgs' }],
+    ['waiting for its records', { loading: false, recordIds: [1124337] }],
+    ['failed', { loading: false, error: { message: 'It went wrong' } }],
+  ])('keeps the page at its final width while an AI search is %s', (_, ai) => {
+    const store = getStore({
+      user: fromJS({ loggedIn: true, data: { roles: ['user'] } }),
+      literature: fromJS({ literatureSelection: [] }),
+      search: fromJS({
+        namespaces: {
+          [LITERATURE_NS]: { total: 0, error: null, aiSearch: ai },
+        },
+      }),
+    });
+
+    const { container } = renderWithProviders(<SearchPageContainer />, {
+      store,
+    });
+
+    expect(container.querySelector('.ant-col-lg-22')).toBeInTheDocument();
+  });
+
+  it('lays an ordinary empty result set out full width', () => {
+    const store = getStore({
+      user: fromJS({ loggedIn: true, data: { roles: ['user'] } }),
+      literature: fromJS({ literatureSelection: [] }),
+      search: fromJS({
+        namespaces: { [LITERATURE_NS]: { total: 0, error: null } },
+      }),
+    });
+
+    const { container } = renderWithProviders(<SearchPageContainer />, {
+      store,
+    });
+
+    expect(container.querySelector('.ant-col-lg-22')).not.toBeInTheDocument();
   });
 });

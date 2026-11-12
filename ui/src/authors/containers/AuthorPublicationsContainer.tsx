@@ -1,17 +1,17 @@
-import React, { useMemo } from 'react';
-import { connect, RootStateOrAny } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
+import { RootState } from '../../types';
 
 import { isCataloger, isSuperUser } from '../../common/authorization';
 import AuthorPublications from '../components/AuthorPublications';
 
-function enableDifferentProfileView(state: RootStateOrAny) {
+function enableDifferentProfileView(state: RootState) {
   if (state.user.getIn(['data', 'recid'])) {
     return true;
   }
   return false;
 }
 
-const stateToProps = (state: RootStateOrAny) => ({
+const stateToProps = (state: RootState) => ({
   authorFacetName: state.authors.getIn([
     'data',
     'metadata',

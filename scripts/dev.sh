@@ -20,7 +20,7 @@ tmux send-keys -t "$SESSION:backend" "cd '$ROOT/backend' && ./scripts/server" En
 
 # Second window: UI
 tmux new-window -t "$SESSION" -n "ui"
-tmux send-keys -t "$SESSION:ui" "cd '$ROOT/ui' && HOST=0.0.0.0 NODE_OPTIONS=--openssl-legacy-provider yarn start" Enter
+tmux send-keys -t "$SESSION:ui" "cd '$ROOT/ui' && INSPIRE_API_PROXY_TARGET=http://localhost:8000 yarn start" Enter
 
 # Third window: backoffice (Django)
 tmux new-window -t "$SESSION" -n "backoffice"

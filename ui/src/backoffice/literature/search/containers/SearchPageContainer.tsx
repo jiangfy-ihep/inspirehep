@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Row, Col, Select, Card, Checkbox } from 'antd';
-import { connect, RootStateOrAny } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import { Action, ActionCreator } from 'redux';
 import { List, Map } from 'immutable';
+import { RootState } from '../../../../types';
 
 import PaginationContainer from '../../../../common/containers/PaginationContainer';
 import ResultsContainer from '../../../../common/containers/ResultsContainer';
@@ -24,9 +25,11 @@ import {
   resolveLiteratureAction,
   resolveLiteratureBatchAction,
 } from '../../../../actions/backoffice';
-import { WorkflowStatuses } from '../../../constants';
+import { WorkflowStatuses, WorkflowTypes } from '../../../constants';
 import LiteratureMatches from '../../components/LiteratureMatches';
+import ExactMatchesCallout from '../../components/ExactMatchesCallout';
 import { forceArray } from '../../../../common/utils';
+import { isFullCoverageWorkflow } from '../../../utils/utils';
 import LiteratureBatchOperationsCard from '../../components/LiteratureBatchOperationsCard';
 
 type BackofficeSearchPageProps = {
@@ -67,14 +70,29 @@ function renderWorkflowItem(
 ) {
   const workflowId = item?.get('id');
   const matches = item?.get('matches');
+  const exactMatches = matches?.get('exact');
   const fuzzyMatches = matches?.get('fuzzy');
   const status = item?.get('status');
   const shouldShowSelectionCheckbox =
     !!status &&
     SELECTABLE_STATUSES.has(status) &&
     !!selectedStatusesFromFacet?.has(status);
+  const workflowType = item?.get('workflow_type');
+  const data = item?.get('data');
+  const hasExactMatches =
+    !!exactMatches?.size &&
+    status === WorkflowStatuses.ERROR_MULTIPLE_EXACT_MATCHES;
   const hasFuzzyMatches =
     !!fuzzyMatches?.size && status === WorkflowStatuses.APPROVAL_FUZZY_MATCHING;
+  const shouldShowSubmissionModal =
+    workflowType === WorkflowTypes.HEP_SUBMISSION &&
+    status === WorkflowStatuses.APPROVAL;
+  const submissionContext = shouldShowSubmissionModal
+    ? {
+        email: data?.getIn(['acquisition_source', 'email']),
+        title: data?.getIn(['titles', 0, 'title']),
+      }
+    : undefined;
 
   const handleResolveAction = (action: string, value: string) =>
     onHandleResolveAction(workflowId, action, value);
@@ -84,13 +102,21 @@ function renderWorkflowItem(
     <>
       <WorkflowResultItem
         item={item}
-        compactBottom={hasFuzzyMatches}
+        compactBottom={hasFuzzyMatches || hasExactMatches}
         handleResolveAction={handleResolveAction}
         shouldShowSelectionCheckbox={shouldShowSelectionCheckbox}
         isSelected={selectedWorkflowIds?.has(workflowId)}
         onSelectionChange={onWorkflowSelectChange}
         isSubmitted={isSubmitted}
+        shouldShowSubmissionModal={shouldShowSubmissionModal}
+        submissionContext={submissionContext}
+        page="Backoffice literature search"
       />
+      {hasExactMatches && (
+        <Card>
+          <ExactMatchesCallout exactMatches={exactMatches} />
+        </Card>
+      )}
       {hasFuzzyMatches && (
         <Card>
           <LiteratureMatches
@@ -132,6 +158,18 @@ const LiteratureSearchPageContainer = ({
 
   const currentPageWorkflowIds: string[] =
     results?.map((item: Map<string, any>) => item?.get('id'))?.toArray() || [];
+  const hasSelectedFullCoverageWorkflow = results?.some(
+    (item: Map<string, any>) => {
+      if (!selectedWorkflowIds.has(item?.get('id'))) {
+        return false;
+      }
+
+      return isFullCoverageWorkflow(
+        item?.get('workflow_type'),
+        item?.get('journal_coverage')
+      );
+    }
+  );
 
   const selectedSelectableCount = currentPageWorkflowIds.filter((workflowId) =>
     selectedWorkflowIds.has(workflowId)
@@ -184,12 +222,13 @@ const LiteratureSearchPageContainer = ({
 
   useEffect(() => {
     setSelectedWorkflowIds(new Set());
-  }, [selectedStatus]);
+  }, [query]);
 
   const renderAggregations = () => (
     <LoadingOrChildren loading={loadingAggregations}>
       <AggregationFiltersContainer
         namespace={BACKOFFICE_LITERATURE_SEARCH_NS}
+        narrow
       />
     </LoadingOrChildren>
   );
@@ -208,42 +247,41 @@ const LiteratureSearchPageContainer = ({
         <EmptyOrChildren data={results} title="0 Results">
           <Col xs={24} lg={24} xl={24} xxl={24}>
             <Row className="mt3" gutter={SEARCH_PAGE_GUTTER} justify="start">
-              <Col xs={0} lg={6}>
-                <Card size="small">
-                  <div style={{ padding: '0.5rem' }}>
-                    <AggregationBox name="Sort by">
-                      <Select
-                        defaultValue="-_updated_at"
-                        value={query?.get('ordering')}
-                        style={{ width: '100%' }}
-                        data-testid="select-sort-by"
-                        options={[
-                          { value: '-_updated_at', label: 'Most recent' },
-                          { value: '_updated_at', label: 'Least recent' },
-                          {
-                            value: '-relevance_prediction',
-                            label: 'Relevance Prediction (Desc)',
-                          },
-                          {
-                            value: 'relevance_prediction',
-                            label: 'Relevance Prediction (Asc)',
-                          },
-                        ]}
-                        onChange={(value: string) =>
-                          onSortByChange(BACKOFFICE_LITERATURE_SEARCH_NS, value)
-                        }
-                      />
-                    </AggregationBox>
-                  </div>
+              <Col xs={0} lg={5}>
+                <Card size="small" styles={{ body: { padding: 0 } }}>
+                  <AggregationBox name="Sort by" className="pa2">
+                    <Select
+                      defaultValue="-_updated_at"
+                      value={query?.get('ordering')}
+                      style={{ width: '100%' }}
+                      data-testid="select-sort-by"
+                      options={[
+                        { value: '-_updated_at', label: 'Most recent' },
+                        { value: '_updated_at', label: 'Least recent' },
+                        {
+                          value: '-relevance_prediction',
+                          label: 'Relevance Prediction (Desc)',
+                        },
+                        {
+                          value: 'relevance_prediction',
+                          label: 'Relevance Prediction (Asc)',
+                        },
+                      ]}
+                      onChange={(value: string) =>
+                        onSortByChange(BACKOFFICE_LITERATURE_SEARCH_NS, value)
+                      }
+                    />
+                  </AggregationBox>
                   {renderAggregations()}
                 </Card>
               </Col>
-              <Col xs={24} lg={18}>
+              <Col xs={24} lg={19}>
                 {batchStatus && selectedWorkflowIds.size > 0 && (
                   <LiteratureBatchOperationsCard
                     selectedCount={selectedWorkflowIds.size}
                     status={batchStatus}
                     onResolveAction={handleBatchResolveAction}
+                    hasFullCoverageSelection={!!hasSelectedFullCoverageWorkflow}
                   />
                 )}
                 <Row justify="space-between" wrap={false}>
@@ -272,18 +310,10 @@ const LiteratureSearchPageContainer = ({
                       </div>
                     )}
                   </Col>
+
                   <Col
                     style={{
-                      width: '29%',
-                      paddingLeft: '5px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Action & Status
-                  </Col>
-                  <Col
-                    style={{
-                      width: '18%',
+                      width: '20%',
                       paddingLeft: '5px',
                       fontWeight: 600,
                     }}
@@ -292,12 +322,21 @@ const LiteratureSearchPageContainer = ({
                   </Col>
                   <Col
                     style={{
-                      width: '18%',
+                      width: '16%',
                       paddingLeft: '5px',
                       fontWeight: 600,
                     }}
                   >
                     Subject Areas
+                  </Col>
+                  <Col
+                    style={{
+                      width: '29%',
+                      paddingLeft: '5px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Action & Status
                   </Col>
                 </Row>
                 <LoadingOrChildren loading={loading}>
@@ -380,7 +419,7 @@ const LiteratureSearchPageContainer = ({
   );
 };
 
-const stateToProps = (state: RootStateOrAny) => ({
+const stateToProps = (state: RootState) => ({
   loading: state.search.getIn([
     'namespaces',
     BACKOFFICE_LITERATURE_SEARCH_NS,

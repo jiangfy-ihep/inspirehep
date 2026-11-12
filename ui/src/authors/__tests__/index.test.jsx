@@ -1,10 +1,10 @@
-import React from 'react';
-import Loadable from 'react-loadable';
 import { fromJS } from 'immutable';
 
+import { Routes, Route } from 'react-router-dom';
 import { getStore } from '../../fixtures/store';
 import { renderWithProviders } from '../../fixtures/render';
 import Authors from '..';
+import { AUTHORS } from '../../common/routes';
 
 describe('Authors', () => {
   it('renders initial state', () => {
@@ -12,18 +12,23 @@ describe('Authors', () => {
     expect(asFragment()).toMatchSnapshot();
   });
 
-  it('navigates to SearchPageContainer when /authors', async () => {
-    const { getByTestId } = renderWithProviders(<Authors />, {
-      route: '/authors',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SearchPageContainer when /authors', () => {
+    const { getByTestId } = renderWithProviders(
+      <Routes>
+        <Route path={`${AUTHORS}/*`} element={<Authors />} />
+      </Routes>,
+      {
+        route: '/authors',
+      }
+    );
     expect(getByTestId('authors-search-page-container')).toBeInTheDocument();
   });
 
-  it('navigates to DetailPageContainer when /authors/:id', async () => {
+  it('navigates to DetailPageContainer when /authors/:id', () => {
     const store = getStore({
       authors: fromJS({
         data: {
+          updated: '2026-09-15T11:40:03.296326+00:00',
           metadata: {
             control_number: 1234,
             titles: [
@@ -41,11 +46,15 @@ describe('Authors', () => {
       }),
     });
 
-    const { getByTestId } = renderWithProviders(<Authors />, {
-      store,
-      route: '/authors/1',
-    });
-    await Loadable.preloadAll();
+    const { getByTestId } = renderWithProviders(
+      <Routes>
+        <Route path={`${AUTHORS}/*`} element={<Authors />} />
+      </Routes>,
+      {
+        store,
+        route: '/authors/1',
+      }
+    );
 
     expect(getByTestId('authors-detail-page-container')).toBeInTheDocument();
   });

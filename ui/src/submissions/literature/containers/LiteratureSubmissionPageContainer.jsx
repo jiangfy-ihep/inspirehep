@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { connect } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import { Map } from 'immutable';
 import { Row, Col, Tooltip, Form } from 'antd';
 
@@ -88,7 +88,7 @@ function LiteratureSubmissionPage({ error, importedFormData, onSubmit }) {
                 wrapperCol={WRAPPER_COL}
               >
                 <SelectBox
-                  data-test-id="document-type-select"
+                  data-testid="document-type-select"
                   className="w-100"
                   value={docType}
                   options={DOC_TYPE_OPTIONS}

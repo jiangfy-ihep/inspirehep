@@ -1,4 +1,3 @@
-import React from 'react';
 import classNames from 'classnames';
 import { Row, Col } from 'antd';
 
@@ -8,7 +7,7 @@ function HomePageSection({
   className,
   title,
 }: {
-  children: JSX.Element;
+  children: React.JSX.Element;
   title?: string;
   description?: string;
   className?: string;

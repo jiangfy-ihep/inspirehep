@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import { Row, Col, Alert } from 'antd';
 import PropTypes from 'prop-types';
 
@@ -12,7 +12,7 @@ class SubmissionSuccess extends Component {
         data-testid={testId || 'submission-success-page'}
       >
         <Col className="mv3" span={14}>
-          <Alert message={message} type="success" showIcon />
+          <Alert title={message} type="success" showIcon />
         </Col>
       </Row>
     );

@@ -1,4 +1,3 @@
-import React from 'react';
 import { within } from '@testing-library/react';
 import { fromJS } from 'immutable';
 
@@ -9,21 +8,26 @@ import * as constants from '../../../common/constants';
 import SeminarStartDateFilterContainer from '../SeminarStartDateFilterContainer';
 import { searchQueryUpdate } from '../../../actions/search';
 
-jest.mock('../../../common/components/EventStartDateFilter', () => (props) => {
-  global.seminarEventStartDateFilterOnChange = props.onChange;
-  return (
-    <div data-testid="event-start-date-filter">
-      <div role="switch" aria-checked={props.selection === 'upcoming'} />
-    </div>
-  );
-});
+vi.mock('../../../common/constants', async () => ({
+  ...(await vi.importActual('../../../common/constants')),
+  LOCAL_TIMEZONE: 'Europe/Zurich',
+}));
 
-jest.mock('../../../actions/search');
+vi.mock('../../../common/components/EventStartDateFilter', () => ({
+  default: (props) => {
+    global.seminarEventStartDateFilterOnChange = props.onChange;
+    return (
+      <div data-testid="event-start-date-filter">
+        <div role="switch" aria-checked={props.selection === 'upcoming'} />
+      </div>
+    );
+  },
+}));
+
+vi.mock('../../../actions/search');
 mockActionCreator(searchQueryUpdate);
 
 describe('SeminarStartDateFilterContainer', () => {
-  constants.LOCAL_TIMEZONE = 'Europe/Zurich';
-
   beforeEach(() => {
     global.seminarEventStartDateFilterOnChange = undefined;
   });

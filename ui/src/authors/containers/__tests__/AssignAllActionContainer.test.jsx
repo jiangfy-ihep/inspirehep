@@ -1,6 +1,6 @@
-import React from 'react';
-import { fireEvent, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { fromJS, Set } from 'immutable';
+import userEvent from '@testing-library/user-event';
 
 import { getStore, mockActionCreator } from '../../../fixtures/store';
 import AssignAllActionContainer from '../AssignAllActionContainer';
@@ -13,20 +13,20 @@ import {
 import AssignAction from '../../components/AssignAction';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('react-router-dom', () => {
-  const actual = jest.requireActual('react-router-dom');
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
   return { ...actual, useParams: jest.fn().mockReturnValue({ id: 123 }) };
 });
 
-jest.mock('../../components/AssignAction', () => {
-  const actual = jest.requireActual('../../components/AssignAction');
+vi.mock('../../components/AssignAction', async () => {
+  const actual = await vi.importActual('../../components/AssignAction');
   return {
     __esModule: true,
     default: jest.fn((props) => <actual.default {...props} />),
   };
 });
 
-jest.mock('../../../actions/authors');
+vi.mock('../../../actions/authors');
 mockActionCreator(setAssignDrawerVisibility);
 mockActionCreator(assignPapers);
 mockActionCreator(unassignPapers);
@@ -53,7 +53,7 @@ describe('AssignAllActionContainer', () => {
       expect.objectContaining({
         disabled: false,
       }),
-      expect.anything()
+      undefined
     );
   });
 
@@ -70,7 +70,7 @@ describe('AssignAllActionContainer', () => {
       expect.objectContaining({
         disabled: true,
       }),
-      expect.anything()
+      undefined
     );
   });
 
@@ -87,28 +87,27 @@ describe('AssignAllActionContainer', () => {
       expect.objectContaining({
         numberOfSelected: 2,
       }),
-      expect.anything()
+      undefined
     );
   });
 
   it('dispatches setAssignDrawerVisibility with true on assign to another author', async () => {
+    const user = userEvent.setup();
     const store = getStore({
       authors: fromJS({
         publicationSelection: Set([1, 2]),
       }),
     });
 
-    const { container, getByTestId } = renderWithProviders(
-      <AssignAllActionContainer />,
-      { store }
-    );
+    const { getByRole } = renderWithProviders(<AssignAllActionContainer />, {
+      store,
+    });
 
-    const dropdown = container.getElementsByClassName(
-      'ant-dropdown-trigger'
-    )[0];
+    const dropdown = getByRole('button', { name: 'file-done claim' });
 
-    await waitFor(() => fireEvent.mouseOver(dropdown));
-    await waitFor(() => fireEvent.click(getByTestId('assign-another')));
+    await user.hover(dropdown);
+    const assignAnotherOption = await screen.findByTestId('assign-another');
+    await user.click(assignAnotherOption);
 
     const expectedActions = [setAssignDrawerVisibility(true)];
     expect(store.getActions()).toEqual(expectedActions);

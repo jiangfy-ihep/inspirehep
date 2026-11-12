@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Button } from 'antd';
 import { useFormikContext } from 'formik';
 
@@ -19,7 +19,7 @@ function SubmitButton() {
     <Button
       type="primary"
       htmlType="submit"
-      data-test-id="submit-button"
+      data-testid="submit-button"
       loading={isSubmitting || isValidating}
     >
       Submit

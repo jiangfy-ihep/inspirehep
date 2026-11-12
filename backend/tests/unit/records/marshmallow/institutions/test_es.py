@@ -4,7 +4,8 @@
 # inspirehep is free software; you can redistribute it and/or modify it under
 # the terms of the MIT License; see LICENSE file for more details.
 
-import mock
+from unittest import mock
+
 from helpers.providers.faker import faker
 from inspirehep.records.api.institutions import InstitutionsRecord
 from inspirehep.records.marshmallow.institutions.es import (
@@ -219,3 +220,21 @@ def test_populate_affiliation_search_as_you_type_to_ref(
     expected = ["CERN"]
 
     assert expected == result
+
+
+@mock.patch("inspirehep.records.api.institutions.InstitutionLiterature")
+def test_populate_affiliation_search_as_you_type_excludes_obsolete_icn(
+    mock_institution_literature_table,
+):
+    data = {
+        "$schema": "http://localhost:5000/schemas/records/institutions.json",
+        "ICN": ["obsolete"],
+        "legacy_ICN": "Harvard U.",
+        "name_variants": [{"value": "Harvard University"}],
+    }
+    record = InstitutionsRecord(faker.record("ins", data))
+
+    schema = InstitutionsElasticSearchSchema()
+    result = schema.dump(record).data
+
+    assert "affiliation_search_as_you_type" not in result

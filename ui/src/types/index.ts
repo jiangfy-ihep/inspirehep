@@ -1,3 +1,6 @@
+import { ParsedQs } from 'qs';
+import { Location } from 'history';
+import { RouterState } from 'redux-first-history';
 import {
   LITERATURE_PID_TYPE,
   JOBS_PID_TYPE,
@@ -8,6 +11,13 @@ import {
   JOURNALS_PID_TYPE,
   DATA_PID_TYPE,
 } from '../common/constants';
+import createRootReducer from '../reducers';
+
+type RootReducer = ReturnType<typeof createRootReducer>;
+
+export type RootState = Omit<ReturnType<RootReducer>, 'router'> & {
+  router: Omit<RouterState, 'location'> & { location: Location };
+};
 
 declare global {
   interface Window {
@@ -39,4 +49,11 @@ export interface User {
 export interface Credentials {
   email?: string | null;
   password?: string | null;
+}
+
+declare module 'history' {
+  interface Location {
+    previousUrl?: string;
+    query?: ParsedQs;
+  }
 }

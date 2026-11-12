@@ -1,11 +1,19 @@
-import React from 'react';
-import Loadable from 'react-loadable';
 import { fromJS } from 'immutable';
+import { Routes, Route } from 'react-router-dom';
 import { renderWithProviders } from '../../fixtures/render';
 import Jobs from '..';
+import { JOBS } from '../../common/routes';
+
+const renderJobs = (route, initialState) =>
+  renderWithProviders(
+    <Routes>
+      <Route path={`${JOBS}/*`} element={<Jobs />} />
+    </Routes>,
+    { initialState, route }
+  );
 
 describe('Jobs', () => {
-  it('navigates to DetailPageContainer when /jobs/:id', async () => {
+  it('navigates to DetailPageContainer when /jobs/:id', () => {
     const initialState = {
       jobs: fromJS({
         data: {
@@ -19,20 +27,13 @@ describe('Jobs', () => {
         },
       }),
     };
-    const { getByTestId } = renderWithProviders(<Jobs />, {
-      route: '/jobs/123',
-      initialState,
-    });
-    await Loadable.preloadAll();
+    const { getByTestId } = renderJobs('/jobs/123', initialState);
 
     expect(getByTestId('jobs-detail-page-container')).toBeInTheDocument();
   });
 
-  it('navigates to SearchPage when /jobs', async () => {
-    const { getByTestId } = renderWithProviders(<Jobs />, {
-      route: '/jobs',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SearchPage when /jobs', () => {
+    const { getByTestId } = renderJobs('/jobs');
 
     expect(getByTestId('jobs-search-page-container')).toBeInTheDocument();
   });

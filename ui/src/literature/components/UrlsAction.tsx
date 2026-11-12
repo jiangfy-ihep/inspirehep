@@ -1,6 +1,5 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { List, Map } from 'immutable';
-import { Menu } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
 
 import { Link } from 'react-router-dom';
@@ -19,8 +18,8 @@ function linkToHrefDisplayPair(link: Map<string, string>) {
 
 interface UrlsActionProps {
   urls: List<string>; // TODO: Fix this type. This is wrong, we should read a List of Map objects, not a List of strings
-  text: string;
-  icon: JSX.Element;
+  text?: string;
+  icon?: React.JSX.Element;
   trackerEventId: string;
   page: string;
   eventAction?: string;
@@ -29,15 +28,15 @@ interface UrlsActionProps {
 
 function UrlsAction({
   urls,
-  text,
-  icon,
+  text = 'website',
+  icon = <LinkOutlined />,
   trackerEventId,
   page,
   eventAction,
   isTargetBlank = true,
 }: UrlsActionProps) {
   const renderUrlsAction = useCallback(
-    (url, title) => {
+    (url: Map<string, any>, title: string) => {
       // TODO: THIS IS A TEMPORARY FIX TO MAKE THE DATASET LINKS WORK
       let value = url.get('value');
       if (text === 'datasets') {
@@ -64,7 +63,7 @@ function UrlsAction({
   );
 
   const renderUrlsDropdownAction = useCallback(
-    (url) => {
+    (url: Map<string, any>) => {
       // TODO: THIS IS A TEMPORARY FIX TO MAKE THE DATASET LINKS WORK
       // eslint-disable-next-line prefer-const
       let [href, display] = linkToHrefDisplayPair(url);
@@ -107,10 +106,5 @@ function UrlsAction({
     />
   );
 }
-
-UrlsAction.defaultProps = {
-  text: 'website',
-  icon: <LinkOutlined />,
-};
 
 export default UrlsAction;

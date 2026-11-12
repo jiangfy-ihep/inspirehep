@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import { Row, Col, Spin } from 'antd';
 
 class Loading extends Component {
@@ -6,12 +6,10 @@ class Loading extends Component {
     return (
       <Row className="w-100" type="flex" justify="center" align="middle">
         <Col>
-          <div
-            data-test-id="loading"
-            data-testid="loading-spinner"
-            className="tc pa4"
-          >
-            <Spin tip="Loading ..." />
+          <div data-testid="loading-spinner" className="tc pa4">
+            <Spin description="Loading ...">
+              <div className="pa4" />
+            </Spin>
           </div>
         </Col>
       </Row>

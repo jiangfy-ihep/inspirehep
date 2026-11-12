@@ -1,9 +1,70 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Seminars renders initial state 1`] = `
+exports[`Seminars > renders initial state 1`] = `
 <DocumentFragment>
   <div
     class="w-100"
-  />
+  >
+    <div
+      class="ant-row css-dev-only-do-not-override-oc1rc0 css-var-root"
+    >
+      <div
+        class="ant-col ant-col-xs-24 ant-col-lg-22 ant-col-xl-20 ant-col-xxl-18 css-dev-only-do-not-override-oc1rc0 css-var-root"
+      >
+        <div
+          class="ant-row ant-row-start mt3 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          data-testid="seminars-search-page-container"
+          style=""
+          type="flex"
+        >
+          <div
+            class="ant-col ant-col-xs-0 ant-col-lg-7 css-dev-only-do-not-override-oc1rc0 css-var-root"
+            style=""
+          />
+          <div
+            class="ant-col ant-col-xs-24 ant-col-lg-17 css-dev-only-do-not-override-oc1rc0 css-var-root"
+            style=""
+          >
+            <div
+              class="ant-row ant-row-end ant-row-middle css-dev-only-do-not-override-oc1rc0 css-var-root"
+              type="flex"
+            >
+              <div
+                class="ant-col ant-col-xs-24 ant-col-lg-12 css-dev-only-do-not-override-oc1rc0 css-var-root"
+              >
+                <span
+                  data-testid="number-of-results"
+                >
+                  0 results
+                </span>
+                <div
+                  class="ant-divider css-dev-only-do-not-override-oc1rc0 css-var-root ant-divider-vertical ant-divider-rail __VerticalDivider__"
+                  role="separator"
+                />
+                Times in UTC (UTC)
+              </div>
+              <div
+                class="ant-col ant-col-xs-12 ant-col-lg-0 css-dev-only-do-not-override-oc1rc0 css-var-root"
+              />
+              <div
+                class="ant-col ant-col-12 tr css-dev-only-do-not-override-oc1rc0 css-var-root"
+              />
+            </div>
+            <div
+              class="ant-row css-dev-only-do-not-override-oc1rc0 css-var-root"
+            >
+              <div
+                class="ant-col ant-col-24 css-dev-only-do-not-override-oc1rc0 css-var-root"
+              >
+                <div
+                  data-testid="search-results"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </DocumentFragment>
 `;

@@ -1,4 +1,4 @@
-import React, { MouseEventHandler } from 'react';
+import { MouseEventHandler } from 'react';
 import { Button } from 'antd';
 import classNames from 'classnames';
 
@@ -8,21 +8,20 @@ const LinkLikeButton = ({
   children,
   onClick,
   dataTestId,
-  color,
-  disabled,
+  color = 'blue',
+  disabled = false,
   className,
 }: {
-  children: JSX.Element | string;
+  children: React.JSX.Element | string;
   onClick: MouseEventHandler<HTMLElement>;
-  dataTestId: string;
-  color: string;
-  disabled: boolean;
+  dataTestId?: string;
+  color?: string;
+  disabled?: boolean;
   className?: string;
 }) => (
   <Button
     disabled={disabled}
     type="text"
-    data-test-id={dataTestId}
     onClick={onClick}
     className={classNames('__LinkLikeButton__', color, { disabled }, className)}
     data-testid={dataTestId}
@@ -30,11 +29,5 @@ const LinkLikeButton = ({
     {children}
   </Button>
 );
-
-LinkLikeButton.defaultProps = {
-  dataTestId: undefined,
-  disabled: false,
-  color: 'blue',
-};
 
 export default LinkLikeButton;

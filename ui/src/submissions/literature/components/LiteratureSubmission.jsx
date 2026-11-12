@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Row, Col, Alert } from 'antd';
 import { Formik, yupToFormErrors } from 'formik';
@@ -84,7 +84,7 @@ function LiteratureSubmission({
       {error && (
         <Row className="mb3">
           <Col span={24}>
-            <Alert message={error.message} type="error" showIcon closable />
+            <Alert title={error.message} type="error" showIcon closable />
           </Col>
         </Row>
       )}
@@ -111,11 +111,6 @@ LiteratureSubmission.propTypes = {
   error: PropTypes.objectOf(PropTypes.any), // must have 'message'
   initialFormData: PropTypes.objectOf(PropTypes.any),
   onSubmit: PropTypes.func.isRequired, // must be async
-};
-
-LiteratureSubmission.defaultProps = {
-  error: null,
-  initialFormData: null,
 };
 
 export default convertAllImmutablePropsToJS(LiteratureSubmission);

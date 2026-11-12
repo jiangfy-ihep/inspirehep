@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ArxivEprintList renders with arXiv id 1`] = `
+exports[`ArxivEprintList > renders with arXiv id 1`] = `
 <DocumentFragment>
   <div
     class="__InlineList__"
@@ -16,6 +16,7 @@ exports[`ArxivEprintList renders with arXiv id 1`] = `
         <span>
           <a
             href="//arxiv.org/abs/123.12345"
+            rel="noopener noreferrer"
             target="_blank"
           >
             123.12345

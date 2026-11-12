@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
 import { advanceTo, clear } from 'jest-date-mock';
 
@@ -87,7 +86,7 @@ describe('DateRangeFilter', () => {
 
     const closeIcon = screen.getAllByRole('img', { name: 'close-circle' })[0]
       .parentElement;
-    fireEvent.mouseUp(closeIcon);
+    fireEvent.click(closeIcon);
 
     expect(onChange).toHaveBeenCalledWith('--2019-11-22');
   });
@@ -100,7 +99,7 @@ describe('DateRangeFilter', () => {
 
     const closeIcon = screen.getAllByRole('img', { name: 'close-circle' })[1]
       .parentElement;
-    fireEvent.mouseUp(closeIcon);
+    fireEvent.click(closeIcon);
 
     expect(onChange).toHaveBeenCalledWith('2019-04-21--');
   });
@@ -137,7 +136,7 @@ describe('DateRangeFilter', () => {
 
     fireEvent.click(screen.getByTestId('start-date-picker'));
 
-    expect(screen.getAllByTitle('2019-11-21')[1]).toHaveClass(
+    expect(screen.getByTitle('2019-11-21')).toHaveClass(
       'ant-picker-cell-disabled'
     );
   });
@@ -163,7 +162,7 @@ describe('DateRangeFilter', () => {
 
     fireEvent.click(screen.getByTestId('start-date-picker'));
 
-    expect(screen.getAllByTitle('2019-11-22')[1]).not.toHaveClass(
+    expect(screen.getByTitle('2019-11-22')).not.toHaveClass(
       'ant-picker-cell-disabled'
     );
   });
@@ -176,7 +175,7 @@ describe('DateRangeFilter', () => {
 
     fireEvent.click(screen.getByTestId('end-date-picker'));
 
-    expect(screen.getAllByTitle('2019-11-22')[1]).not.toHaveClass(
+    expect(screen.getByTitle('2019-11-22')).not.toHaveClass(
       'ant-picker-cell-disabled'
     );
   });

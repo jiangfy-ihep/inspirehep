@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`OrcidPushSetting renders when disabled 1`] = `
+exports[`OrcidPushSetting > renders when disabled 1`] = `
 <DocumentFragment>
   <div
     class="mb3"
@@ -12,8 +12,7 @@ exports[`OrcidPushSetting renders when disabled 1`] = `
     </span>
     <button
       aria-checked="false"
-      class="ant-switch"
-      data-test-id="orcid-switch"
+      class="ant-switch css-dev-only-do-not-override-oc1rc0 css-var-root"
       data-testid="orcid-switch"
       role="switch"
       type="button"
@@ -23,7 +22,14 @@ exports[`OrcidPushSetting renders when disabled 1`] = `
       />
       <span
         class="ant-switch-inner"
-      />
+      >
+        <span
+          class="ant-switch-inner-checked"
+        />
+        <span
+          class="ant-switch-inner-unchecked"
+        />
+      </span>
     </button>
   </div>
   <div>
@@ -38,7 +44,7 @@ exports[`OrcidPushSetting renders when disabled 1`] = `
 </DocumentFragment>
 `;
 
-exports[`OrcidPushSetting renders when enabled 1`] = `
+exports[`OrcidPushSetting > renders when enabled 1`] = `
 <DocumentFragment>
   <div
     class="mb3"
@@ -50,8 +56,7 @@ exports[`OrcidPushSetting renders when enabled 1`] = `
     </span>
     <button
       aria-checked="true"
-      class="ant-switch ant-switch-checked"
-      data-test-id="orcid-switch"
+      class="ant-switch css-dev-only-do-not-override-oc1rc0 css-var-root ant-switch-checked"
       data-testid="orcid-switch"
       role="switch"
       type="button"
@@ -61,7 +66,14 @@ exports[`OrcidPushSetting renders when enabled 1`] = `
       />
       <span
         class="ant-switch-inner"
-      />
+      >
+        <span
+          class="ant-switch-inner-checked"
+        />
+        <span
+          class="ant-switch-inner-unchecked"
+        />
+      </span>
     </button>
   </div>
   <div>

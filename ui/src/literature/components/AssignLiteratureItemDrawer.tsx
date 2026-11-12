@@ -1,6 +1,15 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { SelectOutlined } from '@ant-design/icons';
-import { Drawer, Radio, Row, Col, Button, List, Input } from 'antd';
+import {
+  Drawer,
+  Radio,
+  Row,
+  Col,
+  Button,
+  List,
+  Input,
+  RadioChangeEvent,
+} from 'antd';
 import { Map } from 'immutable';
 
 import AuthorResult from './AuthorResult';
@@ -16,7 +25,6 @@ interface AssignLiteratureItemDrawerProps {
   currentUserRecordId: number;
   authors: Map<string, string>[];
   itemLiteratureId: number;
-  page: string;
 }
 
 function AssignLiteratureItemDrawer({
@@ -26,7 +34,6 @@ function AssignLiteratureItemDrawer({
   currentUserRecordId,
   authors,
   itemLiteratureId,
-  page,
 }: AssignLiteratureItemDrawerProps) {
   const [selectedAuthorId, setSelectedAuthorId] = useState<number>();
   const [availableAuthors, setAvailableAuthors] = useState<
@@ -40,7 +47,7 @@ function AssignLiteratureItemDrawer({
     }
   }, [authors]);
 
-  const onSelectedAuthorChange = useCallback((event) => {
+  const onSelectedAuthorChange = useCallback((event: RadioChangeEvent) => {
     setSelectedAuthorId(event.target.value);
   }, []);
 
@@ -66,7 +73,7 @@ function AssignLiteratureItemDrawer({
 
   return (
     <Drawer
-      className="search-drawer"
+      rootClassName="search-drawer"
       placement="right"
       onClose={() => {
         onDrawerClose();
@@ -84,7 +91,6 @@ function AssignLiteratureItemDrawer({
       <Radio.Group
         className="w-100"
         onChange={onSelectedAuthorChange}
-        data-test-id="literature-drawer-radio-group"
         data-testid="literature-drawer-radio-group"
         value={selectedAuthorId || null}
       >
@@ -97,7 +103,7 @@ function AssignLiteratureItemDrawer({
           }}
           dataSource={availableAuthors}
           renderItem={(item: Map<string, string>) => (
-            <AuthorResult item={item} page={page} />
+            <AuthorResult item={item} />
           )}
         />
       </Radio.Group>
@@ -105,7 +111,6 @@ function AssignLiteratureItemDrawer({
       <Row className="mt2" justify="end">
         <Col>
           <Button
-            data-test-id="assign-literature-item-button"
             data-testid="assign-literature-item-button"
             disabled={selectedAuthorId == null}
             icon={<SelectOutlined />}

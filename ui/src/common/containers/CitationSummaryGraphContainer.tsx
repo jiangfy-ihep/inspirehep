@@ -1,5 +1,6 @@
-import { connect, RootStateOrAny } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import { Action, ActionCreator } from 'redux';
+import { RootState } from '../../types';
 
 import { convertAllImmutablePropsToJS } from '../immutableToJS';
 import {
@@ -13,7 +14,7 @@ import {
 import CitationSummaryGraph from '../components/CitationSummaryGraph';
 import { searchQueryUpdate } from '../../actions/search';
 import { shouldExcludeSelfCitations } from '../../literature/containers/ExcludeSelfCitationsContainer';
-import { Bar } from '../components/CitationSummaryGraph/CitationSummaryGraph';
+import { BarType } from '../components/CitationSummaryGraph/CitationSummaryGraph';
 
 const CLEAR_QUERY = {
   citeable: undefined,
@@ -22,7 +23,7 @@ const CLEAR_QUERY = {
   [CITATION_COUNT_WITHOUT_SELF_CITATIONS_PARAM]: undefined,
 };
 
-function barToQuery(bar: Bar, excludeSelfCitations: boolean) {
+function barToQuery(bar: BarType, excludeSelfCitations: boolean) {
   if (bar == null) {
     return CLEAR_QUERY;
   }
@@ -39,7 +40,7 @@ function barToQuery(bar: Bar, excludeSelfCitations: boolean) {
   return { ...PUBLISHED_QUERY, [citationCountParam]: bar.xValue };
 }
 
-function getSelectedBar(state: RootStateOrAny, namespace: string) {
+function getSelectedBar(state: RootState, namespace: string) {
   const citationCountParam = shouldExcludeSelfCitations(state)
     ? CITATION_COUNT_WITHOUT_SELF_CITATIONS_PARAM
     : CITATION_COUNT_PARAM;
@@ -60,11 +61,17 @@ function getSelectedBar(state: RootStateOrAny, namespace: string) {
 }
 
 const stateToProps = (
-  state: RootStateOrAny,
+  state: RootState,
   { namespace }: { namespace: string }
 ) => ({
-  loading: state.citations.get('loadingCitationSummary'),
+  loading: state.citations.getIn([
+    'namespaces',
+    namespace,
+    'loadingCitationSummary',
+  ]),
   citeableData: state.citations.getIn([
+    'namespaces',
+    namespace,
     'citationSummary',
     'citations',
     'buckets',
@@ -73,6 +80,8 @@ const stateToProps = (
     'buckets',
   ]),
   publishedData: state.citations.getIn([
+    'namespaces',
+    namespace,
     'citationSummary',
     'citations',
     'buckets',
@@ -80,7 +89,11 @@ const stateToProps = (
     'citation_buckets',
     'buckets',
   ]),
-  error: state.citations.get('errorCitationSummary'),
+  error: state.citations.getIn([
+    'namespaces',
+    namespace,
+    'errorCitationSummary',
+  ]),
   selectedBar: getSelectedBar(state, namespace),
   excludeSelfCitations: shouldExcludeSelfCitations(state),
 });
@@ -90,7 +103,7 @@ const dispatchToProps = (
   { namespace }: { namespace: string }
 ) => ({
   // TODO: rename to onSelectedBarChange
-  onSelectBarChange(bar: Bar, excludeSelfCitations: boolean) {
+  onSelectBarChange(bar: BarType, excludeSelfCitations: boolean) {
     const query = barToQuery(bar, excludeSelfCitations);
     dispatch(searchQueryUpdate(namespace, { page: '1', ...query }));
   },

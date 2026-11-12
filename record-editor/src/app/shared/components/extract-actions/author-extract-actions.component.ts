@@ -47,24 +47,24 @@ export class AuthorExtractActionsComponent {
   source: string;
   replaceExisting = true;
   extractingToast: ActiveToast;
-  helpLink = '/tools/authorlist';
+  helpLink = '/authorlist-tool';
 
   constructor(
     private apiService: CommonApiService,
     private jsonStoreService: JsonStoreService,
-    private toastrService: ToastrService
+    private toastrService: ToastrService,
   ) {}
 
   onExtractClick() {
     this.extractingToast = this.toastrService.info(
       'Extracting authors...',
       'Loading',
-      HOVER_TO_DISMISS_INDEFINITE_TOAST
+      HOVER_TO_DISMISS_INDEFINITE_TOAST,
     );
 
     this.apiService.authorExtract(this.source, this.sourceType).subscribe(
       (authors) => this.onExtract(authors),
-      (error) => this.onError(error)
+      (error) => this.onError(error),
     );
   }
 
@@ -85,13 +85,13 @@ export class AuthorExtractActionsComponent {
         this.toastrService.warning(
           warning,
           'Warning',
-          DISMISSIBLE_INDEFINITE_TOAST
+          DISMISSIBLE_INDEFINITE_TOAST,
         );
       });
     }
     this.toastrService.success(
       `${authors.length} authors extracted.`,
-      'Success'
+      'Success',
     );
   }
 
@@ -101,7 +101,7 @@ export class AuthorExtractActionsComponent {
       this.toastrService.error(
         error.message,
         'Error',
-        DISMISSIBLE_INDEFINITE_TOAST
+        DISMISSIBLE_INDEFINITE_TOAST,
       );
     } else {
       this.toastrService.error('Could not extract authors', 'Error');

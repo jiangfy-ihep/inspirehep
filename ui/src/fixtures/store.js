@@ -6,11 +6,12 @@ import { initialState as literature } from '../reducers/literature';
 import { initialState as authors } from '../reducers/authors';
 import { initialState as user } from '../reducers/user';
 import { initialState as submissions } from '../reducers/submissions';
-import { initialState as inspect } from '../reducers/inspect';
 import { initialState as exceptions } from '../reducers/exceptions';
 import { initialState as ui } from '../reducers/ui';
 import { initialState as bibliographyGenerator } from '../reducers/bibliographyGenerator';
+import { initialState as authorlist } from '../reducers/authorlist';
 import { initialState as backoffice } from '../reducers/backoffice';
+import { initialState as editor } from '../reducers/editor';
 
 import { thunkMiddleware } from '../store';
 import { initialState as initialRecordState } from '../reducers/recordsFactory';
@@ -31,19 +32,20 @@ export function getState() {
     search,
     user,
     submissions,
-    inspect,
     exceptions,
     authors,
     ui,
     jobs: initialRecordState,
     conferences: initialRecordState,
     bibliographyGenerator,
+    authorlist,
     seminars: initialRecordState,
     institutions: initialRecordState,
     experiments: initialRecordState,
     journals: initialRecordState,
     data: initialRecordState,
     backoffice,
+    editor,
   };
 }
 

@@ -1,7 +1,7 @@
-import { push, goBack } from 'connected-react-router';
+import { push, goBack } from 'redux-first-history';
 import { Action, ActionCreator } from 'redux';
-import { RootStateOrAny } from 'react-redux';
 
+import { Map } from 'immutable';
 import { HttpClientWrapper } from '../common/http';
 import {
   USER_LOGIN_ERROR,
@@ -19,7 +19,7 @@ import {
 import { HOME } from '../common/routes';
 import { httpErrorToActionPayload } from '../common/utils';
 import notifySessionExpired from '../user/sessionExpireNotification';
-import { Credentials, User } from '../types';
+import { Credentials, User, RootState } from '../types';
 
 export function userLoginSuccess(user: User) {
   return {
@@ -71,7 +71,7 @@ export function userSignUp(
   userEmail: string
 ): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -88,7 +88,7 @@ export function userSignUp(
 
 export function fetchLoggedInUser(): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -96,7 +96,7 @@ export function fetchLoggedInUser(): (
     try {
       const response = await http.get('/accounts/me');
       dispatch(userLoginSuccess(response.data));
-    } catch (error) {
+    } catch {
       // TODO: differentiate between 401 and other errors
       dispatch(userLogoutSuccess());
     }
@@ -107,7 +107,7 @@ export function userLocalLogin(
   credentials: Credentials
 ): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -123,7 +123,7 @@ export function userLocalLogin(
 
 export function userLogout(): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -134,7 +134,7 @@ export function userLogout(): (
       // Hack to reload current page for logged out user
       dispatch(push(HOME));
       dispatch(goBack());
-    } catch (error) {
+    } catch {
       // TODO: dispatch logout error?
     }
   };
@@ -142,14 +142,14 @@ export function userLogout(): (
 
 export function userInactive(): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
     if (getState().user.get('loggedIn')) {
       try {
         await http.get('/accounts/me');
-      } catch (error) {
+      } catch {
         notifySessionExpired();
         dispatch(userLogoutSuccess());
       }
@@ -157,7 +157,10 @@ export function userInactive(): (
   };
 }
 
-export function setPreference(name: string, value: string) {
+export function setPreference(
+  name: string,
+  value: string | Map<string, boolean>
+) {
   return {
     type: USER_SET_PREFERENCE,
     payload: { name, value },
@@ -189,7 +192,7 @@ export function updateOrcidPushSetting(
   value: boolean
 ): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {

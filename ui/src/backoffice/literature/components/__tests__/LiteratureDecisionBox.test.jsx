@@ -1,7 +1,6 @@
-import React from 'react';
 import { screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { Map, List } from 'immutable';
+import { Map } from 'immutable';
 import { renderWithRouter } from '../../../../fixtures/render';
 import { resolveDecision } from '../../../utils/utils';
 import LiteratureDecisionBox from '../LiteratureDecisionBox';
@@ -14,14 +13,12 @@ describe('<LiteratureDecisionBox />', () => {
     const resolved = resolveDecision(action);
 
     const decision = Map({ action });
-    const inspireCategories = List(['hep']);
     const relevancePrediction = Map({ decision: 'CORE', max_score: 0.88 });
 
     const { container } = renderWithRouter(
       <LiteratureDecisionBox
         decision={decision}
         controlNumber={undefined}
-        inspireCategories={inspireCategories}
         relevancePrediction={relevancePrediction}
       />
     );
@@ -36,15 +33,13 @@ describe('<LiteratureDecisionBox />', () => {
 
   test('renders controlNumber link with correct URL and label', () => {
     const decision = Map({ action: WorkflowDecisions.ACCEPT });
-    const inspireCategories = List(['hep']);
     const relevancePrediction = Map({ decision: 'CORE', max_score: 0.77 });
-    const controlNumber = '12345';
+    const controlNumber = 12345;
 
     renderWithRouter(
       <LiteratureDecisionBox
         decision={decision}
         controlNumber={controlNumber}
-        inspireCategories={inspireCategories}
         relevancePrediction={relevancePrediction}
       />
     );

@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ChangeEmailForm disable email input and display loading on the button while loading 1`] = `
+exports[`ChangeEmailForm > disable email input and display loading on the button while loading 1`] = `
 <DocumentFragment>
   <form
     action="#"
@@ -9,16 +9,16 @@ exports[`ChangeEmailForm disable email input and display loading on the button w
       Change the email address associated to your INSPIRE account. This is used by the INSPIRE system to contact you automatically (e.g. job ad closing, submission confirmation, etc.).
     </p>
     <div
-      class="ant-row flex-email pt3"
+      class="ant-row flex-email pt3 css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
-        class="ant-form-item"
+        class="ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-oc1rc0 ant-form-item-horizontal"
       >
         <div
-          class="ant-row ant-form-item-row"
+          class="ant-row ant-form-item-row css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <div
-            class="ant-col ant-form-item-control ant-col-sm-24 ant-col-md-19"
+            class="ant-col ant-form-item-control ant-col-sm-24 ant-col-md-19 css-dev-only-do-not-override-oc1rc0 css-var-root"
           >
             <div
               class="ant-form-item-control-input"
@@ -26,30 +26,39 @@ exports[`ChangeEmailForm disable email input and display loading on the button w
               <div
                 class="ant-form-item-control-input-content"
               >
-                <input
-                  class="ant-input"
-                  data-test-id="email"
-                  data-testid="email"
-                  form="[object Object]"
-                  name="email"
-                  placeholder="Email"
-                  type="email"
-                  value="test@test.pl"
-                />
+                <div
+                  class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
+                >
+                  <span
+                    class="ant-input-affix-wrapper css-dev-only-do-not-override-oc1rc0 ant-input-outlined css-var-root ant-input-css-var ant-input-compact-item ant-input-compact-first-item ant-input-compact-last-item"
+                  >
+                    <input
+                      class="ant-input css-dev-only-do-not-override-oc1rc0"
+                      data-testid="email"
+                      form="[object Object]"
+                      name="email"
+                      placeholder="Email"
+                      type="email"
+                      value="test@test.pl"
+                    />
+                    <span
+                      class="ant-input-suffix"
+                    />
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
       <button
-        class="ant-btn ant-btn-primary ant-btn-loading"
-        data-test-id="submit-email"
+        class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid ant-btn-loading"
         data-testid="submit-email"
         disabled=""
         type="submit"
       >
         <span
-          class="ant-btn-loading-icon"
+          class="ant-btn-icon ant-btn-loading-icon"
         >
           <span
             aria-label="loading"
@@ -80,7 +89,7 @@ exports[`ChangeEmailForm disable email input and display loading on the button w
 </DocumentFragment>
 `;
 
-exports[`ChangeEmailForm renders page 1`] = `
+exports[`ChangeEmailForm > renders page 1`] = `
 <DocumentFragment>
   <form
     action="#"
@@ -89,16 +98,16 @@ exports[`ChangeEmailForm renders page 1`] = `
       Change the email address associated to your INSPIRE account. This is used by the INSPIRE system to contact you automatically (e.g. job ad closing, submission confirmation, etc.).
     </p>
     <div
-      class="ant-row flex-email pt3"
+      class="ant-row flex-email pt3 css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
-        class="ant-form-item"
+        class="ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-oc1rc0 ant-form-item-horizontal"
       >
         <div
-          class="ant-row ant-form-item-row"
+          class="ant-row ant-form-item-row css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <div
-            class="ant-col ant-form-item-control ant-col-sm-24 ant-col-md-19"
+            class="ant-col ant-form-item-control ant-col-sm-24 ant-col-md-19 css-dev-only-do-not-override-oc1rc0 css-var-root"
           >
             <div
               class="ant-form-item-control-input"
@@ -106,24 +115,33 @@ exports[`ChangeEmailForm renders page 1`] = `
               <div
                 class="ant-form-item-control-input-content"
               >
-                <input
-                  class="ant-input"
-                  data-test-id="email"
-                  data-testid="email"
-                  form="[object Object]"
-                  name="email"
-                  placeholder="Email"
-                  type="email"
-                  value="test@test.pl"
-                />
+                <div
+                  class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
+                >
+                  <span
+                    class="ant-input-affix-wrapper css-dev-only-do-not-override-oc1rc0 ant-input-outlined css-var-root ant-input-css-var ant-input-compact-item ant-input-compact-first-item ant-input-compact-last-item"
+                  >
+                    <input
+                      class="ant-input css-dev-only-do-not-override-oc1rc0"
+                      data-testid="email"
+                      form="[object Object]"
+                      name="email"
+                      placeholder="Email"
+                      type="email"
+                      value="test@test.pl"
+                    />
+                    <span
+                      class="ant-input-suffix"
+                    />
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
       <button
-        class="ant-btn ant-btn-primary"
-        data-test-id="submit-email"
+        class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"
         data-testid="submit-email"
         disabled=""
         type="submit"

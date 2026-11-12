@@ -1,13 +1,15 @@
-import React from 'react';
-import { Row, Col, Card, Checkbox, Descriptions, Typography } from 'antd';
-import { List } from 'immutable';
+import { Row, Col, Card, Descriptions, Typography } from 'antd';
+import { List, Map } from 'immutable';
 
 import '../../common/components/ResultItem/ResultItem.less';
-import { Link } from 'react-router-dom';
-import { formatDateTime, hasPublicationInfo } from '../../utils/utils';
-import { LITERATURE_PID_TYPE } from '../../../common/constants';
+import { FilePdfOutlined } from '@ant-design/icons';
+import {
+  createPdfLinksFromArxivEprints,
+  formatDateTime,
+  hasPublicationInfo,
+  isFullCoverageWorkflow,
+} from '../../utils/utils';
 import ResultItem from '../../../common/components/ResultItem';
-import { BACKOFFICE } from '../../../common/routes';
 import AcquisitionSourceInfo from '../../common/components/AcquisitionSourceInfo/AcquisitionSourceInfo';
 import LiteratureActionButtons from './LiteratureActionButtons';
 import LiteratureSubjectAreas from './LiteratureSubjectAreas';
@@ -20,7 +22,11 @@ import AutomaticDecision from './AutomaticDecision';
 import LiteratureReferenceCount from './LiteratureReferenceCount';
 import LiteratureSearchKeywords from './LiteratureSearchKeywords';
 import StatusInfoWithTooltip from '../../common/components/StatusInfoWithTooltip';
-import { WorkflowTypes } from '../../constants';
+import ContentBox from '../../../common/components/ContentBox';
+import { WorkflowStatuses } from '../../constants';
+import ReportNumberList from '../../../literature/components/ReportNumberList';
+import UrlsAction from '../../../literature/components/UrlsAction';
+import { SEPARATOR_SEMICOLON } from '../../../common/components/InlineList';
 
 const { Paragraph } = Typography;
 
@@ -32,6 +38,9 @@ const WorkflowResultItem = ({
   isSelected = false,
   onSelectionChange,
   isSubmitted = false,
+  shouldShowSubmissionModal = false,
+  submissionContext = undefined,
+  page,
 }: {
   item: any;
   compactBottom?: boolean;
@@ -40,12 +49,14 @@ const WorkflowResultItem = ({
   isSelected?: boolean;
   onSelectionChange?: (workflowId: string, checked: boolean) => void;
   isSubmitted?: boolean;
+  shouldShowSubmissionModal?: boolean;
+  submissionContext?: any;
+  page: string;
 }) => {
   const workflowId = item?.get('id');
   const workflowType = item?.get('workflow_type');
   const journalCoverage = item?.get('journal_coverage');
-  const isFullCoverage =
-    workflowType === WorkflowTypes.HEP_CREATE && journalCoverage === 'full';
+  const isFullCoverage = isFullCoverageWorkflow(workflowType, journalCoverage);
   const relevancePrediction = item?.get('relevance_prediction');
   const classifierResults = item?.get('classifier_results');
   const data = item?.get('data');
@@ -58,9 +69,6 @@ const WorkflowResultItem = ({
 
   const status = item?.get('status');
   const referenceCount = item?.get('reference_count');
-  const references = data?.get('references')?.toJS();
-  const totalReferences =
-    references && Array.isArray(references) ? references.length : 0;
 
   const authors = data?.get('authors');
   const hasAuthors = List.isList(authors) && authors.size > 0;
@@ -68,16 +76,21 @@ const WorkflowResultItem = ({
   const publicationInfo = data?.get('publication_info');
   const hasPublicationInfoValue = hasPublicationInfo(publicationInfo);
 
-  const arxivEprints = data?.get('arxiv_eprints');
+  const arxivEprints = data?.get('arxiv_eprints') as List<Map<string, any>>;
   const hasArxivEprints = List.isList(arxivEprints) && arxivEprints.size > 0;
+
+  const pdfLinks = hasArxivEprints
+    ? createPdfLinksFromArxivEprints(arxivEprints)
+    : List([]);
 
   const numberOfPages = data?.get('number_of_pages');
   const publicNotes = data?.get('public_notes');
   const hasPublicNotes = List.isList(publicNotes) && publicNotes.size > 0;
-
-  const inspireCategories = data?.get('inspire_categories')?.toJS();
-  const hasInspireCategories =
-    Array.isArray(inspireCategories) && inspireCategories.length > 0;
+  const reportNumbers = data?.get('report_numbers');
+  const displayReportNumbers =
+    status === WorkflowStatuses.APPROVAL_FUZZY_MATCHING &&
+    List.isList(reportNumbers) &&
+    reportNumbers.size > 0;
 
   return (
     <div
@@ -86,34 +99,36 @@ const WorkflowResultItem = ({
     >
       <Row justify="start" wrap={false}>
         <Col className="col-details">
-          <ResultItem>
-            <div className="workflow-title-with-checkbox">
-              {shouldShowSelectionCheckbox && (
-                <Checkbox
-                  className="workflow-selection-checkbox"
-                  checked={isSelected}
-                  onChange={(event) =>
-                    onSelectionChange?.(workflowId, event.target.checked)
-                  }
-                  aria-label={`Select workflow ${workflowId}`}
+          <ResultItem
+            leftActions={
+              pdfLinks.size > 0 && (
+                <UrlsAction
+                  urls={pdfLinks as List<any>}
+                  icon={<FilePdfOutlined />}
+                  text="pdf"
+                  trackerEventId="Backoffice search pdf download"
+                  eventAction="Download"
+                  page={page}
                 />
-              )}
-              <Link
-                className="result-item-title"
-                to={`${BACKOFFICE}/${LITERATURE_PID_TYPE}/${workflowId}`}
-                target="_blank"
-              >
-                <LiteratureResultItem item={item} />
-              </Link>
-            </div>
+              )
+            }
+          >
+            <LiteratureResultItem
+              item={item}
+              isSelectable={shouldShowSelectionCheckbox}
+              isSelected={isSelected}
+              onSelectionChange={onSelectionChange}
+            />
             {hasAuthors && (
               <div className="mb2">
                 <AuthorList
                   wrapperClassName="author-list-wrapper"
                   limit={10}
                   authors={authors}
-                  page="literature results backofice"
                   unlinked
+                  enableShowAll
+                  alwaysShowNumberOfAuthors
+                  separator={SEPARATOR_SEMICOLON}
                 />
               </div>
             )}
@@ -121,7 +136,7 @@ const WorkflowResultItem = ({
               className={hasAuthors ? '' : 'mt2'}
               column={1}
               size="small"
-              labelStyle={{ width: 140 }}
+              styles={{ label: { width: 140 } }}
             >
               {hasPublicationInfoValue && (
                 <Descriptions.Item label="Published In">
@@ -151,33 +166,16 @@ const WorkflowResultItem = ({
                   </Paragraph>
                 </Descriptions.Item>
               )}
-            </Descriptions>
 
-            <ToggleableAbstract abstract={abstract} />
+              {displayReportNumbers && (
+                <Descriptions.Item label="Report numbers">
+                  <ReportNumberList reportNumbers={reportNumbers} hideLabel />
+                </Descriptions.Item>
+              )}
+            </Descriptions>
           </ResultItem>
         </Col>
-        <Col className="col-actions">
-          <Card>
-            <>
-              <StatusInfoWithTooltip status={status} />
-              <AutomaticDecision
-                hasInspireCategories={hasInspireCategories}
-                relevancePrediction={relevancePrediction}
-              />
-              <LiteratureActionButtons
-                status={status}
-                handleResolveAction={handleResolveAction}
-                isFullCoverage={isFullCoverage}
-                isSubmitted={isSubmitted}
-              />
-              <LiteratureReferenceCount
-                referenceCount={referenceCount}
-                totalReferences={totalReferences}
-              />
-              <LiteratureSearchKeywords classifierResults={classifierResults} />
-            </>
-          </Card>
-        </Col>
+
         <Col className="col-info">
           <Card>
             <AcquisitionSourceInfo
@@ -192,7 +190,38 @@ const WorkflowResultItem = ({
             <LiteratureSubjectAreas categories={subjectAreas} />
           </Card>
         </Col>
+        <Col className="col-actions">
+          <Card>
+            <>
+              <StatusInfoWithTooltip status={status} />
+              <AutomaticDecision relevancePrediction={relevancePrediction} />
+              <div className="mb2">
+                <LiteratureActionButtons
+                  status={status}
+                  handleResolveAction={handleResolveAction}
+                  isFullCoverage={isFullCoverage}
+                  isSubmitted={isSubmitted}
+                  workflowId={workflowId}
+                  shouldShowSubmissionModal={shouldShowSubmissionModal}
+                  submissionContext={submissionContext}
+                  hasInspireCategories={!!subjectAreas && subjectAreas.size > 0}
+                />
+              </div>
+              <LiteratureReferenceCount referenceCount={referenceCount} />
+              <LiteratureSearchKeywords classifierResults={classifierResults} />
+            </>
+          </Card>
+        </Col>
       </Row>
+      {abstract && (
+        <Row>
+          <ContentBox className="w-100">
+            <div style={{ paddingLeft: '29px', paddingRight: '29px' }}>
+              <ToggleableAbstract abstract={abstract} />
+            </div>
+          </ContentBox>
+        </Row>
+      )}
     </div>
   );
 };

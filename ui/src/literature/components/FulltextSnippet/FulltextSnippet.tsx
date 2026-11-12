@@ -1,6 +1,4 @@
-import React from 'react';
-// @ts-ignore
-import SanitizedHTML from 'react-sanitized-html';
+import SanitizedHTML from '../../../common/components/SanitizedHTML';
 
 import './FulltextSnippet.less';
 

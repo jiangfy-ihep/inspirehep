@@ -1,8 +1,8 @@
-import React from 'react';
 import { Row, Col, Select, Card } from 'antd';
-import { connect, RootStateOrAny } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import { Action, ActionCreator } from 'redux';
 import { Map } from 'immutable';
+import { RootState } from '../../../../types';
 
 import PaginationContainer from '../../../../common/containers/PaginationContainer';
 import ResultsContainer from '../../../../common/containers/ResultsContainer';
@@ -44,7 +44,10 @@ const AuthorsSearchPageContainer = ({
 }: BackofficeSearchPageProps) => {
   const renderAggregations = () => (
     <LoadingOrChildren loading={loadingAggregations}>
-      <AggregationFiltersContainer namespace={BACKOFFICE_AUTHORS_SEARCH_NS} />
+      <AggregationFiltersContainer
+        namespace={BACKOFFICE_AUTHORS_SEARCH_NS}
+        narrow
+      />
     </LoadingOrChildren>
   );
   return (
@@ -62,35 +65,52 @@ const AuthorsSearchPageContainer = ({
         <EmptyOrChildren data={results} title="0 Results">
           <Col xs={24} lg={24} xl={24} xxl={24}>
             <Row className="mt3" gutter={SEARCH_PAGE_GUTTER} justify="start">
-              <Col xs={0} lg={6}>
-                <Card size="small">
-                  <div style={{ padding: '0.5rem' }}>
-                    <AggregationBox name="Sort by">
-                      <Select
-                        defaultValue="-_updated_at"
-                        value={query?.get('ordering')}
-                        style={{ width: '100%' }}
-                        data-testid="select-sort-by"
-                        options={[
-                          { value: '-_updated_at', label: 'Most recent' },
-                          { value: '_updated_at', label: 'Least recent' },
-                        ]}
-                        onChange={(value: string) =>
-                          onSortByChange(BACKOFFICE_AUTHORS_SEARCH_NS, value)
-                        }
-                      />
-                    </AggregationBox>
-                  </div>
+              <Col xs={0} lg={5}>
+                <Card size="small" styles={{ body: { padding: 0 } }}>
+                  <AggregationBox name="Sort by" className="pa2">
+                    <Select
+                      defaultValue="-_updated_at"
+                      value={query?.get('ordering')}
+                      style={{ width: '100%' }}
+                      data-testid="select-sort-by"
+                      options={[
+                        { value: '-_updated_at', label: 'Most recent' },
+                        { value: '_updated_at', label: 'Least recent' },
+                      ]}
+                      onChange={(value: string) =>
+                        onSortByChange(BACKOFFICE_AUTHORS_SEARCH_NS, value)
+                      }
+                    />
+                  </AggregationBox>
                   {renderAggregations()}
                 </Card>
               </Col>
-              <Col xs={24} lg={18}>
+              <Col xs={24} lg={19}>
                 <Row justify="space-between" wrap={false}>
                   <span className="mr2" />
                   <Col style={{ width: '55%' }}>
                     <NumberOfResultsContainer
                       namespace={BACKOFFICE_AUTHORS_SEARCH_NS}
                     />
+                  </Col>
+
+                  <Col
+                    style={{
+                      width: '20%',
+                      paddingLeft: '5px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Submission Info
+                  </Col>
+                  <Col
+                    style={{
+                      width: '16%',
+                      paddingLeft: '5px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Subject Areas
                   </Col>
                   <Col
                     style={{
@@ -100,24 +120,6 @@ const AuthorsSearchPageContainer = ({
                     }}
                   >
                     Action & Status
-                  </Col>
-                  <Col
-                    style={{
-                      width: '18%',
-                      paddingLeft: '5px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Submission Info
-                  </Col>
-                  <Col
-                    style={{
-                      width: '18%',
-                      paddingLeft: '5px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Subject Areas
                   </Col>
                 </Row>
                 <LoadingOrChildren loading={loading}>
@@ -183,7 +185,7 @@ const AuthorsSearchPageContainer = ({
   );
 };
 
-const stateToProps = (state: RootStateOrAny) => ({
+const stateToProps = (state: RootState) => ({
   loading: state.search.getIn([
     'namespaces',
     BACKOFFICE_AUTHORS_SEARCH_NS,

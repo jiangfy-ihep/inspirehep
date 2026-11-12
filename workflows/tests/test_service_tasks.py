@@ -1,10 +1,13 @@
 import datetime
 import os
 import tempfile
+import uuid
 from unittest.mock import patch
 
 import pytest
 from airflow.models import DagBag
+
+from tests.test_utils import task_test
 
 dagbag = DagBag()
 
@@ -49,16 +52,18 @@ class TestCleanupLogs:
         assert os.path.exists(old_log)
         assert os.path.exists(new_log)
 
-        task = self.dag.get_task("find_and_cleanup_logs")
-        context = {"params": {"retention_hours": 48}}
-        task.python_callable(**context)
+        task_test(
+            self.dag,
+            "find_and_cleanup_logs",
+            context_params={"retention_days": 2},
+        )
 
         assert not os.path.exists(old_log), "Old log should be deleted"
         assert os.path.exists(new_log), "New log should be preserved"
 
     @patch("os.getenv")
-    def test_cleanup_logs_respects_retention_hours(self, mock_getenv, temp_logs_dir):
-        """Test that cleanup respects different retention hour parameters."""
+    def test_cleanup_logs_respects_retention_days(self, mock_getenv, temp_logs_dir):
+        """Test that cleanup respects different retention day parameters."""
         mock_getenv.side_effect = lambda key, default: (
             temp_logs_dir if key == "AIRFLOW_HOME" else default
         )
@@ -66,21 +71,48 @@ class TestCleanupLogs:
         logs_dir = os.path.join(temp_logs_dir, "logs")
         os.makedirs(logs_dir)
 
-        log_24h = self.create_mock_log_dir(logs_dir, "dag1", "run_24h", hours_old=24)
+        log_12h = self.create_mock_log_dir(logs_dir, "dag1", "run_12h", hours_old=12)
         log_48h = self.create_mock_log_dir(logs_dir, "dag1", "run_48h", hours_old=48)
         log_72h = self.create_mock_log_dir(logs_dir, "dag1", "run_72h", hours_old=72)
 
-        assert os.path.exists(log_24h)
+        assert os.path.exists(log_12h)
         assert os.path.exists(log_48h)
         assert os.path.exists(log_72h)
 
-        task = self.dag.get_task("find_and_cleanup_logs")
-        context = {"params": {"retention_hours": 30}}
-        task.python_callable(**context)
+        task_test(
+            self.dag,
+            "find_and_cleanup_logs",
+            context_params={"retention_days": 1},
+        )
 
-        assert os.path.exists(log_24h), "24h log should be preserved"
+        assert os.path.exists(log_12h), "12h log should be preserved"
         assert not os.path.exists(log_48h), "48h log should be deleted"
         assert not os.path.exists(log_72h), "72h log should be deleted"
+
+    @patch("airflow.sdk.Variable.get", return_value="1")
+    @patch("os.getenv")
+    def test_cleanup_logs_uses_variable_by_default(
+        self, mock_getenv, mock_variable_get, temp_logs_dir
+    ):
+        """Test that LOG_RETENTION_DAYS is used when retention_days is empty."""
+        mock_getenv.side_effect = lambda key, default: (
+            temp_logs_dir if key == "AIRFLOW_HOME" else default
+        )
+
+        logs_dir = os.path.join(temp_logs_dir, "logs")
+        os.makedirs(logs_dir)
+
+        new_log = self.create_mock_log_dir(logs_dir, "dag1", "run1", hours_old=12)
+        old_log = self.create_mock_log_dir(logs_dir, "dag1", "run2", hours_old=48)
+
+        task_test(
+            self.dag,
+            "find_and_cleanup_logs",
+            context_params={"retention_days": None},
+        )
+
+        assert os.path.exists(new_log), "12h log should be preserved"
+        assert not os.path.exists(old_log), "48h log should be deleted"
 
     @patch("os.getenv")
     def test_cleanup_logs_handles_nonexistent_directory(
@@ -90,9 +122,12 @@ class TestCleanupLogs:
         mock_getenv.side_effect = lambda key, default: (
             temp_logs_dir if key == "AIRFLOW_HOME" else default
         )
-        task = self.dag.get_task("find_and_cleanup_logs")
-        context = {"params": {"retention_hours": 48}}
-        task.python_callable(**context)
+
+        task_test(
+            self.dag,
+            "find_and_cleanup_logs",
+            context_params={"retention_days": 2},
+        )
 
     @patch("os.getenv")
     def test_cleanup_logs_multiple_dags(self, mock_getenv, temp_logs_dir):
@@ -109,11 +144,54 @@ class TestCleanupLogs:
         old_dag2 = self.create_mock_log_dir(logs_dir, "dag2", "run1", hours_old=60)
         new_dag2 = self.create_mock_log_dir(logs_dir, "dag2", "run2", hours_old=36)
 
-        task = self.dag.get_task("find_and_cleanup_logs")
-        context = {"params": {"retention_hours": 48}}
-        task.python_callable(**context)
+        task_test(
+            self.dag,
+            "find_and_cleanup_logs",
+            context_params={"retention_days": 2},
+        )
 
         assert not os.path.exists(old_dag1), "dag1 72h log should be deleted"
         assert os.path.exists(new_dag1), "dag1 12h log should be preserved"
         assert not os.path.exists(old_dag2), "dag2 60h log should be deleted"
         assert os.path.exists(new_dag2), "dag2 36h log should be preserved"
+
+
+@pytest.mark.usefixtures("hep_env")
+@patch("include.utils.opensearch.OpenSearchHook.search")
+class TestLiteratureS3Cleanup:
+    dag = dagbag.get_dag("literature_s3_cleanup")
+
+    def run_task(self, task_id, mock_search, workflow_id):
+        mock_search.return_value = {
+            "hits": {"hits": [{"_source": {"id": workflow_id}, "sort": [0]}]}
+        }
+        task_test(
+            self.dag,
+            task_id,
+            params=self.dag.get_task(task_id).op_kwargs,
+            context_params=self.dag.params.dump(),
+        )
+
+    def write_workflow_files(self, workflow_id):
+        for key in [f"{workflow_id}/plots/plot.json", f"{workflow_id}/workflow.json"]:
+            self.s3_store.write_object({"test": "data"}, key=key)
+
+    def test_soft_cleanup_deletes_prefixes(self, mock_search):
+        workflow_id = str(uuid.uuid4())
+        self.write_workflow_files(workflow_id)
+
+        self.run_task("find_wfs_and_soft_cleanup_s3", mock_search, workflow_id)
+
+        assert self.s3_store.hook.list_keys(
+            self.s3_store.bucket_name, f"{workflow_id}/"
+        ) == [f"{workflow_id}/workflow.json"]
+
+    def test_hard_cleanup_deletes_whole_workflow_folder(self, mock_search):
+        workflow_id = str(uuid.uuid4())
+        self.write_workflow_files(workflow_id)
+
+        self.run_task("find_wfs_and_hard_cleanup_s3", mock_search, workflow_id)
+
+        assert not self.s3_store.hook.list_keys(
+            self.s3_store.bucket_name, f"{workflow_id}/"
+        )

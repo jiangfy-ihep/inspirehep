@@ -1,7 +1,7 @@
 import { stringify } from 'qs';
 import { ExportOutlined } from '@ant-design/icons';
 
-import React, { Component } from 'react';
+import { Component } from 'react';
 import { Button, Tooltip } from 'antd';
 import PropTypes from 'prop-types';
 import UserAction from '../../common/components/UserAction';
@@ -45,7 +45,7 @@ class CiteAllAction extends Component {
         `INSPIRE-CiteAll.${CITE_FILE_FORMAT[key].extension}`,
         CITE_FILE_FORMAT[key].mimetype
       );
-    } catch (error) {
+    } catch {
       this.setState({ loading: false });
     }
   }
@@ -75,7 +75,7 @@ class CiteAllAction extends Component {
         <DropdownMenu
           disabled={disabled}
           onClick={this.onCiteClick}
-          title={this.renderDropdownTitle(disabled)}
+          title={<span>{this.renderDropdownTitle(disabled)}</span>} // span absorbs the disabled prop antd's Dropdown injects into its direct child, which would otherwise suppress a Tooltip child's own hover
           items={CITE_FORMAT_OPTIONS.map((format) => ({
             key: format.value,
             label: <span key={format.value}>{format.display}</span>,

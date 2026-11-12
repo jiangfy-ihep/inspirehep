@@ -1,4 +1,3 @@
-import React from 'react';
 import { fromJS, Set } from 'immutable';
 
 import { getStore, mockActionCreator } from '../../../fixtures/store';
@@ -11,10 +10,13 @@ import {
 import * as constants from '../../constants';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('../../../actions/literature');
-jest.mock('../../components/ToolAction', () =>
-  jest.fn(() => <div data-testid="tool-action">Mock ToolAction</div>)
-);
+vi.mock('../../../actions/literature');
+vi.mock('../../constants', async () => ({
+  ...(await vi.importActual('../../constants')),
+}));
+vi.mock('../../components/ToolAction', () => ({
+  default: jest.fn(() => <div data-testid="tool-action">Mock ToolAction</div>),
+}));
 
 mockActionCreator(setAssignDrawerVisibility);
 mockActionCreator(exportToCds);
@@ -41,7 +43,7 @@ describe('ToolActionContainer', () => {
         onExportToCds: expect.any(Function),
         onAssignToConference: expect.any(Function),
       }),
-      {}
+      undefined
     );
   });
 
@@ -62,7 +64,7 @@ describe('ToolActionContainer', () => {
         disabledBulkAssign: true,
         selectionSize: 3,
       }),
-      {}
+      undefined
     );
   });
 

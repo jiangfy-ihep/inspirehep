@@ -24,6 +24,7 @@ if READ_DOT_ENV_FILE:
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
 DEBUG = env.bool("DJANGO_DEBUG", False)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MiB
 # Local time zone. Choices are
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
 # though not all of them may be available with every OS.
@@ -163,6 +164,7 @@ AUTH_PASSWORD_VALIDATORS = [
 MIDDLEWARE = [
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -173,7 +175,6 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
@@ -329,6 +330,7 @@ CELERY_TASK_SEND_SENT_EVENT = True
 # django-allauth
 # ------------------------------------------------------------------------------
 ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", True)
+SOCIALACCOUNT_ONLY = env.bool("DJANGO_SOCIALACCOUNT_ONLY", True)
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
@@ -398,15 +400,15 @@ HEP_DOCUMENTS = "backoffice.hep.documents"
 
 # Name of the Opensearch index
 OPENSEARCH_INDEX_NAMES = {
-    AUTHORS_DOCUMENTS: f'{env("OPENSEARCH_INDEX_PREFIX")}-workflows',
-    HEP_DOCUMENTS: f'{env("OPENSEARCH_INDEX_PREFIX")}-hep-workflows',
+    AUTHORS_DOCUMENTS: f"{env('OPENSEARCH_INDEX_PREFIX')}-workflows",
+    HEP_DOCUMENTS: f"{env('OPENSEARCH_INDEX_PREFIX')}-hep-workflows",
 }
 
 OPENSEARCH_DSL = {
     "default": {"hosts": env("OPENSEARCH_HOST")},
 }
 
-OPENSEARCH_DSL_SIGNAL_PROCESSOR = "django_opensearch_dsl.signals.CelerySignalProcessor"
+OPENSEARCH_DSL_SIGNAL_PROCESSOR = "backoffice.common.signals.OnCommitSignalProcessor"
 
 # Workaround because it wont add the connection settings automatically
 connections.configure(default=OPENSEARCH_DSL["default"])

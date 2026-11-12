@@ -1,4 +1,3 @@
-import React from 'react';
 import { fireEvent } from '@testing-library/react';
 import { fromJS, Set } from 'immutable';
 
@@ -13,15 +12,17 @@ import PublicationsSelectAll from '../../components/PublicationsSelectAll';
 import { AUTHOR_PUBLICATIONS_NS } from '../../../search/constants';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('../../components/PublicationsSelectAll', () => {
-  const actual = jest.requireActual('../../components/PublicationsSelectAll');
+vi.mock('../../components/PublicationsSelectAll', async () => {
+  const actual = await vi.importActual(
+    '../../components/PublicationsSelectAll'
+  );
   return {
     __esModule: true,
     default: jest.fn((props) => <actual.default {...props} />),
   };
 });
 
-jest.mock('../../../actions/authors');
+vi.mock('../../../actions/authors');
 mockActionCreator(setPublicationSelection);
 mockActionCreator(setPublicationsClaimedSelection);
 mockActionCreator(setPublicationsUnclaimedSelection);
@@ -68,7 +69,7 @@ describe('PublicationsSelectAllContainer', () => {
         publications,
         selection,
       }),
-      expect.anything()
+      undefined
     );
   });
 

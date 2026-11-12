@@ -1,5 +1,4 @@
-/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */
-import React, { Fragment, useContext } from 'react';
+import { Fragment, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { Map } from 'immutable';
@@ -105,7 +104,7 @@ function LiteratureItem({
     : null;
 
   return (
-    <div data-test-id="literature-result-item">
+    <div data-testid="literature-result-item">
       <ResultItem
         leftActions={
           <Fragment>
@@ -191,11 +190,11 @@ function LiteratureItem({
           </Fragment>
         }
       >
-        <div data-test-id="literature-result-item-inner">
+        <div data-testid="literature-result-item-inner">
           <div className="flex flex-nowrap">
             <div className="flex-grow-1">
               <Link
-                data-test-id="literature-result-title-link"
+                data-testid="literature-result-title-link"
                 className="result-item-title"
                 to={`${LITERATURE}/${recordId}`}
               >
@@ -212,7 +211,7 @@ function LiteratureItem({
               min="sm"
               render={() => (
                 <div
-                  data-test-id="literature-result-rank"
+                  data-testid="literature-result-rank"
                   className="light-silver pl2"
                 >
                   #{searchRank}
@@ -226,7 +225,6 @@ function LiteratureItem({
               authors={authors}
               collaborations={collaborations}
               collaborationsWithSuffix={collaborationsWithSuffix}
-              page={page}
             />
             {date && (
               <>
@@ -271,10 +269,7 @@ function LiteratureItem({
           </div>
         )}
         {authors && (
-          <AssignLiteratureItemDrawerContainer
-            itemLiteratureId={recordId}
-            page={page}
-          />
+          <AssignLiteratureItemDrawerContainer itemLiteratureId={recordId} />
         )}
       </ResultItem>
     </div>

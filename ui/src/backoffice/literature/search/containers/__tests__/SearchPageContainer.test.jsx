@@ -1,4 +1,3 @@
-import React from 'react';
 import { screen, waitFor, within } from '@testing-library/react';
 import { fromJS } from 'immutable';
 import userEvent from '@testing-library/user-event';
@@ -19,8 +18,8 @@ import {
 } from '../../../../../actions/backoffice';
 import { WorkflowDecisions } from '../../../../../common/constants';
 
-jest.mock('../../../../../actions/backoffice', () => {
-  const actual = jest.requireActual('../../../../../actions/backoffice');
+vi.mock('../../../../../actions/backoffice', async () => {
+  const actual = await vi.importActual('../../../../../actions/backoffice');
   return {
     ...actual,
     resolveLiteratureAction: jest.fn(),
@@ -57,6 +56,7 @@ const buildLiteratureResult = (id, status = WorkflowStatuses.APPROVAL) => ({
   id,
   workflow_type: WorkflowTypes.HEP_CREATE,
   status,
+  journal_coverage: null,
   data: {
     titles: [{ title: `Example title ${id}` }],
     inspire_categories: [{ term: 'hep-th' }],
@@ -292,6 +292,47 @@ describe('SearchPageContainer', () => {
     });
   });
 
+  it('does not open submission rejection modal for batch actions', async () => {
+    const user = userEvent.setup();
+    const interactiveStore = getStore({
+      search: buildSearchState({
+        status: WorkflowStatuses.APPROVAL,
+        results: [
+          {
+            ...buildLiteratureResult('submission-x'),
+            workflow_type: WorkflowTypes.HEP_SUBMISSION,
+          },
+          {
+            ...buildLiteratureResult('submission-y'),
+            workflow_type: WorkflowTypes.HEP_SUBMISSION,
+          },
+        ],
+      }),
+    });
+
+    renderComponent(interactiveStore);
+
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select all workflows' })
+    );
+
+    const batchCardTitle = screen.getByText(
+      'Batch operations on 2 selected records.'
+    );
+    const batchCard = batchCardTitle.closest('.ant-card');
+    expect(batchCard).toBeInTheDocument();
+
+    await user.click(within(batchCard).getByRole('button', { name: 'Reject' }));
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Reason for rejection' })
+    ).not.toBeInTheDocument();
+    expect(resolveLiteratureBatchAction).toHaveBeenCalledWith({
+      action: WorkflowDecisions.HEP_REJECT,
+      ids: ['submission-x', 'submission-y'],
+    });
+  });
+
   it('shows batch operations card only when at least one workflow is selected', async () => {
     const user = userEvent.setup();
     const interactiveStore = getStore({
@@ -312,6 +353,60 @@ describe('SearchPageContainer', () => {
     );
     expect(
       screen.getByText('Batch operations on 1 selected records.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows a batch warning when selected workflows include full coverage items', async () => {
+    const user = userEvent.setup();
+    const interactiveStore = getStore({
+      search: buildSearchState({
+        status: WorkflowStatuses.APPROVAL,
+        results: [
+          {
+            ...buildLiteratureResult('full-coverage'),
+            journal_coverage: 'full',
+          },
+          buildLiteratureResult('regular'),
+        ],
+      }),
+    });
+
+    renderComponent(interactiveStore);
+
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select workflow full-coverage' })
+    );
+
+    expect(
+      screen.getByText('Some selected articles belong to fully taken journals.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows a batch warning for full coverage publisher create workflows', async () => {
+    const user = userEvent.setup();
+    const interactiveStore = getStore({
+      search: buildSearchState({
+        status: WorkflowStatuses.APPROVAL,
+        results: [
+          {
+            ...buildLiteratureResult('publisher-full-coverage'),
+            workflow_type: WorkflowTypes.HEP_PUBLISHER_CREATE,
+            journal_coverage: 'full',
+          },
+        ],
+      }),
+    });
+
+    renderComponent(interactiveStore);
+
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select workflow publisher-full-coverage',
+      })
+    );
+
+    expect(
+      screen.getByText('Some selected articles belong to fully taken journals.')
     ).toBeInTheDocument();
   });
 

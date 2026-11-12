@@ -1,4 +1,3 @@
-import React from 'react';
 import { Row, Col, Alert } from 'antd';
 import { Formik, FormikValues } from 'formik';
 
@@ -26,7 +25,7 @@ export const JournalSubmission = ({
         <Row className="mb3">
           <Col span={24}>
             <Alert
-              message={error}
+              title={error}
               type="error"
               showIcon
               closable

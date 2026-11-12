@@ -28,7 +28,6 @@ FEATURE_FLAG_ENABLE_BAI_PROVIDER = False
 FEATURE_FLAG_ENABLE_BAI_CREATION = False
 FEATURE_FLAG_ENABLE_FILES = False
 FEATURE_FLAG_ENABLE_ORCID_PUSH = False
-FEATURE_FLAG_ENABLE_SEND_TO_BACKOFFICE = False
 FEATURE_FLAG_ENABLE_LITERATURE_DATA_LINKS = False
 # Only push to ORCIDs that match this regex.
 # Examples:
@@ -37,14 +36,16 @@ FEATURE_FLAG_ENABLE_LITERATURE_DATA_LINKS = False
 #   some ORCIDs -> "^(0000-0002-7638-5686|0000-0002-7638-5687)$"
 FEATURE_FLAG_ORCID_PUSH_WHITELIST_REGEX = ".*"
 FEATURE_FLAG_ENABLE_FULLTEXT = False
+# Password login (POST /api/accounts/login), local and e2e only.
+# Never enable on prod/QA.
+FEATURE_FLAG_ENABLE_LOCAL_LOGIN = False
 
 # Web services and APIs
 # =====================
 AUTHENTICATION_TOKEN = "CHANGE_ME"
-INSPIRE_NEXT_URL = "http://localhost:5000"
 LEGACY_BASE_URL = "https://old.inspirehep.net"
 LEGACY_RECORD_URL_PATTERN = "http://inspirehep.net/record/{recid}"
-INSPIRE_BACKOFFICE_URL = "https://backoffice.dev.inspirebeta.net"
+INSPIRE_BACKOFFICE_URL = "http://localhost:8001"
 AUTHENTICATION_TOKEN_BACKOFFICE = "CHANGE_ME"
 MAX_API_RESULTS = 10000
 REST_MIMETYPE_QUERY_ARG_NAME = "format"
@@ -134,11 +135,9 @@ SECURITY_EMAIL_SENDER = SUPPORT_EMAIL
 SECURITY_EMAIL_SUBJECT_REGISTER = "Welcome to inspirehep!"
 #: Redis session storage URL.
 ACCOUNTS_SESSION_REDIS_URL = "redis://localhost:6379/1"
-
-# Sessions
-# ========
-#: Pickle session protocol. This is needed because inspire-next uses python 2.
-SESSION_PICKLE_PROTOCOL = 2
+#: Disable invenio-accounts REST auth views (/api/login, /api/register, ...),
+#: login goes through inspirehep.accounts.views.
+ACCOUNTS_REST_AUTH_VIEWS = {}
 
 # Celery configuration
 # ====================

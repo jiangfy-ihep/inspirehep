@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { FileDoneOutlined } from '@ant-design/icons';
 import { Button, Tooltip } from 'antd';
 import { useParams } from 'react-router-dom';
@@ -26,7 +26,6 @@ function AssignDifferentProfileAction({
       key: '1',
       label: (
         <span
-          data-test-id="assign-self"
           data-testid="assign-self"
           key="assign-self"
           onClick={onSelfAssign}
@@ -42,17 +41,19 @@ function AssignDifferentProfileAction({
       <DropdownMenu
         disabled={disabled}
         title={
-          <Tooltip
-            title={
-              disabled
-                ? 'Please select the papers you want to claim or remove from the profile.'
-                : null
-            }
-          >
-            <Button data-test-id="claim-multiple" data-testid="claim-multiple">
-              <IconText text="claim" icon={<FileDoneOutlined />} />
-            </Button>
-          </Tooltip>
+          <span>
+            <Tooltip
+              title={
+                disabled
+                  ? 'Please select the papers you want to claim or remove from the profile.'
+                  : null
+              }
+            >
+              <Button data-testid="claim-multiple" disabled={disabled}>
+                <IconText text="claim" icon={<FileDoneOutlined />} />
+              </Button>
+            </Tooltip>
+          </span>
         }
         items={menuItems}
       />

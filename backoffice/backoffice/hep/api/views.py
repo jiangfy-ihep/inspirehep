@@ -1,9 +1,20 @@
 import logging
+import os
 
+import requests
+from django.db import IntegrityError, transaction
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from backoffice.hep.utils import add_hep_decision, resolve_workflow, complete_workflow
+from backoffice.hep.tasks import batch_resolve_workflows
+from backoffice.hep.utils import (
+    add_hep_decision,
+    add_hep_decision_batch,
+    resolve_workflow,
+    complete_workflow,
+    get_restored_hep_workflow_type,
+    is_another_hep_submission_running,
+)
 from backoffice.hep.api.serializers import (
     HepWorkflowSerializer,
     HepWorkflowDocumentSerializer,
@@ -11,6 +22,7 @@ from backoffice.hep.api.serializers import (
     HepDecisionSerializer,
     HepResolutionSerializer,
     HepBatchResolutionSerializer,
+    ManualMergeWorkflowSerializer,
 )
 from rest_framework.decorators import action
 from backoffice.common.views import BaseWorkflowTicketViewSet, BaseWorkflowViewSet
@@ -39,6 +51,7 @@ from backoffice.hep.api.renderers import (
     HepBackofficeUIBrowsableRenderer,
     HepBackofficeUIRenderer,
 )
+from backoffice.hep.tasks import trigger_hep_workflow_initialization
 from django_elasticsearch_dsl_drf.filter_backends import (
     CompoundSearchFilterBackend,
     DefaultOrderingFilterBackend,
@@ -46,7 +59,14 @@ from django_elasticsearch_dsl_drf.filter_backends import (
     FilteringFilterBackend,
     OrderingFilterBackend,
 )
-from backoffice.hep.constants import HepStatusChoices, HepWorkflowType, HepResolutions
+from backoffice.hep.constants import (
+    ERROR_STATUSES,
+    HepStatusChoices,
+    HepWorkflowType,
+    HepResolutions,
+    FACET_SIZE_MEDIUM,
+    FACET_SIZE_LARGE,
+)
 from backoffice.common.constants import WORKFLOW_DAGS
 
 logger = logging.getLogger(__name__)
@@ -128,21 +148,42 @@ class HepWorkflowViewSet(BaseWorkflowViewSet):
         return Response(serializer.data)
 
     def create(self, request):
-        logger.info("Creating workflow with data: %s", request.data)
-
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         logger.info("Data passed schema validation, creating workflow.")
+
+        is_submission = (
+            serializer.validated_data["workflow_type"] == HepWorkflowType.HEP_SUBMISSION
+        )
+
+        if is_submission and is_another_hep_submission_running(request.data):
+            logger.info(
+                "Another submission with the same arXiv eprint or DOI is currently being processed."
+            )
+            return Response(
+                {
+                    "error": "A workflow with the same arXiv eprint or DOI is currently being processed, please wait for blocking workflows to finish"
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         workflow = serializer.save()
-        try:
-            airflow_utils.trigger_airflow_dag(
-                WORKFLOW_DAGS[workflow.workflow_type].initialize, str(workflow.id)
-            )
-        except RequestException as e:
-            return handle_request_exception(
-                "Error triggering Airflow DAG",
-                e,
-            )
+
+        def _initialize():
+            try:
+                trigger_hep_workflow_initialization.delay(
+                    str(workflow.id), workflow.workflow_type
+                )
+            except Exception:
+                logger.exception(
+                    "Broker unavailable, triggering DAG inline for workflow %s",
+                    workflow.id,
+                )
+                trigger_hep_workflow_initialization(
+                    str(workflow.id), workflow.workflow_type
+                )
+
+        transaction.on_commit(_initialize)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
@@ -158,6 +199,50 @@ class HepWorkflowViewSet(BaseWorkflowViewSet):
             )
         workflow_serializer = self.serializer_class(workflow)
         return Response(workflow_serializer.data)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="resolve",
+        url_name="batch-resolve-list",
+    )
+    def batch_resolve(self, request):
+        serializer = HepBatchResolutionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        data["ids"] = [str(wf_id) for wf_id in data["ids"]]
+        accepted_ids = []
+
+        for wf_id in data["ids"]:
+            workflow = get_object_or_404(HepWorkflow, pk=wf_id)
+            try:
+                with transaction.atomic():
+                    add_hep_decision_batch(
+                        wf_id,
+                        request.user,
+                        data["action"],
+                        data.get("value"),
+                    )
+            except IntegrityError:
+                logger.warning(
+                    "Workflow %s already has an accept, core or reject decision.", wf_id
+                )
+                continue
+
+            workflow.status = HepStatusChoices.RUNNING
+            workflow.save()
+
+            accepted_ids.append(wf_id)
+
+        data["ids"] = accepted_ids
+        if accepted_ids:
+            transaction.on_commit(lambda: batch_resolve_workflows.delay(data))
+
+        return Response(
+            {"message": "Batch resolution started.", "ids": data["ids"]},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     @action(detail=True, methods=["post"])
     def discard(self, request, pk=None):
@@ -176,27 +261,6 @@ class HepWorkflowViewSet(BaseWorkflowViewSet):
         workflow.save()
         return Response(status=status.HTTP_200_OK)
 
-    @action(
-        detail=False,
-        methods=["post"],
-        url_path="resolve",
-    )
-    def batch_resolve(self, request):
-        serializer = HepBatchResolutionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        results = []
-        for id in serializer.validated_data["ids"]:
-            try:
-                resolve_workflow(id, serializer.validated_data, request.user)
-                results.append({"id": id, "success": True})
-
-            except Exception as e:
-                logger.exception("Error resolving workflow %s", id)
-                results.append({"id": id, "success": False, "error": str(e)})
-
-        return Response({"results": results}, status=status.HTTP_200_OK)
-
     @action(detail=True, methods=["post"])
     def restart(self, request, pk=None):
         workflow = get_object_or_404(HepWorkflow, pk=pk)
@@ -210,6 +274,14 @@ class HepWorkflowViewSet(BaseWorkflowViewSet):
         only_failed = request.data.get("restart_current_task", False)
 
         dag_id = WORKFLOW_DAGS[workflow.workflow_type].initialize
+
+        if only_failed and workflow.status not in ERROR_STATUSES:
+            return Response(
+                {
+                    "message": "Can only restart current task for workflows in error state."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             airflow_utils.clear_airflow_dag_run(
@@ -228,6 +300,79 @@ class HepWorkflowViewSet(BaseWorkflowViewSet):
             )
 
         return Response(self.get_serializer(workflow).data)
+
+    @action(detail=True, methods=["post"])
+    def restore(self, request, pk=None):
+        workflow = get_object_or_404(HepWorkflow, pk=pk)
+
+        if workflow.status == HepStatusChoices.COMPLETED:
+            return Response(
+                {"message": "Cannot restore a completed workflow."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        workflow.decisions.all().delete()
+        workflow.matches = None
+        workflow.merge_details = None
+        workflow.classifier_results = None
+        workflow.relevance_prediction = None
+        workflow.reference_count = None
+        workflow.journal_coverage = None
+        workflow.data = workflow.source_data
+        workflow.workflow_type = get_restored_hep_workflow_type(workflow)
+
+        workflow.save()
+
+        return Response(self.get_serializer(workflow).data)
+
+    @action(detail=False, methods=["post"])
+    def manual_merge(self, request):
+        logger.info("Resolving data: %s", request.data)
+        serializer = ManualMergeWorkflowSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        logger.info("Data passed schema validation, creating workflow.")
+
+        head_control_number = serializer.validated_data["head_control_number"]
+        inspirehep_base_url = os.environ.get("INSPIREHEP_BASE_URL", "")
+        try:
+            response = requests.get(
+                f"{inspirehep_base_url}/api/literature/{head_control_number}",
+                headers={"Accept": "application/json"},
+            )
+            response.raise_for_status()
+            head_record_data = response.json().get("metadata", {})
+        except requests.RequestException as e:
+            return handle_request_exception(
+                f"Could not fetch head record {head_control_number} from inspirehep",
+                e,
+            )
+
+        wf_serializer = self.serializer_class(
+            data={
+                "data": head_record_data,
+                "workflow_type": HepWorkflowType.HEP_MANUAL_MERGE,
+            }
+        )
+
+        wf_serializer.is_valid(raise_exception=True)
+        workflow = wf_serializer.save()
+        try:
+            logger.info(
+                "Triggering DAG %s with id  %s",
+                WORKFLOW_DAGS[workflow.workflow_type].initialize,
+                str(workflow.id),
+            )
+            airflow_utils.trigger_airflow_dag(
+                WORKFLOW_DAGS[workflow.workflow_type].initialize,
+                str(workflow.id),
+                **serializer.data,
+            )
+        except RequestException as e:
+            return handle_request_exception(
+                "Error triggering Airflow DAG",
+                e,
+            )
+
+        return Response(wf_serializer.data)
 
 
 @extend_schema_view(
@@ -292,6 +437,13 @@ class HepWorkflowViewSet(BaseWorkflowViewSet):
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
             ),
+            OpenApiParameter(
+                name="source",
+                description="Filter by acquisition source.",
+                required=False,
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+            ),
         ],
     ),
 )
@@ -322,6 +474,7 @@ class HepWorkflowDocumentView(BaseDocumentViewSet):
         "data.titles.full_title.keyword",
         "data.arxiv_eprints.value.raw",
         "data.dois.value.raw",
+        "data._private_notes.value",
     )
 
     filter_fields = {
@@ -330,6 +483,7 @@ class HepWorkflowDocumentView(BaseDocumentViewSet):
         "subject": "data.inspire_categories.term",
         "journal": "data.publication_info.journal_title.raw",
         "decision": "relevance_prediction.decision",
+        "source": "data.source",
         "data.arxiv_eprints.value": "data.arxiv_eprints.value",
         "data.dois.value": "data.dois.value",
     }
@@ -347,7 +501,7 @@ class HepWorkflowDocumentView(BaseDocumentViewSet):
             "field": "status",
             "facet": TermsFacet,
             "options": {
-                "size": 20,
+                "size": FACET_SIZE_MEDIUM,
                 "order": {
                     "_key": "asc",
                 },
@@ -358,7 +512,7 @@ class HepWorkflowDocumentView(BaseDocumentViewSet):
             "field": "data.inspire_categories.term",
             "facet": TermsFacet,
             "options": {
-                "size": 20,
+                "size": FACET_SIZE_MEDIUM,
                 "order": {
                     "_key": "asc",
                 },
@@ -369,7 +523,7 @@ class HepWorkflowDocumentView(BaseDocumentViewSet):
             "field": "data.publication_info.journal_title.raw",
             "facet": TermsFacet,
             "options": {
-                "size": 20,
+                "size": FACET_SIZE_MEDIUM,
                 "order": {
                     "_key": "asc",
                 },
@@ -380,7 +534,18 @@ class HepWorkflowDocumentView(BaseDocumentViewSet):
             "field": "relevance_prediction.decision",
             "facet": TermsFacet,
             "options": {
-                "size": 20,
+                "size": FACET_SIZE_MEDIUM,
+                "order": {
+                    "_key": "asc",
+                },
+            },
+            "enabled": True,
+        },
+        "source": {
+            "field": "data.source",
+            "facet": TermsFacet,
+            "options": {
+                "size": FACET_SIZE_LARGE,
                 "order": {
                     "_key": "asc",
                 },
@@ -391,7 +556,7 @@ class HepWorkflowDocumentView(BaseDocumentViewSet):
             "field": "workflow_type",
             "facet": TermsFacet,
             "options": {
-                "size": 20,
+                "size": FACET_SIZE_MEDIUM,
                 "order": {
                     "_key": "asc",
                 },

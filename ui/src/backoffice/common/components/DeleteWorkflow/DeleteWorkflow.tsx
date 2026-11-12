@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, Modal } from 'antd';
-import { Action, ActionCreator } from 'redux';
 
 import './DeleteWorkflow.less';
-import { deleteWorkflow } from '../../../../actions/backoffice';
 
 type DeleteWorkflowProps = {
   onConfirm: () => void;
@@ -27,7 +25,7 @@ const DeleteWorkflow = ({ onConfirm }: DeleteWorkflowProps) => {
 
   return (
     <>
-      <Button className="font-white bg-error" onClick={showModal}>
+      <Button danger onClick={showModal} type="primary">
         Delete
       </Button>
       <Modal

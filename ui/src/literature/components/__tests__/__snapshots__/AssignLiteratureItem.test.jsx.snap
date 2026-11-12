@@ -1,13 +1,12 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`AssignLiteratureItem renders 1`] = `
+exports[`AssignLiteratureItem > renders 1`] = `
 <DocumentFragment>
   <span
     class="__UserAction__"
   >
     <button
-      class="ant-btn ant-btn-default ant-dropdown-trigger"
-      data-test-id="btn-claiming-literature"
+      class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-default ant-btn-color-default ant-btn-variant-outlined ant-dropdown-trigger"
       data-testid="btn-claiming-literature"
       type="button"
     >

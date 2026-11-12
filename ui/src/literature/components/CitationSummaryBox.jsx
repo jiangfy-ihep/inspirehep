@@ -1,4 +1,3 @@
-import React from 'react';
 import { Col, Row } from 'antd';
 import PropTypes from 'prop-types';
 
@@ -14,7 +13,7 @@ function CitationSummaryBox({ namespace }) {
 
       <Row gutter={{ xs: 0, lg: 32 }}>
         <Col span={24}>
-          <CitationSummaryTableContainer />
+          <CitationSummaryTableContainer namespace={namespace} />
         </Col>
         <Col span={24}>
           <CitationSummaryGraphContainer namespace={namespace} />

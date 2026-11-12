@@ -5,16 +5,19 @@ from airflow.sdk import Param, dag, task
 from airflow.sdk.execution_time.macros import ds_add
 from hooks.backoffice.workflow_management_hook import HEP, WorkflowManagementHook
 from include.utils.alerts import FailedDagNotifier
-from include.utils.arxiv import build_records, fetch_records, load_records
+from include.utils.arxiv import build_records
+from include.utils.constants import HEP_CREATE
+from include.utils.harvests import fetch_records_oaipmh, load_records
 from include.utils.s3 import S3JsonStore
 from literature.check_failures_task import check_failures
+from literature.oai_harvest_tasks import get_sets
 
 logger = logging.getLogger(__name__)
 
 
 @dag(
     start_date=datetime.datetime(2024, 11, 28),
-    schedule="0 2 * * *",
+    schedule="0 3 * * *",
     catchup=False,
     tags=["literature", "arxiv", "harvest"],
     params={
@@ -48,6 +51,7 @@ logger = logging.getLogger(__name__)
             ],
         ),
     },
+    default_args={"queue": "harvests"},
     on_failure_callback=FailedDagNotifier(),
 )
 def arxiv_harvest_dag():
@@ -59,14 +63,6 @@ def arxiv_harvest_dag():
     3. load_record: pushes records to the backoffice
     4. check_failures: checks and reports any failed records
     """
-
-    @task
-    def get_sets(**context):
-        """Collects the ids of the records that have been updated in the last two days.
-
-        Returns: list of sets
-        """
-        return context["params"]["sets"]
 
     @task
     def process_records(sets, **context):
@@ -83,22 +79,28 @@ def arxiv_harvest_dag():
         from_date = context["params"]["from"] or ds_add(context["ds"], -1)
         until_date = context["params"]["until"]
 
-        xml_records = fetch_records(
+        xml_records, failed_sets = fetch_records_oaipmh(
             connection_id="arxiv_oaipmh_connection",
             metadata_prefix=context["params"]["metadata_prefix"],
+            sets=sets,
             from_date=from_date,
             until_date=until_date,
-            sets=sets,
         )
+        logger.info(f"Fetched {len(xml_records)} records")
 
         parsed_records, failed_build_records = build_records(
             xml_records, context["run_id"]
         )
 
-        failed_load_records = load_records(parsed_records, workflow_management_hook)
+        failed_load_records = load_records(
+            parsed_records,
+            workflow_management_hook,
+            workflow_type=HEP_CREATE,
+        )
 
         return s3_json_store.write_object(
             {
+                "failed_sets": failed_sets,
                 "failed_build_records": failed_build_records,
                 "failed_load_records": failed_load_records,
             }

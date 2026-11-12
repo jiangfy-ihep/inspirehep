@@ -1,14 +1,9 @@
-import React from 'react';
-import { Map } from 'immutable';
 import { Row, Col, Card } from 'antd';
 
 import '../../common/components/ResultItem/ResultItem.less';
 import { Link } from 'react-router-dom';
 import { formatDateTime } from '../../utils/utils';
-import {
-  AUTHORS_PID_TYPE,
-  LITERATURE_PID_TYPE,
-} from '../../../common/constants';
+import { AUTHORS_PID_TYPE } from '../../../common/constants';
 import ResultItem from '../../../common/components/ResultItem';
 import { BACKOFFICE } from '../../../common/routes';
 import AcquisitionSourceInfo from '../../common/components/AcquisitionSourceInfo/AcquisitionSourceInfo';
@@ -41,11 +36,7 @@ const WorkflowResultItem = ({ item }: { item: any }) => {
             </Link>
           </ResultItem>
         </Col>
-        <Col className="col-actions">
-          <Card>
-            <StatusInfoWithTooltip status={status} />
-          </Card>
-        </Col>
+
         <Col className="col-info">
           <Card>
             <AcquisitionSourceInfo
@@ -58,6 +49,11 @@ const WorkflowResultItem = ({ item }: { item: any }) => {
         <Col className="col-subject">
           <Card>
             <AuthorSubjectAreas categories={subjectAreas} />
+          </Card>
+        </Col>
+        <Col className="col-actions">
+          <Card>
+            <StatusInfoWithTooltip status={status} />
           </Card>
         </Col>
       </Row>

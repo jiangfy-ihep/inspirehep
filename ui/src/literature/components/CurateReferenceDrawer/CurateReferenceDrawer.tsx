@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SelectOutlined } from '@ant-design/icons';
-import { Drawer, Radio, Row, Col, Card, Button } from 'antd';
+import { Drawer, Radio, Row, Col, Card, Button, RadioChangeEvent } from 'antd';
 import { Map } from 'immutable';
 
 import './CurateReferenceDrawer.less';
@@ -15,8 +15,13 @@ import { LITERATURE } from '../../../common/routes';
 import LiteratureDate from '../../../common/components/LiteratureDate';
 import LoadingOrChildren from '../../../common/components/LoadingOrChildren';
 import PaginationContainer from '../../../common/containers/PaginationContainer';
+import useResponsiveCheck from '../../../common/hooks/useResponsiveCheck';
+import EventTracker from '../../../common/components/EventTracker';
 
-export function renderReferenceItem(result: Map<string, any>) {
+export function renderReferenceItem(
+  result: Map<string, any>,
+  isMobile: boolean
+) {
   const metadata = result?.get('metadata');
   const controlNumber = metadata?.get('control_number');
   const title = metadata?.getIn(['titles', 0]);
@@ -27,19 +32,19 @@ export function renderReferenceItem(result: Map<string, any>) {
   const collaborationsWithSuffix = metadata?.get('collaborations_with_suffix');
 
   return (
-    <div data-test-id={`reference-drawer-item-${controlNumber}`}>
-      <Row>
+    <div data-testid={`reference-drawer-item-${controlNumber}`}>
+      <Row className="flex justify-between w100">
         <Col span={1}>
           <Radio
             value={controlNumber}
-            data-test-id={`reference-drawer-radio-${controlNumber}`}
+            data-testid={`reference-drawer-radio-${controlNumber}`}
           />
         </Col>
-        <Col span={23}>
+        <Col span={isMobile ? 22 : 23}>
           <Card className="reference-result-item">
             <div>
               <Link
-                data-test-id="result-item-title"
+                data-testid="result-item-title"
                 className="result-item-title"
                 to={`${LITERATURE}/${controlNumber}`}
               >
@@ -52,7 +57,6 @@ export function renderReferenceItem(result: Map<string, any>) {
                 authors={authors}
                 collaborations={collaborations}
                 collaborationsWithSuffix={collaborationsWithSuffix}
-                page="Literature detail"
               />
             </div>
             <div>
@@ -70,13 +74,13 @@ export function renderReferenceItem(result: Map<string, any>) {
 }
 
 interface CurateReferenceDrawerProps {
-  recordId: number;
+  recordId: string;
   recordUuid: string;
   revisionId: number;
   referenceId: number;
   onDrawerClose: () => void;
   onCurate: (args: {
-    recordId: number;
+    recordId: string;
     recordUuid: string;
     revisionId: number;
     referenceId: number;
@@ -97,8 +101,9 @@ function CurateReferenceDrawer({
   visible,
 }: CurateReferenceDrawerProps) {
   const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null);
+  const isMobile = useResponsiveCheck({ max: 'md' });
 
-  const onSelectedRecordChange = useCallback((event) => {
+  const onSelectedRecordChange = useCallback((event: RadioChangeEvent) => {
     setSelectedRecordId(event.target.value);
   }, []);
 
@@ -124,17 +129,17 @@ function CurateReferenceDrawer({
 
   return (
     <Drawer
-      className="search-drawer"
+      rootClassName="search-drawer curate-reference-drawer"
       placement="right"
       onClose={() => {
         onDrawerClose();
         setSelectedRecordId(null);
       }}
-      destroyOnClose
+      destroyOnHidden
       open={visible}
       title="Find the correct reference:"
     >
-      <div data-test-id="reference-embedded-search">
+      <div data-testid="reference-embedded-search">
         <EmbeddedSearchBoxContainer namespace={CURATE_REFERENCE_NS} />
       </div>
       <LoadingOrChildren loading={loading}>
@@ -142,29 +147,37 @@ function CurateReferenceDrawer({
           <NumberOfResultsContainer namespace={CURATE_REFERENCE_NS} />
         </div>
         <Radio.Group
-          data-test-id="reference-radio-group"
+          data-testid="reference-radio-group"
           className="w-100"
           onChange={onSelectedRecordChange}
           value={selectedRecordId}
         >
           <ResultsContainer
             namespace={CURATE_REFERENCE_NS}
-            renderItem={renderReferenceItem}
+            renderItem={(result: Map<string, any>) =>
+              renderReferenceItem(result, isMobile)
+            }
           />
           <PaginationContainer namespace={CURATE_REFERENCE_NS} hideSizeChange />
         </Radio.Group>
 
         <Row className="mt2" justify="end">
           <Col>
-            <Button
-              data-test-id="curate-button"
-              disabled={selectedRecordId == null}
-              icon={<SelectOutlined />}
-              type="primary"
-              onClick={onSelectClick}
+            <EventTracker
+              eventCategory="Literature detail"
+              eventAction="Select reference"
+              eventId={`curate-reference-${referenceId}`}
             >
-              Select
-            </Button>
+              <Button
+                data-testid="curate-button"
+                disabled={selectedRecordId == null}
+                icon={<SelectOutlined />}
+                type="primary"
+                onClick={onSelectClick}
+              >
+                Select
+              </Button>
+            </EventTracker>
           </Col>
         </Row>
       </LoadingOrChildren>

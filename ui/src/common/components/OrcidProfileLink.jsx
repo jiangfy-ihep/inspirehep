@@ -1,10 +1,9 @@
-import React from 'react';
 import PropTypes from 'prop-types';
 
 import LinkWithTargetBlank from './LinkWithTargetBlank';
 import EventTracker from './EventTracker';
 
-function OrcidProfileLink({ children, orcid, className }) {
+function OrcidProfileLink({ children, orcid, className = '' }) {
   return (
     <EventTracker
       eventCategory="Author detail"

@@ -1,48 +1,51 @@
-import React, { useEffect } from 'react';
-import { Action, ActionCreator, AnyAction, Dispatch } from 'redux';
-import { connect, ConnectedComponent, RootStateOrAny } from 'react-redux';
-import { withRouter } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Action, ActionCreator, Dispatch } from 'redux';
+import { legacy_connect as connect, ConnectedComponent } from 'react-redux';
+import { Params, useParams } from 'react-router-dom';
+import { RootState } from '../types';
 
-import { getWrapperComponentDisplayName } from './utils';
 import LoadingOrChildren from './components/LoadingOrChildren';
 import { HttpClientWrapper } from './http';
+import { getWrapperComponentDisplayName } from './utils';
 
 // used to dispatch actions when route has changed
-export default function withRouteActionsDispatcher(
+export default function withRouteActionsDispatcher<T>(
   DetailPage: ConnectedComponent<any, any>,
   {
     routeParamSelector,
     routeActions,
     loadingStateSelector,
   }: {
-    routeParamSelector: ({ id }: { id: number }) => number;
+    routeParamSelector: (args: Params<string>) => T;
     routeActions: (
-      id: number
+      selectedParam: T
     ) => (
       | ((
-          dispatch: Dispatch<AnyAction>,
-          getState: () => RootStateOrAny,
+          dispatch: Dispatch<Action>,
+          getState: () => RootState,
           http: HttpClientWrapper
         ) => Promise<void>)
-      | { type: string; payload: unknown }
+      | { type: string; payload?: unknown }
     )[];
-    loadingStateSelector: (state: RootStateOrAny) => boolean;
+    loadingStateSelector: (state: RootState) => boolean;
   }
 ) {
   const Wrapper = ({
-    match,
     dispatch,
     loading,
+    loggedIn,
     ...props
   }: {
-    match: { params: { id: number; old?: number; new?: number } };
     dispatch: ActionCreator<Action>;
     loading: boolean;
+    loggedIn: boolean;
   }) => {
-    const selectedParam = routeParamSelector(match.params);
+    const params = useParams();
+    const selectedParam = routeParamSelector(params);
+
     useEffect(() => {
       routeActions(selectedParam).forEach(dispatch);
-    }, [selectedParam, dispatch]);
+    }, [selectedParam, dispatch, loggedIn]);
 
     return (
       <LoadingOrChildren loading={loading}>
@@ -52,15 +55,16 @@ export default function withRouteActionsDispatcher(
   };
 
   const ConnectedWrapper = connect(
-    (state) => ({ loading: loadingStateSelector(state) }),
+    (state: RootState) => ({
+      loading: loadingStateSelector(state),
+      loggedIn: state.user.get('loggedIn'),
+    }),
     (dispatch) => ({ dispatch })
   )(Wrapper);
 
-  const ConnectedWrapperWithRouter = withRouter(ConnectedWrapper);
-
-  ConnectedWrapperWithRouter.displayName = getWrapperComponentDisplayName(
+  ConnectedWrapper.displayName = getWrapperComponentDisplayName(
     'withRouteActionsDispatcher',
     DetailPage
   );
-  return ConnectedWrapperWithRouter;
+  return ConnectedWrapper;
 }

@@ -6,11 +6,12 @@
 
 """INSPIRE module that adds more fun to the platform."""
 
+import os
 from contextlib import contextmanager
 from functools import partial
+from unittest import mock
 
 import boto3
-import mock
 import pytest
 from click.testing import CliRunner
 from flask import current_app
@@ -38,6 +39,7 @@ def app_config(app_config):
     # add extra global config if you would like to customize the config
     # for a specific test you can change create fixture per-directory
     # using ``conftest.py`` or per-file.
+    os.environ["SERVER_NAME"] = "localhost:5000"
     app_config["DEBUG"] = False
     app_config["JSONSCHEMAS_HOST"] = "localhost:5000"
     app_config["SERVER_NAME"] = "localhost:5000"

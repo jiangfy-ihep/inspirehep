@@ -1,5 +1,3 @@
-import React from 'react';
-
 type AcquisitionSourceInfoProps = {
   datetime?: { date: string; time: string } | null;
   source?: string | null;
@@ -14,7 +12,7 @@ const AcquisitionSourceInfo = ({
   <>
     {datetime && (
       <p className="waiting">
-        {datetime.date} at {datetime.time}
+        {datetime.date}, {datetime.time}
       </p>
     )}
     {source && <p className="waiting">{source}</p>}

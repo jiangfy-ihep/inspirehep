@@ -1,6 +1,8 @@
 import logging
 
 import sentry_sdk
+from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST
+
 from opensearch_dsl import connections
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -106,11 +108,7 @@ STORAGES = {
         },
     },
     "staticfiles": {
-        "BACKEND": "storages.backends.s3boto3.S3ManifestStaticStorage",
-        "OPTIONS": {
-            "location": "static/",
-            "default_acl": "public-read",
-        },
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
@@ -202,11 +200,19 @@ integrations = [
     CeleryIntegration(),
     RedisIntegration(),
 ]
+
+denylist = DEFAULT_DENYLIST + env.list("SENTRY_DENYLIST", default=[])
+
 sentry_sdk.init(
     dsn=SENTRY_DSN,
     integrations=integrations,
+    include_local_variables=False,
     environment=env("SENTRY_ENVIRONMENT", default="production"),
     traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
+    event_scrubber=EventScrubber(
+        denylist=denylist,
+        recursive=True,
+    ),
 )
 
 # Opensearch

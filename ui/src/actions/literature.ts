@@ -1,6 +1,6 @@
 import { stringify } from 'qs';
 import { Action, ActionCreator } from 'redux';
-import { RootStateOrAny } from 'react-redux';
+import { RootState } from '../types';
 
 import {
   LITERATURE_ERROR,
@@ -19,9 +19,6 @@ import {
   LITERATURE_ALL_AUTHORS_REQUEST,
   LITERATURE_ALL_AUTHORS_SUCCESS,
   LITERATURE_ALL_AUTHORS_ERROR,
-  REFERENCES_DIFF_SUCCESS,
-  REFERENCES_DIFF_ERROR,
-  REFERENCES_DIFF_REQUEST,
   LITERATURE_SET_CURATE_DRAWER_VISIBILITY,
 } from './actionTypes';
 import { isCancelError, HttpClientWrapper } from '../common/http';
@@ -70,30 +67,6 @@ function fetchLiteratureReferencesSuccess<T>(result: {
 function fetchLiteratureReferencesError(error: { error: Error }) {
   return {
     type: LITERATURE_REFERENCES_ERROR,
-    payload: error,
-  };
-}
-
-function fetchingReferenceDiff() {
-  return {
-    type: REFERENCES_DIFF_REQUEST,
-  };
-}
-
-function fetchReferenceDiffSuccess(result: {
-  currentVersion: Map<string, any>;
-  previousVersion: Map<string, any>;
-  referenceIndex: number;
-}) {
-  return {
-    type: REFERENCES_DIFF_SUCCESS,
-    payload: result,
-  };
-}
-
-function fetchReferenceDiffError(error: { error: Error }) {
-  return {
-    type: REFERENCES_DIFF_ERROR,
     payload: error,
   };
 }
@@ -154,11 +127,11 @@ export const fetchLiterature = generateRecordFetchAction({
 });
 
 export function fetchLiteratureReferences(
-  recordId: number,
+  recordId: string,
   newQuery = {}
 ): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -197,36 +170,11 @@ export function fetchLiteratureReferences(
   };
 }
 
-export function fetchReferencesDiff(
-  recordId: number,
-  prevRevisionId: number,
-  newRevisionId: number
-): (
-  dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
-  http: HttpClientWrapper
-) => Promise<void> {
-  return async (dispatch, getState, http) => {
-    dispatch(fetchingReferenceDiff());
-    try {
-      const response = await http.get(
-        `/literature/${recordId}/diff/${prevRevisionId}..${newRevisionId}`
-      );
-      dispatch(fetchReferenceDiffSuccess(response.data));
-    } catch (err) {
-      if (!isCancelError(err as Error)) {
-        const { error } = httpErrorToActionPayload(err);
-        dispatch(fetchReferenceDiffError({ error }));
-      }
-    }
-  };
-}
-
 export function fetchLiteratureAuthors(
-  recordId: number
+  recordId: string
 ): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -251,7 +199,7 @@ export function fetchLiteratureAllAuthors(
   recordId: number
 ): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -315,14 +263,14 @@ export function curateReference({
   referenceId,
   newReferenceId,
 }: {
-  recordId: number;
+  recordId: string;
   recordUuid: string;
   revisionId: number;
   referenceId: number;
   newReferenceId: number;
 }): (
   dispatch: any,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -365,7 +313,7 @@ export function curateReference({
         scrollToElement(element);
         dispatch(setScrollElement(null));
       });
-    } catch (error) {
+    } catch {
       curationError(CURATING_NOTIFICATION_KEY);
     }
   };
@@ -381,7 +329,7 @@ export function assignLiteratureItem({
   literatureId: number;
 }): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -393,7 +341,7 @@ export function assignLiteratureItem({
         literature_ids: [literatureId],
       });
       if (data) assignLiteratureItemSuccess();
-    } catch (error) {
+    } catch {
       assignError(ASSIGNING_NOTIFICATION_LITERATURE_ITEM_KEY);
     }
   };
@@ -409,7 +357,7 @@ export function assignLiteratureItemNoNameMatch({
   literatureId: number;
 }): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -440,7 +388,7 @@ export function assignLiteratureItemNoNameMatch({
       } else {
         assignLiteratureItemError(ASSIGNING_NOTIFICATION_LITERATURE_ITEM_KEY);
       }
-    } catch (error) {
+    } catch {
       assignLiteratureItemError(ASSIGNING_NOTIFICATION_LITERATURE_ITEM_KEY);
     }
   };
@@ -454,7 +402,7 @@ export function checkNameCompatibility({
   literatureId: number;
 }): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -479,7 +427,7 @@ export function checkNameCompatibility({
           })
         );
       }
-    } catch (error) {
+    } catch {
       dispatch(fetchLiteratureAllAuthors(literatureId));
       dispatch(setAssignLiteratureItemDrawerVisibility(literatureId));
     }
@@ -491,7 +439,7 @@ export function assignPapers(
   conferenceTitle: string
 ): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -505,7 +453,7 @@ export function assignPapers(
       assignSuccess({ conferenceId, conferenceTitle, papers });
       dispatch(clearLiteratureSelection());
       dispatch(setAssignDrawerVisibility(false));
-    } catch (error) {
+    } catch {
       assignError(ASSIGNING_NOTIFICATION_KEY);
     }
   };
@@ -513,7 +461,7 @@ export function assignPapers(
 
 export function exportToCds(): (
   dispatch: ActionCreator<Action>,
-  getState: () => RootStateOrAny,
+  getState: () => RootState,
   http: HttpClientWrapper
 ) => Promise<void> {
   return async (dispatch, getState, http) => {
@@ -525,7 +473,7 @@ export function exportToCds(): (
       });
       exportToCdsSuccess({ papers });
       dispatch(clearLiteratureSelection());
-    } catch (error) {
+    } catch {
       exportToCdsError();
     }
   };

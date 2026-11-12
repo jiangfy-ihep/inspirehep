@@ -1,13 +1,18 @@
-import React from 'react';
 import { fromJS } from 'immutable';
 import { screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
+import { vi } from 'vitest';
 import LiteratureDetailPageContainer from '../LiteratureDetailPageContainer';
 import { getStore } from '../../../../fixtures/store';
 import { renderWithProviders } from '../../../../fixtures/render';
 import { BACKOFFICE } from '../../../../common/routes';
 import { WorkflowStatuses } from '../../../constants';
+
+vi.mock('react-router-dom', async () => ({
+  ...(await vi.importActual('react-router-dom')),
+  useParams: () => ({ id: '1' }),
+}));
 
 describe('LiteratureDetailPageContainer', () => {
   const renderComponent = (status = WorkflowStatuses.APPROVAL) => {
@@ -51,6 +56,21 @@ describe('LiteratureDetailPageContainer', () => {
                   'https://lss.fnal.gov/archive/2025/pub/fermilab-pub-25-0393-ppd.pdf',
               },
             ],
+            references: [
+              {
+                reference: {
+                  authors: [{ full_name: 'Doe, J.' }],
+                  misc: ['Extra info'],
+                  publication_info: { year: 2001, artid: 'X42' },
+                },
+              },
+            ],
+          },
+          form_data: {
+            references: '[1] Raw reference text\n[2] Another raw reference',
+          },
+          matches: {
+            exact: [3076804, 3143839],
           },
           status,
           tickets: [
@@ -114,6 +134,17 @@ describe('LiteratureDetailPageContainer', () => {
     expect(screen.getByText('Computing')).toBeInTheDocument();
   });
 
+  it('renders raw references from form_data in the References section', () => {
+    renderComponent();
+
+    expect(
+      screen.getByRole('heading', { name: 'References' })
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('.literature-references-raw')?.textContent
+    ).toBe('[1] Raw reference text\n[2] Another raw reference');
+  });
+
   it('renders the Submission box with acquisition source details', () => {
     renderComponent();
 
@@ -162,6 +193,19 @@ describe('LiteratureDetailPageContainer', () => {
 
     expect(
       screen.getByText('Workflow completed, no further actions available')
+    ).toBeInTheDocument();
+  });
+
+  it('renders exact match callout for multiple exact matches status', () => {
+    renderComponent(WorkflowStatuses.ERROR_MULTIPLE_EXACT_MATCHES);
+
+    expect(screen.getByText('Multiple exact matches')).toBeInTheDocument();
+    const duplicateIdsText = screen.getByText('3076804 or 3143839');
+    expect(duplicateIdsText).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'When you resolve this error, restart the workflow to continue'
+      )
     ).toBeInTheDocument();
   });
 });

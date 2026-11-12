@@ -1,4 +1,3 @@
-import React from 'react';
 import { fromJS } from 'immutable';
 
 import { getStore } from '../../../fixtures/store';
@@ -7,9 +6,11 @@ import AuthorCitationsContainer from '../AuthorCitationsContainer';
 import LiteratureSearchContainer from '../../../literature/containers/LiteratureSearchContainer';
 import { renderWithProviders } from '../../../fixtures/render';
 
-jest.mock('../../../literature/containers/LiteratureSearchContainer', () =>
-  jest.fn(() => <div data-testid="literature-citations-search-container" />)
-);
+vi.mock('../../../literature/containers/LiteratureSearchContainer', () => ({
+  default: jest.fn(() => (
+    <div data-testid="literature-citations-search-container" />
+  )),
+}));
 
 describe('AuthorCitationsContainer', () => {
   it('passes all props to LiteratureSearchContainer', () => {
@@ -30,7 +31,7 @@ describe('AuthorCitationsContainer', () => {
         namespace: AUTHOR_CITATIONS_NS,
         baseQuery: { q: 'refersto a T.Dude.1' },
       }),
-      {}
+      undefined
     );
   });
 });

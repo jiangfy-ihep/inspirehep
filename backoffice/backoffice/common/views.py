@@ -3,9 +3,11 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
 from inspire_schemas.errors import SchemaKeyNotFound, SchemaNotFound
 from inspire_schemas.utils import get_validation_errors
 from rest_framework.decorators import action
+from rest_framework.exceptions import MethodNotAllowed
 
 from backoffice.common.utils import (
     render_validation_error_response,
@@ -63,15 +65,14 @@ class BaseWorkflowViewSet(viewsets.ModelViewSet):
 
     schema_name = None
 
-    def get_queryset(self):
-        qp = self.request.query_params
-        status_val = qp.get("status")
-        if status_val:
-            return self.queryset.filter(status__status=status_val)
-        return self.queryset
+    @extend_schema(exclude=True)
+    def list(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method)
 
     def partial_update(self, request, pk=None):
-        logger.info("Updating workflow %s with data: %s", pk, request.data)
+        logger.info(
+            "Updating workflow %s with data fields: %s", pk, request.data.keys()
+        )
         workflow_instance = get_object_or_404(self.queryset, pk=pk)
         serializer = self.get_serializer(
             workflow_instance, data=request.data, partial=True

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Row, Card, Button } from 'antd';
 
 import './LoginPage.less';
@@ -10,7 +9,7 @@ import { WHAT_IS_ORCID_URL } from '../../../common/constants';
 const META_DESCRIPTION = 'Log in to your INSPIRE account. Log in with ORCID';
 const TITLE = 'Login';
 
-const LoginPage = ({ previousUrl }: { previousUrl: string }) => {
+const LoginPage = ({ previousUrl = '' }: { previousUrl?: string }) => {
   const loginHref = `/api/accounts/login?next=${previousUrl}`;
   return (
     <>
@@ -21,7 +20,7 @@ const LoginPage = ({ previousUrl }: { previousUrl: string }) => {
         align="middle"
         data-testid="login-page"
       >
-        <Card bodyStyle={{ textAlign: 'center' }}>
+        <Card styles={{ body: { textAlign: 'center' } }}>
           <p className="f4">Please sign in to INSPIRE</p>
           <p className="pb2">
             To suggest content to INSPIRE, an ORCID is required. Registration is

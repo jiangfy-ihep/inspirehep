@@ -1,4 +1,3 @@
-import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { fromJS } from 'immutable';
 
@@ -7,7 +6,7 @@ import { BACKOFFICE_LOGIN } from '../../../../common/routes';
 import { renderWithProviders } from '../../../../fixtures/render';
 import { getStore } from '../../../../fixtures/store';
 
-jest.mock('../../../../common/components/DocumentHead', () => ({
+vi.mock('../../../../common/components/DocumentHead', () => ({
   __esModule: true,
   default: ({ title }: { title: string }) => (
     <div data-testid="document-head">{title}</div>

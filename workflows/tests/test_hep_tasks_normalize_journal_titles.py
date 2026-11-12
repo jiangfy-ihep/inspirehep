@@ -1,14 +1,18 @@
 import pytest
+from airflow.models import DagBag
 
 from tests.test_utils import (
     task_test,
 )
 
+dagbag = DagBag()
 
-@pytest.mark.usefixtures("_s3_store")
+
+@pytest.mark.usefixtures("hep_env")
 class TestNormalizeJournalTitles:
     """Test class for normalize_journal_titles function logic using Airflow task."""
 
+    dag = dagbag.get_dag("hep_create_dag")
     context = {
         "dag_run": {"run_id": "test_run"},
         "ti": {"xcom_push": lambda key, value: None},
@@ -44,9 +48,9 @@ class TestNormalizeJournalTitles:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.normalize_journal_titles",
-            dag_params=self.context["params"],
+            context=self.context,
         )
 
         updated_data = self.s3_store.read_workflow(self.workflow_id)
@@ -80,9 +84,9 @@ class TestNormalizeJournalTitles:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.normalize_journal_titles",
-            dag_params=self.context["params"],
+            context=self.context,
         )
 
         updated_data = self.s3_store.read_workflow(self.workflow_id)
@@ -124,9 +128,9 @@ class TestNormalizeJournalTitles:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.normalize_journal_titles",
-            dag_params=self.context["params"],
+            context=self.context,
         )
 
         updated_data = self.s3_store.read_workflow(self.workflow_id)
@@ -159,9 +163,9 @@ class TestNormalizeJournalTitles:
         self.s3_store.write_workflow(workflow_data)
 
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.normalize_journal_titles",
-            dag_params=self.context["params"],
+            context=self.context,
         )
 
         updated_data = self.s3_store.read_workflow(self.workflow_id)
@@ -202,9 +206,9 @@ class TestNormalizeJournalTitles:
 
         self.s3_store.write_workflow(workflow_data)
         task_test(
-            "hep_create_dag",
+            self.dag,
             "preprocessing.normalize_journal_titles",
-            dag_params=self.context["params"],
+            context=self.context,
         )
 
         updated_data = self.s3_store.read_workflow(self.workflow_id)

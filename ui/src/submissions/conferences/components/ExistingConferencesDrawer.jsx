@@ -1,4 +1,3 @@
-import React from 'react';
 import PropTypes from 'prop-types';
 import { Drawer } from 'antd';
 import ResultsContainer from '../../../common/containers/ResultsContainer';
@@ -20,7 +19,7 @@ function ExistingConferencesDrawer({
 }) {
   return (
     <Drawer
-      className="search-drawer"
+      rootClassName="search-drawer"
       placement="right"
       closable={false}
       onClose={onDrawerClose}

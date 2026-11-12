@@ -1,4 +1,3 @@
-import React from 'react';
 import { List, Map } from 'immutable';
 import {
   WarningOutlined,
@@ -10,15 +9,26 @@ import {
 } from '@ant-design/icons';
 import { Action, ActionCreator } from 'redux';
 
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
 import storage from '../../common/storage';
 import { BACKOFFICE_LOGIN, BACKOFFICE_LOGIN_API } from '../../common/routes';
 import { searchQueryUpdate } from '../../actions/search';
-import { WorkflowStatuses, WorkflowTypes } from '../constants';
+import { WorkflowTypes } from '../constants';
 import {
   BACKOFFICE_AUTHORS_SEARCH_NS,
   BACKOFFICE_LITERATURE_SEARCH_NS,
 } from '../../search/constants';
-import { WorkflowDecisions } from '../../common/constants';
+import {
+  WorkflowDecisions,
+  HIDDEN_DECISION_ACTIONS,
+  LOCAL_TIMEZONE,
+} from '../../common/constants';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export const COLLECTIONS = [
   {
@@ -34,6 +44,14 @@ export const COLLECTIONS = [
     value: WorkflowTypes.HEP_CREATE,
   },
   {
+    key: 'new publisher harvests',
+    value: WorkflowTypes.HEP_PUBLISHER_CREATE,
+  },
+  {
+    key: 'publisher updates',
+    value: WorkflowTypes.HEP_PUBLISHER_UPDATE,
+  },
+  {
     key: 'arxiv updates',
     value: WorkflowTypes.HEP_UPDATE,
   },
@@ -41,38 +59,8 @@ export const COLLECTIONS = [
     key: 'new literature submissions',
     value: WorkflowTypes.HEP_SUBMISSION,
   },
+  { key: 'manual merge', value: WorkflowTypes.HEP_MANUAL_MERGE },
 ];
-
-export const getIcon = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case WorkflowStatuses.APPROVAL:
-      return <HourglassOutlined className="mr2" />;
-    case WorkflowStatuses.ERROR:
-      return <WarningOutlined className="mr2" />;
-    case WorkflowStatuses.COMPLETED:
-      return <CheckOutlined className="mr2" />;
-    case WorkflowStatuses.RUNNING:
-      return <LoadingOutlined className="mr2" />;
-    case WorkflowStatuses.PROCESSING:
-      return <FieldTimeOutlined className="mr2" />;
-    case WorkflowStatuses.BLOCKED:
-      return <StopOutlined className="mr2" />;
-    case WorkflowStatuses.APPROVAL_FUZZY_MATCHING:
-      return <HourglassOutlined className="mr2" />;
-    case WorkflowStatuses.ERROR_MULTIPLE_EXACT_MATCHES:
-      return <WarningOutlined className="mr2" />;
-    case WorkflowStatuses.ERROR_VALIDATION:
-      return <WarningOutlined className="mr2" />;
-    case WorkflowStatuses.APPROVAL_CORE_SELECTION:
-      return <HourglassOutlined className="mr2" />;
-    case WorkflowStatuses.APPROVAL_MERGE:
-      return <HourglassOutlined className="mr2" />;
-    case WorkflowStatuses.MISSING_SUBJECT_FIELDS:
-      return <HourglassOutlined className="mr2" />;
-    default:
-      return null;
-  }
-};
 
 export const refreshToken = async () => {
   try {
@@ -93,7 +81,7 @@ export const refreshToken = async () => {
     const data = await res.json();
     storage.set('backoffice.token', data.access);
     return data.access;
-  } catch (error) {
+  } catch {
     window.location.assign(BACKOFFICE_LOGIN);
   }
 
@@ -159,6 +147,16 @@ export const resolveDecision = (decision: string | number) => {
       text: 'Discard',
       decision: 'discarded',
     },
+    [WorkflowDecisions.WITHDRAWN]: {
+      bg: 'bg-error font-white',
+      text: 'Withdrawn',
+      decision: 'withdrawn',
+    },
+    [WorkflowDecisions.MANUAL_MERGE_APPROVE]: {
+      bg: 'bg-completed ml1',
+      text: 'Merge Approved',
+      decision: 'merge approved',
+    },
   };
   return decisions[decision] || null;
 };
@@ -166,7 +164,7 @@ export const resolveDecision = (decision: string | number) => {
 export const filterDecisions = (decisions?: List<Map<string, any>>) =>
   decisions?.filter(
     (decision: Map<string, any>) =>
-      decision.get('action') !== WorkflowDecisions.FUZZY_MATCH
+      !HIDDEN_DECISION_ACTIONS.has(decision.get('action'))
   ) ?? null;
 
 export const resolveAutomaticDecision = (decision: string | number) => {
@@ -215,9 +213,30 @@ export const hasPublicationInfo = (
   );
 };
 
+const FULL_COVERAGE_WORKFLOW_TYPES = new Set<string>([
+  WorkflowTypes.HEP_CREATE,
+  WorkflowTypes.HEP_PUBLISHER_CREATE,
+]);
+
+export const isFullCoverageWorkflow = (
+  workflowType?: string | null,
+  journalCoverage?: string | null
+) =>
+  !!workflowType &&
+  FULL_COVERAGE_WORKFLOW_TYPES.has(workflowType) &&
+  journalCoverage === 'full';
+
+export const isLiteratureUpdateWorkflow = (workflowType?: string | null) =>
+  workflowType === WorkflowTypes.HEP_UPDATE ||
+  workflowType === WorkflowTypes.HEP_PUBLISHER_UPDATE;
+
 export const getWorkflowStatusInfo = (status: string) => {
   const statuses: {
-    [key: string]: { icon: JSX.Element; text: string; description: string };
+    [key: string]: {
+      icon: React.JSX.Element;
+      text: string;
+      description: string;
+    };
   } = {
     completed: {
       icon: <CheckOutlined className="mr2" />,
@@ -295,40 +314,53 @@ export const filterByProperty = (
   property: string,
   value: any,
   include: boolean = true
-) => {
-  return data
+) =>
+  data
     ?.get(dataField)
     ?.filter((item: Map<string, any>) =>
       include ? item.get(property) === value : item.get(property) !== value
     );
-};
 
 export const formatDateTime = (
-  rawDateTime: string
+  rawDateTime: string | undefined
 ): { date: string; time: string } | undefined => {
-  try {
-    const isoString = new Date(rawDateTime).toISOString();
-    const [datePart, timePart] = isoString.split('T');
-    const formattedTimePart = timePart.slice(0, 5);
-    return { date: datePart, time: formattedTimePart };
-  } catch (error) {
+  if (!rawDateTime) {
     return undefined;
   }
+  const dayjsToLocalTimezone = dayjs.utc(rawDateTime).tz(LOCAL_TIMEZONE);
+  if (!dayjsToLocalTimezone.isValid()) return undefined;
+  return {
+    date: dayjsToLocalTimezone.format('YYYY-MM-DD'),
+    time: dayjsToLocalTimezone.format('hh:mm A'),
+  };
 };
 
-export const getDag = (workflow_type: string): string | undefined => {
-  switch (workflow_type) {
+export const getDag = (workflowType: string): string | undefined => {
+  switch (workflowType) {
     case WorkflowTypes.AUTHOR_CREATE:
       return 'author_create_initialization_dag';
     case WorkflowTypes.AUTHOR_UPDATE:
       return 'author_update_dag';
     case WorkflowTypes.HEP_CREATE:
       return 'hep_create_dag';
+    case WorkflowTypes.HEP_PUBLISHER_CREATE:
+      return 'hep_create_dag';
+    case WorkflowTypes.HEP_PUBLISHER_UPDATE:
+      return 'hep_create_dag';
     case WorkflowTypes.HEP_SUBMISSION:
       return 'hep_create_dag';
     case WorkflowTypes.HEP_UPDATE:
       return 'hep_create_dag';
+    case WorkflowTypes.HEP_MANUAL_MERGE:
+      return 'hep_manual_merge_dag';
     default:
       return undefined;
   }
 };
+
+export const createPdfLinksFromArxivEprints = (
+  eprints: List<Map<string, any>>
+): List<Map<string, any>> =>
+  eprints.map((eprint) =>
+    Map({ value: `//arxiv.org/pdf/${eprint.get('value')}` })
+  );

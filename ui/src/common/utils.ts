@@ -1,5 +1,7 @@
 import { mergeWith, cloneDeep } from 'lodash';
-import moment from 'moment-timezone';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import { List, Map, Set } from 'immutable';
 // TODO: use different package suitable for typescript (this one doesn't have types)
 // @ts-ignore
@@ -10,6 +12,9 @@ import {
   SEARCH_PAGE_COL_SIZE_WITHOUT_FACETS,
   SEARCH_PAGE_COL_SIZE_NO_RESULTS,
 } from './constants';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export function forceArray(maybeArray: any) {
   return maybeArray === undefined || Array.isArray(maybeArray)
@@ -102,7 +107,6 @@ export function isEmptyObjectShallow(object: { [key: string]: any }) {
 
 export function mergeWithConcattingArrays(destObject: any, ...sources: any) {
   const clonedDestObject = cloneDeep(destObject);
-  // eslint-disable-next-line consistent-return
   return mergeWith(
     clonedDestObject,
     ...sources,
@@ -116,8 +120,8 @@ export function mergeWithConcattingArrays(destObject: any, ...sources: any) {
 }
 
 export function httpErrorToActionPayload(httpError: any) {
-  const { message } = httpError;
-  if (message === 'Network Error') {
+  const { message, code } = httpError;
+  if (message === 'Network Error' || code === 'ECONNABORTED') {
     return {
       error: { status: 'network' },
     };
@@ -325,12 +329,13 @@ export function doTimezonesHaveDifferentTimes(
   timezone2: string
 ) {
   const now = Date.now();
-  return (
-    // @ts-ignore
-    moment.tz.zone(timezone1).utcOffset(now) !==
-    // @ts-ignore
-    moment.tz.zone(timezone2).utcOffset(now)
-  );
+  try {
+    const offset1 = dayjs(now).tz(timezone1).utcOffset();
+    const offset2 = dayjs(now).tz(timezone2).utcOffset();
+    return offset1 !== offset2;
+  } catch {
+    return false;
+  }
 }
 
 export function hasMonthAndYear(date: string) {
@@ -350,9 +355,9 @@ export function columnSize(numberOfResults: number, hasFacets?: boolean) {
   return SEARCH_PAGE_COL_SIZE_NO_RESULTS;
 }
 
-export function toTitleCaseFromSnake(str: string, split_by: string) {
+export function toTitleCaseFromSnake(str: string, splitBy: string) {
   return str
-    .split(split_by)
+    .split(splitBy)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');

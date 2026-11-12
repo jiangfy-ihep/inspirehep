@@ -2,8 +2,9 @@ import json
 import uuid
 from urllib.parse import urlparse
 
-from airflow.models import Variable
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.sdk import Variable
+from botocore.exceptions import ClientError
 
 
 class S3JsonStore:
@@ -68,7 +69,9 @@ class S3JsonStore:
         key = f"{workflow_id}/flags.json"
         try:
             flags = self.read_object(key=key, bucket_name=bucket_name)
-        except Exception:
+        except ClientError as error:
+            if error.response["Error"]["Code"] not in {"404", "NoSuchKey"}:
+                raise
             flags = {}
         flags[flag] = value
         self.write_object(flags, key=key, bucket_name=bucket_name, overwrite=True)
@@ -88,4 +91,26 @@ class S3JsonStore:
         )
 
     def get_default_bucket_name(self):
-        return self.hook.get_bucket().name
+        return self.bucket_name or self.hook.get_bucket().name
+
+    def move_all_files_for_subdirectory(self, prefix, src_bucket, dest_bucket):
+        prefix_keys = self.hook.list_keys(src_bucket, prefix)
+        for file_key in prefix_keys:
+            self.hook.copy_object(
+                source_bucket_key=file_key,
+                dest_bucket_key=file_key,
+                source_bucket_name=src_bucket,
+                dest_bucket_name=dest_bucket,
+            )
+        self.hook.delete_objects(keys=prefix_keys, bucket=src_bucket)
+
+    def key_to_s3_url(self, key, bucket_name=None):
+        s3_host = self.hook.conn.meta.endpoint_url
+        return f"{s3_host}/{bucket_name or self.bucket_name}/{key}"
+
+    def cleanup_prefix(self, prefixes, bucket_name=None):
+        bucket = bucket_name or self.bucket_name
+        for prefix in prefixes:
+            keys_to_delete = self.hook.list_keys(bucket, prefix)
+            if keys_to_delete:
+                self.hook.delete_objects(keys=keys_to_delete, bucket=bucket)

@@ -1,3 +1,6 @@
+import codecs
+from copy import deepcopy
+
 from django_elasticsearch_dsl_drf.serializers import DocumentSerializer
 from drf_spectacular.utils import OpenApiExample, extend_schema_serializer
 from rest_framework import serializers
@@ -6,15 +9,29 @@ from backoffice.common.serializers import (
     BaseBackofficeSearchUISerializer,
     BaseWorkflowSerializer,
 )
+from backoffice.common.utils import remove_null_characters
 from backoffice.hep.constants import (
     HepWorkflowType,
     HepStatusChoices,
     HEP_DECISION_CHOICES,
 )
 from backoffice.hep.documents import HepWorkflowDocument
-from backoffice.hep.models import HepDecision, HepWorkflow, HepWorkflowTicket
+from backoffice.hep.models import (
+    HepDecision,
+    HepWorkflow,
+    HepWorkflowTicket,
+)
 
 from django.urls import reverse
+
+HEP_DECISION_VALUE_MAX_LENGTH = 1500
+
+
+def deserialize_references(value):
+    try:
+        return codecs.decode(value, "unicode_escape")
+    except Exception:
+        return value
 
 
 class HepWorkflowTicketSerializer(BaseWorkflowTicketSerializer):
@@ -59,8 +76,11 @@ class HepWorkflowSerializer(BaseWorkflowSerializer):
     workflow_type = serializers.ChoiceField(
         choices=[
             HepWorkflowType.HEP_CREATE,
+            HepWorkflowType.HEP_PUBLISHER_CREATE,
+            HepWorkflowType.HEP_PUBLISHER_UPDATE,
             HepWorkflowType.HEP_SUBMISSION,
             HepWorkflowType.HEP_UPDATE,
+            HepWorkflowType.HEP_MANUAL_MERGE,
         ],
         required=True,
     )
@@ -69,14 +89,41 @@ class HepWorkflowSerializer(BaseWorkflowSerializer):
     merge_details = serializers.JSONField(required=False, allow_null=True)
     callback_url = serializers.SerializerMethodField()
 
-    class Meta(BaseWorkflowSerializer.Meta):
+    class Meta:
         model = HepWorkflow
+        exclude = ["source_data"]
 
     def validate_data(self, value):
         """
         Disable BaseWorkflowSerializer schema validation for HepWorkflow.
         """
-        return value
+        return remove_null_characters(value)
+
+    def validate_form_data(self, value):
+        return remove_null_characters(value)
+
+    def create(self, validated_data):
+        validated_data["source_data"] = deepcopy(validated_data["data"])
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        form_data = data.get("form_data")
+
+        if form_data is None:
+            return data
+
+        references = form_data.get("references")
+
+        if not isinstance(references, str):
+            return data
+
+        data["form_data"] = {
+            **form_data,
+            "references": deserialize_references(references),
+        }
+
+        return data
 
     def get_callback_url(self, instance):
         routes = {
@@ -120,9 +167,31 @@ class HepWorkflowDocumentSerializer(DocumentSerializer):
         fields = "__all__"
 
 
+HEP_SEARCH_RESULT_DATA_FIELDS = (
+    "titles",
+    "document_type",
+    "abstracts",
+    "acquisition_source",
+    "inspire_categories",
+    "authors",
+    "publication_info",
+    "arxiv_eprints",
+    "number_of_pages",
+    "public_notes",
+    "report_numbers",
+    "_created_at",
+    "_updated_at",
+)
+
+
 class HepBackofficeSearchUISerializer(BaseBackofficeSearchUISerializer):
     def get_hit_representation(self, item):
         hit = super().get_hit_representation(item)
+        hit["data"] = {
+            key: value
+            for key, value in hit["data"].items()
+            if key in HEP_SEARCH_RESULT_DATA_FIELDS
+        }
         hit.update(
             {
                 "classifier_results": item.get("classifier_results"),
@@ -151,7 +220,11 @@ class HepBackofficeSearchUISerializer(BaseBackofficeSearchUISerializer):
 )
 class HepResolutionSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=HEP_DECISION_CHOICES)
-    value = serializers.CharField(max_length=30, default="")
+    value = serializers.CharField(
+        default="",
+        allow_blank=True,
+        max_length=HEP_DECISION_VALUE_MAX_LENGTH,
+    )
 
 
 class HepBatchResolutionSerializer(serializers.Serializer):
@@ -161,3 +234,15 @@ class HepBatchResolutionSerializer(serializers.Serializer):
 
 class HepChangeStatusSerializer(serializers.Serializer):
     note = serializers.CharField(max_length=255, default="")
+
+
+class ManualMergeWorkflowSerializer(serializers.Serializer):
+    head_control_number = serializers.IntegerField(required=True)
+    update_control_number = serializers.IntegerField(required=True)
+
+    def validate(self, data):
+        if data["head_control_number"] == data["update_control_number"]:
+            raise serializers.ValidationError(
+                "head_control_number and update_control_number must be different."
+            )
+        return data

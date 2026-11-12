@@ -1,6 +1,5 @@
 import logging
 
-from airflow.models import Variable
 from hooks.generic_http_hook import GenericHttpHook
 
 logger = logging.getLogger()
@@ -27,21 +26,25 @@ class InspireHttpHook(GenericHttpHook):
     def __init__(self, method="GET", http_conn_id="inspire_connection"):
         super().__init__(method=method, http_conn_id=http_conn_id)
 
-    @property
-    def headers(self) -> dict:
-        return {
-            "Authorization": f'Bearer {Variable.get("inspire_token")}',
-            "Accept": "application/vnd+inspire.record.raw+json",
-        }
-
     def get_backoffice_url(self, workflow_type: str, workflow_id: str) -> str:
+        """Build the backoffice URL for a workflow."""
         self.get_conn()
         return f"{self.base_url}/backoffice/{workflow_type}/{workflow_id}"
 
     def create_ticket(
-        self, functional_category, template_name, subject, email, template_context
+        self,
+        functional_category,
+        template_name,
+        subject,
+        email,
+        template_context,
+        recid=None,
     ):
-        # TODO add docstring
+        """Create a backoffice ticket with the given template and context.
+
+        The recid links the ticket to the record in SNOW through a third party
+        ticket, which is what makes it show up in the record editor.
+        """
         endpoint = "/api/tickets/create"
 
         request_data = {
@@ -51,11 +54,13 @@ class InspireHttpHook(GenericHttpHook):
             "template_context": template_context,
             "caller_email": email,
         }
+        if recid:
+            request_data["recid"] = str(recid)
 
         return self.call_api(endpoint=endpoint, json=request_data, method="POST")
 
     def reply_ticket(self, ticket_id, template, template_context, email):
-        # TODO add docstring
+        """Reply to an existing ticket using a template and user email."""
         endpoint = "/api/tickets/reply"
 
         request_data = {
@@ -68,8 +73,11 @@ class InspireHttpHook(GenericHttpHook):
 
         return self.call_api(endpoint=endpoint, json=request_data, method="POST")
 
-    def close_ticket(self, ticket_id, template=None, template_context=None):
-        # TODO add docstring
+    def close_ticket(
+        self, ticket_id, template=None, template_context=None, message=None
+    ):
+        """Resolve a ticket and optionally send a templated
+        reply or free-form message."""
         endpoint = "/api/tickets/resolve"
 
         request_data = {"ticket_id": str(ticket_id)}
@@ -80,6 +88,8 @@ class InspireHttpHook(GenericHttpHook):
                     "template_context": template_context,
                 }
             )
+        if message is not None:
+            request_data["message"] = message
 
         logging.info(f"Closing ticket {ticket_id}")
 

@@ -1,6 +1,8 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
-import { connect, MapDispatchToPropsParam } from 'react-redux';
+import {
+  legacy_connect as connect,
+  MapDispatchToPropsParam,
+} from 'react-redux';
 
 import { submit } from '../../../actions/submissions';
 import SubmissionPage from '../../common/components/SubmissionPage';

@@ -1,63 +1,55 @@
-Cypress.Commands.add('text', { prevSubject: true }, (subject) => {
+Cypress.Commands.add("text", { prevSubject: true }, (subject) => {
   return subject.text();
 });
 
-Cypress.Commands.overwrite('visit', (originalVisit, relativeUrl, options) => {
-  const baseUrl = Cypress.env('inspirehep_url');
-  const absoluteUrl = `${baseUrl}${relativeUrl}`;
-  return originalVisit(absoluteUrl, options);
+Cypress.Commands.overwrite("visit", (originalVisit, relativeUrl, options) => {
+  cy.env(["inspirehep_url"]).then(({ inspirehep_url }) => {
+    const absoluteUrl = `${inspirehep_url}${relativeUrl}`;
+    return originalVisit(absoluteUrl, options);
+  });
 });
 
-Cypress.Commands.add('useMobile', () => {
-  cy.viewport(
-    Cypress.env('mobile_viewport_width'),
-    Cypress.env('mobile_viewport_height')
-  );
-});
-
-Cypress.Commands.add('selectFromDropdown', (dropdownId, option) => {
-  const dropdownSelector = `[data-test-id="${dropdownId}"]`;
-  const optionSelector = `[data-test-id="${dropdownId}-option-${option}"]`;
+Cypress.Commands.add("selectFromDropdown", (dropdownId, option) => {
+  const dropdownSelector = `[data-testid="${dropdownId}"]`;
+  const optionSelector = `[data-testid="${dropdownId}-option-${option}"]`;
   // TODO: instead `first` workaround for sort-by dropdown
   // give id such as `sort-by-{searchNamespace}` to make them unique
   cy.get(dropdownSelector).first().click();
   cy.get(optionSelector).click();
 });
 
-Cypress.Commands.add('selectFromSelectBox', (selectBoxId, options) => {
-  const selectBoxSelector = `[data-test-id="${selectBoxId}"]`;
+Cypress.Commands.add("selectFromSelectBox", (selectBoxId, options) => {
+  const selectBoxSelector = `[data-testid="${selectBoxId}"]`;
   const selectBoxInputSelector = `${selectBoxSelector} input`;
   cy.get(selectBoxSelector).then(($selectBox) => {
-    const hasSearch = $selectBox.hasClass('ant-select-show-search');
+    const hasSearch = $selectBox.hasClass("ant-select-show-search");
     const isMultiSelect = Array.isArray(options);
-    cy.wrap($selectBox).click();
-    cy.get('.ant-select-dropdown')
-      .invoke('css', 'display', 'initial')
-      .should('be.visible');
+    cy.wrap($selectBox).find(".ant-select-content").click();
+    cy.get(".ant-select-dropdown")
+      .invoke("css", "display", "initial")
+      .should("be.visible");
     const optionsArray = isMultiSelect ? options : [options];
     for (const option of optionsArray) {
       if (hasSearch) {
-        cy.get(selectBoxInputSelector)
-          .focus()
-          .type(`${option}`, { force: true });
+        cy.get(selectBoxInputSelector).focus().type(`${option}`);
       }
-      const optionSelector = `[data-test-id="${selectBoxId}-option-${option}"]`;
+      const optionSelector = `[data-testid="${selectBoxId}-option-${option}"]`;
       cy.get(optionSelector).click();
     }
 
     if (isMultiSelect) {
-      cy.wrap($selectBox).click({ force: true });
+      cy.wrap($selectBox).find(".ant-select-content").click();
     }
 
-    cy.get('.ant-select-dropdown')
-      .invoke('css', 'display', 'none')
-      .should('not.be.visible');
+    cy.get(".ant-select-dropdown")
+      .invoke("css", "display", "none")
+      .should("not.be.visible");
   });
 });
 
-Cypress.Commands.add('registerRoute', (optionsOrRoute = '/api/**') => {
+Cypress.Commands.add("registerRoute", (optionsOrRoute = "/api/**") => {
   let route;
-  if (optionsOrRoute instanceof RegExp || typeof optionsOrRoute === 'string') {
+  if (optionsOrRoute instanceof RegExp || typeof optionsOrRoute === "string") {
     route = optionsOrRoute;
   } else {
     route = optionsOrRoute.url;
@@ -66,26 +58,23 @@ Cypress.Commands.add('registerRoute', (optionsOrRoute = '/api/**') => {
   cy.intercept(optionsOrRoute).as(route);
 });
 
-Cypress.Commands.add('waitForRoute', (route = '/api/**') => {
+Cypress.Commands.add("waitForRoute", (route = "/api/**") => {
   return cy.wait(`@${route}`, { timeout: 60000 });
 });
 
-Cypress.Commands.add('requestRecord', ({ collection, recordId }) => {
-  cy.request(`/api/${collection}/${recordId}`).its('body');
+Cypress.Commands.add("requestRecord", ({ collection, recordId }) => {
+  cy.request(`/api/${collection}/${recordId}`).its("body");
 });
-Cypress.Commands.add('requestWorkflow', ({ workflowId }) => {
-  cy.request(`/api/holdingpen/${workflowId}`).its('body');
-});
-Cypress.Commands.add('requestEditor', ({ collection, recordId }) => {
-  cy.request(`/editor/record/${collection}/${recordId}`).its('body');
+Cypress.Commands.add("requestEditor", ({ collection, recordId }) => {
+  cy.request(`/editor/record/${collection}/${recordId}`).its("body");
 });
 
-Cypress.Commands.add('waitForSearchResults', () => {
+Cypress.Commands.add("waitForSearchResults", () => {
   cy.get('[data-testid="search-results"]', { timeout: 20000 }).should(
-    'be.visible'
+    "be.visible",
   );
 });
 
-Cypress.Commands.add('waitForLoading', (timeout = 20000) => {
-  cy.get('[data-test-id="loading"]', { timeout }).should('not.exist');
+Cypress.Commands.add("waitForLoading", (timeout = 20000) => {
+  cy.get('[data-testid="loading-spinner"]', { timeout }).should("not.exist");
 });

@@ -1,5 +1,4 @@
-import React from 'react';
-import { connect } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import PropTypes from 'prop-types';
 import { Map } from 'immutable';
 import { Row, Col } from 'antd';
@@ -127,7 +126,7 @@ function DetailPage({ record, isSuperUserLoggedIn }) {
             </Row>
             <Row>
               <Col>
-                <AuthorList authors={speakers} page="Seminar detail" />
+                <AuthorList authors={speakers} />
               </Col>
             </Row>
             <Row>

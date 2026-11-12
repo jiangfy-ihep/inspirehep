@@ -1,9 +1,8 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 
 import './Logo.less';
 import { HOME } from '../../routes';
-import { ReactComponent as LogoSvg } from './logo.svg';
+import LogoSvg from './logo.svg?react';
 
 const Logo = () => (
   <Link className="__Logo__" to={HOME}>

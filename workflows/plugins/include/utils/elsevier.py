@@ -4,7 +4,7 @@ import zipfile
 from io import BytesIO
 from xml.etree import ElementTree
 
-from include.utils.constants import HEP_CREATE
+from include.utils.constants import HEP_PUBLISHER_CREATE
 from inspire_schemas.parsers.elsevier import ElsevierParser
 
 logger = logging.getLogger(__name__)
@@ -48,10 +48,16 @@ def process_package(package_key, s3_store, submission_number, workflow_managemen
 
 
 def process_article(
-    file_name, xml_text, submission_number, s3_store, workflow_management_hook
+    file_name,
+    xml_text,
+    submission_number,
+    s3_store,
+    workflow_management_hook,
+    push_to_s3=True,
 ):
-    parser = ElsevierParser(xml_text)
+    doi = None
     try:
+        parser = ElsevierParser(xml_text)
         doi = parser.get_identifier()
         if not parser.should_record_be_harvested():
             logger.info(
@@ -61,21 +67,26 @@ def process_article(
             return
 
         file_key = f"articles/{doi}.xml"
-        s3_store.hook.load_string(xml_text, file_key, replace=True)
+        if push_to_s3:
+            s3_store.hook.load_string(xml_text, file_key, replace=True)
 
-        s3_host = s3_store.hook.conn.meta.endpoint_url
-        document_url = f"{s3_host}/{s3_store.bucket_name}/{file_key}"
+        document_url = s3_store.key_to_s3_url(file_key)
 
         parser.attach_fulltext_document(file_key, document_url)
-        record = parser.parse()
-        record["acquisition_source"] = {
-            "source": "Elsevier",
-            "method": "hepcrawl",
-            "datetime": datetime.datetime.now().isoformat(),
-            "submission_number": submission_number,
-        }
+        parser.parse()
+        parser.builder.add_acquisition_source(
+            source="Elsevier",
+            method="hepcrawl",
+            datetime=datetime.datetime.now(datetime.UTC).isoformat(),
+            submission_number=submission_number,
+        )
+        for document in parser.builder.record.get("documents", []):
+            document["original_url"] = document["url"]
         workflow_management_hook.post_workflow(
-            workflow_data={"data": record, "workflow_type": HEP_CREATE}
+            workflow_data={
+                "data": parser.builder.record,
+                "workflow_type": HEP_PUBLISHER_CREATE,
+            }
         )
     except Exception as e:
         return {"doi": doi, "file": file_name, "error": str(e)}

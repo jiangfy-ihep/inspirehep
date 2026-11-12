@@ -1,4 +1,3 @@
-import React from 'react';
 import { fromJS } from 'immutable';
 import { render } from '@testing-library/react';
 
@@ -7,42 +6,42 @@ import EmptyOrChildren from '../EmptyOrChildren';
 describe('EmptyOrChildren', () => {
   it('renders empty if data is empty object', () => {
     const data = {};
-    const { getByText } = render(
+    const { getAllByText } = render(
       <EmptyOrChildren data={data}>
         <div>{data.toString()}</div>
       </EmptyOrChildren>
     );
-    expect(getByText('No data')).toBeInTheDocument();
+    expect(getAllByText('No data').length).toBeGreaterThan(0);
   });
 
   it('renders empty if data is empty array', () => {
     const data = [];
-    const { getByText } = render(
+    const { getAllByText } = render(
       <EmptyOrChildren data={data}>
         <div>{data.toString()}</div>
       </EmptyOrChildren>
     );
-    expect(getByText('No data')).toBeInTheDocument();
+    expect(getAllByText('No data').length).toBeGreaterThan(0);
   });
 
   it('renders empty if data is empty Map', () => {
     const data = fromJS({});
-    const { getByText } = render(
+    const { getAllByText } = render(
       <EmptyOrChildren data={data}>
         <div>{data.toString()}</div>
       </EmptyOrChildren>
     );
-    expect(getByText('No data')).toBeInTheDocument();
+    expect(getAllByText('No data').length).toBeGreaterThan(0);
   });
 
   it('renders empty if data is empty List', () => {
     const data = fromJS([]);
-    const { getByText } = render(
+    const { getAllByText } = render(
       <EmptyOrChildren data={data}>
         <div>{data.toString()}</div>
       </EmptyOrChildren>
     );
-    expect(getByText('No data')).toBeInTheDocument();
+    expect(getAllByText('No data').length).toBeGreaterThan(0);
   });
 
   it('renders children if data is null', () => {

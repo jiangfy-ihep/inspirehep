@@ -4,6 +4,8 @@
 # inspirehep is free software; you can redistribute it and/or modify it under
 # the terms of the MIT License; see LICENSE file for more details.
 
+from unittest.mock import patch
+
 import pytest
 from helpers.utils import create_record, search_index_flush_and_refresh
 from inspire_schemas.api import load_schema, validate
@@ -16,7 +18,6 @@ from inspirehep.matcher.api import (
     match_reference_control_numbers_with_relaxed_journal_titles,
     match_references,
 )
-from mock import patch
 
 
 @pytest.mark.vcr
@@ -542,7 +543,7 @@ def test_match_references_returns_five_references(inspire_app):
 
 
 def test_match_references_matches_when_multiple_match_if_same_as_previous(inspire_app):
-    """Test reference matcher for when inspire-matcher returns multiple matches
+    """Test reference matcher for when the matcher returns multiple matches
     where the matched record id is one of the previous matched record id as well"""
 
     original_cited_record_json = {
@@ -637,7 +638,7 @@ def test_match_references_matches_when_multiple_match_if_same_as_previous(inspir
 def test_match_references_no_match_when_multiple_match_different_from_previous(
     inspire_app,
 ):
-    """Test reference matcher for when inspire-matcher returns multiple matches
+    """Test reference matcher for when the matcher returns multiple matches
     where the matched record id is not the same as the previous matched record id"""
 
     original_cited_record_json = {
@@ -732,7 +733,7 @@ def test_match_references_no_match_when_multiple_match_different_from_previous(
     ],
 )
 def test_match_references_finds_match_when_repeated_record_with_different_scores(
-    mocked_inspire_matcher_match, inspire_app
+    mocked_match, inspire_app
 ):
     references = [
         {

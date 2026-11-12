@@ -1,4 +1,3 @@
-import React from 'react';
 import ContentBox from '../../../common/components/ContentBox';
 
 type PrivateNotesProps = {
@@ -9,9 +8,9 @@ const PrivateNotes = ({ privateNotes }: PrivateNotesProps) => (
   <ContentBox className="mb3" fullHeight={false} subTitle="Notes">
     <i>
       {privateNotes.map((note) => {
-        const value = note?.get('value');
+        const value = note.get('value') as string | undefined;
         return (
-          <p className="mb0" key={value as string}>
+          <p className="mb0 notes" key={value}>
             &quot;{value}&quot;
           </p>
         );

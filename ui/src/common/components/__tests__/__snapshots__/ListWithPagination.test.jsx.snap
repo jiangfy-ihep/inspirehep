@@ -1,25 +1,29 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ListWithPagination renders in grid mode 1`] = `
+exports[`ListWithPagination > renders in grid mode 1`] = `
 <DocumentFragment>
   <div
-    class="ant-list ant-list-split ant-list-grid ant-list-something-after-last-item"
+    class="ant-list ant-list-split ant-list-grid ant-list-something-after-last-item css-dev-only-do-not-override-oc1rc0 css-var-root"
     data-testid="pagination-list"
   >
     <div
-      class="ant-spin-nested-loading"
+      aria-busy="false"
+      aria-live="polite"
+      class="ant-spin css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
         class="ant-spin-container"
       >
         <div
-          class="ant-row"
-          style="margin-left: -8px; margin-right: -8px;"
+          class="ant-row ant-list-container css-var-root css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="margin-inline: -8px;"
         >
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -28,10 +32,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -40,10 +46,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -52,10 +60,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -64,10 +74,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -76,10 +88,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -88,10 +102,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -100,10 +116,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -112,10 +130,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -124,10 +144,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -136,10 +158,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -148,10 +172,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -160,10 +186,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -172,10 +200,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -184,10 +214,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -196,10 +228,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -208,10 +242,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -220,10 +256,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -232,10 +270,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -244,10 +284,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -256,10 +298,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -268,10 +312,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -280,10 +326,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -292,10 +340,12 @@ exports[`ListWithPagination renders in grid mode 1`] = `
               </div>
             </div>
           </div>
-          <div>
+          <div
+            style="width: 25%; max-width: 25%;"
+          >
             <div
-              class="ant-col"
-              style="padding-left: 8px; padding-right: 8px; flex: 1 1 auto;"
+              class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+              style="padding-inline: 8px; flex: 1 1 auto;"
             >
               <div
                 class="ant-list-item"
@@ -311,7 +361,7 @@ exports[`ListWithPagination renders in grid mode 1`] = `
       class="ant-list-footer"
     >
       <ul
-        class="ant-pagination ant-col-24"
+        class="ant-pagination ant-col-24 css-dev-only-do-not-override-oc1rc0 css-var-root"
         data-testid="list-pagination"
       >
         <li
@@ -411,10 +461,10 @@ exports[`ListWithPagination renders in grid mode 1`] = `
 </DocumentFragment>
 `;
 
-exports[`ListWithPagination renders with all props 1`] = `
+exports[`ListWithPagination > renders with all props 1`] = `
 <DocumentFragment>
   <div
-    class="ant-list ant-list-split ant-list-something-after-last-item"
+    class="ant-list ant-list-split ant-list-something-after-last-item css-dev-only-do-not-override-oc1rc0 css-var-root"
     data-testid="pagination-list"
   >
     <div
@@ -423,13 +473,15 @@ exports[`ListWithPagination renders with all props 1`] = `
       Test
     </div>
     <div
-      class="ant-spin-nested-loading"
+      aria-busy="false"
+      aria-live="polite"
+      class="ant-spin css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
         class="ant-spin-container"
       >
         <ul
-          class="ant-list-items"
+          class="ant-list-items ant-list-container css-var-root"
         >
           <li
             class="ant-list-item"
@@ -558,7 +610,7 @@ exports[`ListWithPagination renders with all props 1`] = `
       class="ant-list-footer"
     >
       <ul
-        class="ant-pagination"
+        class="ant-pagination css-dev-only-do-not-override-oc1rc0 css-var-root"
         data-testid="list-pagination"
       >
         <li

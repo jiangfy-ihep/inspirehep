@@ -1,13 +1,20 @@
 from unittest.mock import Mock, patch
+from types import SimpleNamespace
 import pytest
 import uuid
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.test import TransactionTestCase
 from rest_framework.exceptions import ValidationError
-from backoffice.hep.utils import resolve_workflow, complete_workflow
+from backoffice.hep.utils import (
+    resolve_workflow,
+    complete_workflow,
+    get_restored_hep_workflow_type,
+    is_another_hep_submission_running,
+)
 
-from backoffice.hep.constants import HepStatusChoices, HepResolutions
+from backoffice.hep.constants import HepStatusChoices, HepResolutions, HepWorkflowType
+from backoffice.hep.models import HepDecision
 from backoffice.hep.utils import add_hep_decision
 
 User = get_user_model()
@@ -35,6 +42,22 @@ class TestUtils(TransactionTestCase):
         )
         self.assertIsNotNone(decision_data)
 
+    def test_add_decision_is_idempotent(self):
+        first = add_hep_decision(
+            self.workflow.id, self.user, HepResolutions.auto_reject
+        )
+        second = add_hep_decision(
+            self.workflow.id, self.user, HepResolutions.auto_reject
+        )
+        self.assertEqual(
+            HepDecision.objects.filter(
+                workflow=self.workflow, action=HepResolutions.auto_reject
+            ).count(),
+            1,
+        )
+        self.assertIsNotNone(second)
+        self.assertEqual(first["action"], second["action"])
+
     def test_add_decision_validation_errors(self):
         with pytest.raises(ValidationError):
             add_hep_decision(
@@ -59,6 +82,14 @@ class TestUtils(TransactionTestCase):
         self.assertEqual(workflow.status, HepStatusChoices.RUNNING)
         self.assertEqual(workflow.decisions.first().action, HepResolutions.auto_reject)
 
+        resolve_workflow(self.workflow.id, decision_data, self.user)
+        self.assertEqual(
+            HepDecision.objects.filter(
+                workflow=self.workflow, action=HepResolutions.auto_reject
+            ).count(),
+            1,
+        )
+
     @patch("requests.patch")
     def test_complete_workflow(self, mock_patch):
         mock_response = Mock()
@@ -70,3 +101,116 @@ class TestUtils(TransactionTestCase):
         }
 
         complete_workflow(self.workflow.id, request_data)
+
+    def test_get_restored_hep_workflow_type_for_publisher(self):
+        workflow = SimpleNamespace(
+            workflow_type=HepWorkflowType.HEP_PUBLISHER_UPDATE,
+            source_data={},
+        )
+
+        restored_type = get_restored_hep_workflow_type(workflow)
+
+        self.assertEqual(restored_type, HepWorkflowType.HEP_PUBLISHER_CREATE)
+
+    def test_get_restored_hep_workflow_type_for_submission(self):
+        workflow = SimpleNamespace(
+            workflow_type=HepWorkflowType.HEP_UPDATE,
+            source_data={"acquisition_source": {"method": "submitter"}},
+        )
+
+        restored_type = get_restored_hep_workflow_type(workflow)
+
+        self.assertEqual(restored_type, HepWorkflowType.HEP_SUBMISSION)
+
+    def test_get_restored_hep_workflow_type_for_arxiv(self):
+        workflow = SimpleNamespace(
+            workflow_type=HepWorkflowType.HEP_UPDATE,
+            source_data={},
+        )
+
+        restored_type = get_restored_hep_workflow_type(workflow)
+
+        self.assertEqual(restored_type, HepWorkflowType.HEP_CREATE)
+
+    @patch("backoffice.hep.utils.opensearch_client.search")
+    def test_is_another_hep_submission_running_matches_identifiers(self, mock_search):
+        mock_search.return_value = {"hits": {"total": {"value": 1}}}
+        result = is_another_hep_submission_running(
+            {
+                "data": {
+                    "arxiv_eprints": [
+                        {"value": "2502.05665"},
+                        {"value": "2504.01123"},
+                    ],
+                    "dois": [{"value": "10.1103/fc8j-tb8k"}],
+                }
+            }
+        )
+
+        self.assertTrue(result)
+        mock_search.assert_called_once_with(
+            index="backoffice-backend-test-hep-workflows",
+            body={
+                "query": {
+                    "bool": {
+                        "must": [
+                            {"term": {"data.acquisition_source.method": "submitter"}}
+                        ],
+                        "must_not": [
+                            {"match": {"status": HepStatusChoices.COMPLETED}},
+                        ],
+                        "should": [
+                            {
+                                "terms": {
+                                    "data.arxiv_eprints.value": [
+                                        "2502.05665",
+                                        "2504.01123",
+                                    ]
+                                }
+                            },
+                            {"terms": {"data.dois.value": ["10.1103/fc8j-tb8k"]}},
+                        ],
+                        "minimum_should_match": 1,
+                    }
+                }
+            },
+        )
+
+    @patch("backoffice.hep.utils.opensearch_client.search")
+    def test_is_another_hep_submission_running_ignores_opensearch_error(
+        self, mock_search
+    ):
+        mock_search.side_effect = Exception("OpenSearch unavailable")
+
+        with self.assertLogs("backoffice.hep.utils", level="ERROR") as logs:
+            result = is_another_hep_submission_running(
+                {
+                    "data": {
+                        "arxiv_eprints": [{"value": "2502.05665"}],
+                    }
+                }
+            )
+
+        self.assertFalse(result)
+        mock_search.assert_called_once()
+        self.assertIn("OpenSearch unavailable", logs.output[0])
+
+    @patch("backoffice.hep.utils.opensearch_client.search")
+    def test_is_another_hep_submission_running_skips_without_identifiers(
+        self, mock_search
+    ):
+        result = is_another_hep_submission_running({"data": {}})
+
+        self.assertFalse(result)
+        mock_search.assert_not_called()
+
+    @patch("backoffice.hep.utils.opensearch_client.search")
+    def test_is_another_hep_submission_running_skips_null_arxiv_value(
+        self, mock_search
+    ):
+        result = is_another_hep_submission_running(
+            {"data": {"arxiv_eprints": [{"value": None}]}}
+        )
+
+        self.assertFalse(result)
+        mock_search.assert_not_called()

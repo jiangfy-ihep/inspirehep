@@ -1,18 +1,18 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`SingUpForm disable email input and display loading on the button while loading 1`] = `
+exports[`SingUpForm > disable email input and display loading on the button while loading 1`] = `
 <DocumentFragment>
   <form
     action="#"
   >
     <div
-      class="ant-form-item"
+      class="ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-oc1rc0 ant-form-item-horizontal"
     >
       <div
-        class="ant-row ant-form-item-row"
+        class="ant-row ant-form-item-row css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
-          class="ant-col ant-col-24 ant-form-item-control"
+          class="ant-col ant-col-24 ant-form-item-control css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <div
             class="ant-form-item-control-input"
@@ -20,36 +20,46 @@ exports[`SingUpForm disable email input and display loading on the button while 
             <div
               class="ant-form-item-control-input-content"
             >
-              <input
-                class="ant-input ant-input-disabled"
-                data-test-id="email"
-                data-testid="email"
-                disabled=""
-                form="[object Object]"
-                name="email"
-                placeholder="Email"
-                type="email"
-                value=""
-              />
+              <div
+                class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
+              >
+                <span
+                  class="ant-input-affix-wrapper ant-input-disabled ant-input-affix-wrapper-disabled css-dev-only-do-not-override-oc1rc0 ant-input-outlined css-var-root ant-input-css-var ant-input-compact-item ant-input-compact-first-item ant-input-compact-last-item"
+                >
+                  <input
+                    class="ant-input ant-input-disabled css-dev-only-do-not-override-oc1rc0"
+                    data-testid="email"
+                    disabled=""
+                    form="[object Object]"
+                    name="email"
+                    placeholder="Email"
+                    type="email"
+                    value=""
+                  />
+                  <span
+                    class="ant-input-suffix"
+                  />
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
     <div
-      class="ant-row ant-row-end"
+      class="ant-row ant-row-end css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
-        class="ant-col"
+        class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <button
-          class="ant-btn ant-btn-primary ant-btn-loading"
+          class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid ant-btn-loading"
           data-testid="submit"
           disabled=""
           type="submit"
         >
           <span
-            class="ant-btn-loading-icon"
+            class="ant-btn-icon ant-btn-loading-icon"
           >
             <span
               aria-label="loading"
@@ -81,19 +91,19 @@ exports[`SingUpForm disable email input and display loading on the button while 
 </DocumentFragment>
 `;
 
-exports[`SingUpForm renders the form 1`] = `
+exports[`SingUpForm > renders the form 1`] = `
 <DocumentFragment>
   <form
     action="#"
   >
     <div
-      class="ant-form-item"
+      class="ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-oc1rc0 ant-form-item-horizontal"
     >
       <div
-        class="ant-row ant-form-item-row"
+        class="ant-row ant-form-item-row css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <div
-          class="ant-col ant-col-24 ant-form-item-control"
+          class="ant-col ant-col-24 ant-form-item-control css-dev-only-do-not-override-oc1rc0 css-var-root"
         >
           <div
             class="ant-form-item-control-input"
@@ -101,29 +111,39 @@ exports[`SingUpForm renders the form 1`] = `
             <div
               class="ant-form-item-control-input-content"
             >
-              <input
-                class="ant-input"
-                data-test-id="email"
-                data-testid="email"
-                form="[object Object]"
-                name="email"
-                placeholder="Email"
-                type="email"
-                value=""
-              />
+              <div
+                class="ant-space-compact css-dev-only-do-not-override-oc1rc0 ant-space-compact-block"
+              >
+                <span
+                  class="ant-input-affix-wrapper css-dev-only-do-not-override-oc1rc0 ant-input-outlined css-var-root ant-input-css-var ant-input-compact-item ant-input-compact-first-item ant-input-compact-last-item"
+                >
+                  <input
+                    class="ant-input css-dev-only-do-not-override-oc1rc0"
+                    data-testid="email"
+                    form="[object Object]"
+                    name="email"
+                    placeholder="Email"
+                    type="email"
+                    value=""
+                  />
+                  <span
+                    class="ant-input-suffix"
+                  />
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
     <div
-      class="ant-row ant-row-end"
+      class="ant-row ant-row-end css-dev-only-do-not-override-oc1rc0 css-var-root"
     >
       <div
-        class="ant-col"
+        class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
       >
         <button
-          class="ant-btn ant-btn-primary"
+          class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"
           data-testid="submit"
           disabled=""
           type="submit"

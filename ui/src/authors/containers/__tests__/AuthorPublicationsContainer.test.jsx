@@ -1,4 +1,3 @@
-import React from 'react';
 import { fromJS } from 'immutable';
 
 import { getStore } from '../../../fixtures/store';
@@ -7,9 +6,9 @@ import AuthorPublicationsContainer from '../AuthorPublicationsContainer';
 import AuthorPublications from '../../components/AuthorPublications';
 import { initialState } from '../../../reducers/authors';
 
-jest.mock('../../components/AuthorPublications', () =>
-  jest.fn(() => <div data-testid="author-publications" />)
-);
+vi.mock('../../components/AuthorPublications', () => ({
+  default: jest.fn(() => <div data-testid="author-publications" />),
+}));
 
 describe('AuthorPublicationsContainer with AuthorPublications mocked', () => {
   it('set assignView true if cataloger is logged in and flag is enabled', () => {
@@ -31,7 +30,7 @@ describe('AuthorPublicationsContainer with AuthorPublications mocked', () => {
       expect.objectContaining({
         assignView: true,
       }),
-      {}
+      undefined
     );
   });
 
@@ -54,7 +53,7 @@ describe('AuthorPublicationsContainer with AuthorPublications mocked', () => {
       expect.objectContaining({
         assignView: true,
       }),
-      {}
+      undefined
     );
   });
 
@@ -86,7 +85,7 @@ describe('AuthorPublicationsContainer with AuthorPublications mocked', () => {
       expect.objectContaining({
         assignViewDifferentProfile: true,
       }),
-      {}
+      undefined
     );
   });
 
@@ -110,7 +109,7 @@ describe('AuthorPublicationsContainer with AuthorPublications mocked', () => {
       expect.objectContaining({
         assignViewNoProfile: true,
       }),
-      {}
+      undefined
     );
   });
 
@@ -134,7 +133,7 @@ describe('AuthorPublicationsContainer with AuthorPublications mocked', () => {
       expect.objectContaining({
         assignViewNotLoggedIn: true,
       }),
-      {}
+      undefined
     );
   });
 
@@ -158,7 +157,7 @@ describe('AuthorPublicationsContainer with AuthorPublications mocked', () => {
       expect.objectContaining({
         numberOfSelected: 2,
       }),
-      {}
+      undefined
     );
   });
 });

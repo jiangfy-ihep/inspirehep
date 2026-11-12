@@ -1,9 +1,8 @@
-import React from 'react';
 import { pluralizeUnlessSingle } from '../utils';
 import FormattedNumber from './FormattedNumber';
 
 const NumberOfResults = ({ numberOfResults }: { numberOfResults: number }) => (
-  <span>
+  <span data-testid="number-of-results">
     <FormattedNumber>{numberOfResults}</FormattedNumber>{' '}
     {pluralizeUnlessSingle('result', numberOfResults)}
   </span>

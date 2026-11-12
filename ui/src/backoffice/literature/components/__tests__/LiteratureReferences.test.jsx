@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import LiteratureReferences from '../LiteratureReferences';
@@ -91,5 +90,19 @@ describe('LiteratureReferences', () => {
     expect(screen.getByText('X42')).toBeInTheDocument();
     expect(screen.getByText('2001')).toBeInTheDocument();
     expect(screen.getByText('Extra info')).toBeInTheDocument();
+  });
+
+  test('renders raw references when they are provided', () => {
+    render(
+      <LiteratureReferences
+        references={SAMPLE_REFERENCES}
+        rawReferences={'[1] Raw reference text\n[2] Another reference'}
+      />
+    );
+
+    expect(
+      document.querySelector('.literature-references-raw')?.textContent
+    ).toBe('[1] Raw reference text\n[2] Another reference');
+    expect(screen.getByText('Gruber, A.')).toBeInTheDocument();
   });
 });

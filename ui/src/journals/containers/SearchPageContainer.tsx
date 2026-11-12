@@ -1,7 +1,7 @@
-import React from 'react';
-import { connect, RootStateOrAny } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import { Row, Col } from 'antd';
 import { Map } from 'immutable';
+import { RootState } from '../../types';
 
 import PaginationContainer from '../../common/containers/PaginationContainer';
 import ResultsContainer from '../../common/containers/ResultsContainer';
@@ -94,7 +94,7 @@ export const JournalSearchPage = ({
   );
 };
 
-const stateToProps = (state: RootStateOrAny) => ({
+const stateToProps = (state: RootState) => ({
   loading: state.search.getIn(['namespaces', JOURNALS_NS, 'loading']),
   isCatalogerLoggedIn: isCataloger(state.user.getIn(['data', 'roles'])),
   isSuperUserLoggedIn: isSuperUser(state.user.getIn(['data', 'roles'])),

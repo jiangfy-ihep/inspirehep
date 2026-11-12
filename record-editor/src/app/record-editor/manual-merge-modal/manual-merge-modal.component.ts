@@ -27,8 +27,6 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { Observable } from 'rxjs/Observable';
-
 import { ModalDirective } from 'ngx-bootstrap/modal';
 import { ToastrService } from 'ngx-toastr';
 
@@ -36,6 +34,7 @@ import {
   RecordApiService,
   DomUtilsService,
   GlobalAppStateService,
+  BackofficeApiService,
 } from '../../core/services';
 import { RecordRevision } from '../../shared/interfaces';
 import { SubscriberComponent } from '../../shared/classes';
@@ -62,7 +61,8 @@ export class ManualMergeModalComponent extends SubscriberComponent
     private toastrService: ToastrService,
     private recordApiService: RecordApiService,
     private domUtilsService: DomUtilsService,
-    private globalAppStateService: GlobalAppStateService
+    private globalAppStateService: GlobalAppStateService,
+    private backofficeApiService: BackofficeApiService
   ) {
     super();
   }
@@ -83,7 +83,7 @@ export class ManualMergeModalComponent extends SubscriberComponent
   }
 
   onMergeClick() {
-    let infoToast = this.toastrService.info(
+    const infoToast = this.toastrService.info(
       'Merging records...',
       'Loading',
       HOVER_TO_DISMISS_INDEFINITE_TOAST
@@ -91,18 +91,25 @@ export class ManualMergeModalComponent extends SubscriberComponent
 
     this.recordApiService
       .saveRecord(this.record)
-      .switchMap(() => {
-        return this.recordApiService.manualMerge(this.updateRecordId);
-      })
+      .switchMap(() =>
+        this.backofficeApiService.triggerManualMerge(
+          this.record['control_number'],
+          parseInt(this.updateRecordId, 10)
+        )
+      )
       .subscribe(
-        mergeWorkflowObjectId => {
+        workflow => {
           this.toastrService.clear(infoToast.toastId);
-          this.router.navigate([`holdingpen/${mergeWorkflowObjectId}`]);
+          window.location.href = `${window.location.origin}/backoffice/literature/${workflow.id}`;
         },
-        () => {
+        (error) => {
+          const errorMessage =
+            error.status === 403
+              ? 'Could not merge: log in to backoffice first, then refresh this page and try again'
+              : 'Could not merge!';
           this.toastrService.clear(infoToast.toastId);
-          this.toastrService.error('Could not merge!', 'Error');
-        }
+          this.toastrService.error(errorMessage, 'Error');
+        },
       );
   }
 

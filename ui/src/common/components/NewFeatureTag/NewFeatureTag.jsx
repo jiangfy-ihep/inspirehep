@@ -1,4 +1,3 @@
-import React from 'react';
 import { Tag } from 'antd';
 import PropTypes from 'prop-types';
 import classnames from 'classnames';
@@ -8,7 +7,7 @@ import './NewFeatureTag.less';
 
 const GREEN = styleVariables['@success-color'];
 
-function NewFeatureTag({ className }) {
+function NewFeatureTag({ className = '' }) {
   return (
     <Tag className={classnames('__NewFeatureTag__', className)} color={GREEN}>
       New

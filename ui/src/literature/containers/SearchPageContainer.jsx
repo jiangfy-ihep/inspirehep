@@ -1,7 +1,6 @@
-import React from 'react';
 import { Row, Col, Empty } from 'antd';
 import { WarningOutlined } from '@ant-design/icons';
-import { connect } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 import PropTypes from 'prop-types';
 
 import LiteratureSearchContainer from './LiteratureSearchContainer';
@@ -25,6 +24,7 @@ export function SearchPage({
   assignView,
   numberOfSelected,
   numberOfResults,
+  hasAiSearch,
   error,
 }) {
   const noResultsMessage = (
@@ -48,6 +48,9 @@ export function SearchPage({
     </>
   );
 
+  const numberOfResultsForLayout =
+    hasAiSearch && !numberOfResults ? 1 : numberOfResults;
+
   return (
     <>
       <DocumentHead title={TITLE} description={META_DESCRIPTION} />
@@ -66,7 +69,7 @@ export function SearchPage({
         </Row>
       ) : (
         <Row>
-          <Col {...columnSize(numberOfResults, true)}>
+          <Col {...columnSize(numberOfResultsForLayout, true)}>
             <AssignViewContext.Provider value={assignView}>
               <LiteratureSearchContainer
                 namespace={LITERATURE_NS}
@@ -95,6 +98,9 @@ const stateToProps = (state) => ({
     isCataloger(state.user.getIn(['data', 'roles'])),
   numberOfSelected: state.literature.get('literatureSelection').size,
   numberOfResults: state.search.getIn(['namespaces', LITERATURE_NS, 'total']),
+  hasAiSearch: Boolean(
+    state.search.getIn(['namespaces', LITERATURE_NS, 'aiSearch'])
+  ),
   error: state.search.getIn(['namespaces', LITERATURE_NS, 'error']),
 });
 

@@ -1,30 +1,30 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ReferenceItem does not render misc if title present 1`] = `
+exports[`ReferenceItem > does not render misc if title present 1`] = `
 <DocumentFragment>
   <div
-    data-test-id="reference-item"
+    data-testid="reference-item"
     id="reference-123"
   >
     <li
       class="ant-list-item"
     >
       <div
-        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap"
-        style="margin-left: -12px; margin-right: -12px;"
+        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap css-dev-only-do-not-override-oc1rc0 css-var-root"
+        style="margin-inline: -12px;"
         type="flex"
       >
         <div
-          class="ant-col ant-col-xs-2 ant-col-lg-1"
-          style="padding-left: 12px; padding-right: 12px;"
+          class="ant-col ant-col-xs-2 ant-col-lg-1 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px;"
         >
           <div
             class="flex"
           />
         </div>
         <div
-          class="ant-col"
-          style="padding-left: 12px; padding-right: 12px; width: 100%;"
+          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px; width: 100%;"
         >
           <div
             class="ant-list-item-meta"
@@ -37,14 +37,12 @@ exports[`ReferenceItem does not render misc if title present 1`] = `
               >
                 <div
                   class="f5"
-                  data-test-id="reference-title"
+                  data-testid="reference-title"
                 >
                   <span
-                    data-test-id="literature-detail-title"
+                    data-testid="literature-detail-title"
                   >
-                    <span
-                      class="__Latex__"
-                    >
+                    <span>
                       Title
                     </span>
                   </span>
@@ -63,15 +61,15 @@ exports[`ReferenceItem does not render misc if title present 1`] = `
           </div>
         </div>
         <div
-          class="ant-col ant-col-2 pr3"
-          style="padding-left: 12px; padding-right: 12px;"
+          class="ant-col ant-col-2 pr3 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px;"
         >
           <div
             class="flex items-center justify-center"
-            data-test-id="edit-reference"
+            data-testid="edit-reference"
           >
             <button
-              class="ant-btn ant-btn-text __LinkLikeButton__ blue disabled"
+              class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-text ant-btn-color-default ant-btn-variant-text __LinkLikeButton__ blue disabled"
               disabled=""
               type="button"
             >
@@ -116,31 +114,31 @@ exports[`ReferenceItem does not render misc if title present 1`] = `
 </DocumentFragment>
 `;
 
-exports[`ReferenceItem renders misc if present 1`] = `
+exports[`ReferenceItem > renders misc if present 1`] = `
 <DocumentFragment>
   <div
-    data-test-id="reference-item"
+    data-testid="reference-item"
     id="reference-123"
   >
     <li
       class="ant-list-item"
     >
       <div
-        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap"
-        style="margin-left: -12px; margin-right: -12px;"
+        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap css-dev-only-do-not-override-oc1rc0 css-var-root"
+        style="margin-inline: -12px;"
         type="flex"
       >
         <div
-          class="ant-col ant-col-xs-2 ant-col-lg-1"
-          style="padding-left: 12px; padding-right: 12px;"
+          class="ant-col ant-col-xs-2 ant-col-lg-1 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px;"
         >
           <div
             class="flex"
           />
         </div>
         <div
-          class="ant-col"
-          style="padding-left: 12px; padding-right: 12px; width: 100%;"
+          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px; width: 100%;"
         >
           <div
             class="ant-list-item-meta"
@@ -164,15 +162,15 @@ exports[`ReferenceItem renders misc if present 1`] = `
           </div>
         </div>
         <div
-          class="ant-col ant-col-2 pr3"
-          style="padding-left: 12px; padding-right: 12px;"
+          class="ant-col ant-col-2 pr3 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px;"
         >
           <div
             class="flex items-center justify-center"
-            data-test-id="edit-reference"
+            data-testid="edit-reference"
           >
             <button
-              class="ant-btn ant-btn-text __LinkLikeButton__ blue disabled"
+              class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-text ant-btn-color-default ant-btn-variant-text __LinkLikeButton__ blue disabled"
               disabled=""
               type="button"
             >
@@ -217,31 +215,31 @@ exports[`ReferenceItem renders misc if present 1`] = `
 </DocumentFragment>
 `;
 
-exports[`ReferenceItem renders unlinked reference (no control_number) 1`] = `
+exports[`ReferenceItem > renders unlinked reference (no control_number) 1`] = `
 <DocumentFragment>
   <div
-    data-test-id="reference-item"
+    data-testid="reference-item"
     id="reference-123"
   >
     <li
       class="ant-list-item"
     >
       <div
-        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap"
-        style="margin-left: -12px; margin-right: -12px;"
+        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap css-dev-only-do-not-override-oc1rc0 css-var-root"
+        style="margin-inline: -12px;"
         type="flex"
       >
         <div
-          class="ant-col ant-col-xs-2 ant-col-lg-1"
-          style="padding-left: 12px; padding-right: 12px;"
+          class="ant-col ant-col-xs-2 ant-col-lg-1 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px;"
         >
           <div
             class="flex"
           />
         </div>
         <div
-          class="ant-col"
-          style="padding-left: 12px; padding-right: 12px; width: 100%;"
+          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px; width: 100%;"
         >
           <div
             class="ant-list-item-meta"
@@ -254,14 +252,12 @@ exports[`ReferenceItem renders unlinked reference (no control_number) 1`] = `
               >
                 <div
                   class="f5"
-                  data-test-id="reference-title"
+                  data-testid="reference-title"
                 >
                   <span
-                    data-test-id="literature-detail-title"
+                    data-testid="literature-detail-title"
                   >
-                    <span
-                      class="__Latex__"
-                    >
+                    <span>
                       Title
                     </span>
                   </span>
@@ -406,15 +402,15 @@ exports[`ReferenceItem renders unlinked reference (no control_number) 1`] = `
           </div>
         </div>
         <div
-          class="ant-col ant-col-2 pr3"
-          style="padding-left: 12px; padding-right: 12px;"
+          class="ant-col ant-col-2 pr3 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px;"
         >
           <div
             class="flex items-center justify-center"
-            data-test-id="edit-reference"
+            data-testid="edit-reference"
           >
             <button
-              class="ant-btn ant-btn-text __LinkLikeButton__ blue disabled"
+              class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-text ant-btn-color-default ant-btn-variant-text __LinkLikeButton__ blue disabled"
               disabled=""
               type="button"
             >
@@ -459,23 +455,23 @@ exports[`ReferenceItem renders unlinked reference (no control_number) 1`] = `
 </DocumentFragment>
 `;
 
-exports[`ReferenceItem renders with full reference 1`] = `
+exports[`ReferenceItem > renders with full reference 1`] = `
 <DocumentFragment>
   <div
-    data-test-id="reference-item"
+    data-testid="reference-item"
     id="reference-123"
   >
     <li
       class="ant-list-item"
     >
       <div
-        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap"
-        style="margin-left: -12px; margin-right: -12px;"
+        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap css-dev-only-do-not-override-oc1rc0 css-var-root"
+        style="margin-inline: -12px;"
         type="flex"
       >
         <div
-          class="ant-col ant-col-xs-2 ant-col-lg-1"
-          style="padding-left: 12px; padding-right: 12px;"
+          class="ant-col ant-col-xs-2 ant-col-lg-1 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px;"
         >
           <div
             class="flex"
@@ -486,8 +482,8 @@ exports[`ReferenceItem renders with full reference 1`] = `
           </div>
         </div>
         <div
-          class="ant-col"
-          style="padding-left: 12px; padding-right: 12px; width: 100%;"
+          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px; width: 100%;"
         >
           <div
             class="ant-list-item-meta"
@@ -499,18 +495,16 @@ exports[`ReferenceItem renders with full reference 1`] = `
                 class="ant-list-item-meta-title"
               >
                 <div
-                  data-test-id="reference-title"
+                  data-testid="reference-title"
                 >
                   <a
                     class="f5"
                     href="/literature/12345"
                   >
                     <span
-                      data-test-id="literature-detail-title"
+                      data-testid="literature-detail-title"
                     >
-                      <span
-                        class="__Latex__"
-                      >
+                      <span>
                         Title
                       </span>
                     </span>
@@ -638,15 +632,15 @@ exports[`ReferenceItem renders with full reference 1`] = `
           </div>
         </div>
         <div
-          class="ant-col ant-col-2 pr3"
-          style="padding-left: 12px; padding-right: 12px;"
+          class="ant-col ant-col-2 pr3 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px;"
         >
           <div
             class="flex items-center justify-center"
-            data-test-id="edit-reference"
+            data-testid="edit-reference"
           >
             <button
-              class="ant-btn ant-btn-text __LinkLikeButton__ blue disabled"
+              class="ant-btn css-dev-only-do-not-override-oc1rc0 css-var-root ant-btn-text ant-btn-color-default ant-btn-variant-text __LinkLikeButton__ blue disabled"
               disabled=""
               type="button"
             >
@@ -691,31 +685,31 @@ exports[`ReferenceItem renders with full reference 1`] = `
 </DocumentFragment>
 `;
 
-exports[`ReferenceItem renders without edit button if disableEdit 1`] = `
+exports[`ReferenceItem > renders without edit button if disableEdit 1`] = `
 <DocumentFragment>
   <div
-    data-test-id="reference-item"
+    data-testid="reference-item"
     id="reference-123"
   >
     <li
       class="ant-list-item"
     >
       <div
-        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap"
-        style="margin-left: -12px; margin-right: -12px;"
+        class="ant-row ant-row-start ant-row-middle w-100 flex-nowrap css-dev-only-do-not-override-oc1rc0 css-var-root"
+        style="margin-inline: -12px;"
         type="flex"
       >
         <div
-          class="ant-col ant-col-xs-2 ant-col-lg-1"
-          style="padding-left: 12px; padding-right: 12px;"
+          class="ant-col ant-col-xs-2 ant-col-lg-1 css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px;"
         >
           <div
             class="flex"
           />
         </div>
         <div
-          class="ant-col"
-          style="padding-left: 12px; padding-right: 12px; width: 100%;"
+          class="ant-col css-dev-only-do-not-override-oc1rc0 css-var-root"
+          style="padding-inline: 12px; width: 100%;"
         >
           <div
             class="ant-list-item-meta"
@@ -728,14 +722,12 @@ exports[`ReferenceItem renders without edit button if disableEdit 1`] = `
               >
                 <div
                   class="f5"
-                  data-test-id="reference-title"
+                  data-testid="reference-title"
                 >
                   <span
-                    data-test-id="literature-detail-title"
+                    data-testid="literature-detail-title"
                   >
-                    <span
-                      class="__Latex__"
-                    >
+                    <span>
                       Title
                     </span>
                   </span>

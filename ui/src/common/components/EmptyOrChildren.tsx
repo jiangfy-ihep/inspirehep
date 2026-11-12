@@ -1,5 +1,3 @@
-import React from 'react';
-import { List, Map } from 'immutable';
 import { Empty } from 'antd';
 
 function isEmptyCollection(data: any) {
@@ -17,17 +15,16 @@ const EmptyOrChildren = ({
   description,
 }: {
   data: any;
-  children: JSX.Element;
-  title: string | JSX.Element;
-  description?: string;
-}) => {
-  return isEmptyCollection(data) ? (
+  children: React.JSX.Element;
+  title: string | React.JSX.Element;
+  description?: React.ReactNode;
+}) =>
+  isEmptyCollection(data) ? (
     <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={title}>
       {description}
     </Empty>
   ) : (
     children
   );
-};
 
 export default EmptyOrChildren;

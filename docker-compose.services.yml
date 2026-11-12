@@ -24,9 +24,9 @@ services:
       - "INVENIO_SEARCH_ELASTIC_HOSTS=['es:9200']"
       - 'INVENIO_SECRET_KEY=CHANGE_ME'
       - 'INVENIO_SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://postgres:postgres@db:5432/inspirehep'
-      - 'INVENIO_INSPIRE_NEXT_URL=http://ui:8080'
       - 'INVENIO_INSPIRE_BACKOFFICE_URL=http://host.docker.internal:8001'
       - 'INVENIO_AUTHENTICATION_TOKEN_BACKOFFICE=2e04111a61e8f5ba6ecec52af21bbb9e81732085'
+      - 'SERVER_NAME=localhost:8000'
   cache:
     image: redis:8-alpine
     restart: 'always'
@@ -51,7 +51,7 @@ services:
       retries: 5
       start_period: 5s
   mq:
-    image: rabbitmq:4-management-alpine
+    image: rabbitmq:4.2-management-alpine # Maximum supported with current setup
     restart: 'always'
   es:
     platform: linux/amd64
@@ -63,7 +63,6 @@ services:
       - DISABLE_SECURITY_PLUGIN=true
       - cluster.name=opensearch-cluster
       - node.name=opensearch-node1
-      - discovery.seed_hosts=opensearch-node1
       - bootstrap.memory_lock=false
       - cluster.routing.allocation.disk.threshold_enabled=false
       - discovery.type=single-node
@@ -85,12 +84,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-  kibana:
-    image: kibana:7.10.1
-    environment:
-      - 'ELASTICSEARCH_URL=http://es:9200'
-      - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
-    ports: ['5601:5601']
   flower:
     image: mher/flower:0.9.5
     command: --broker=amqp://guest:guest@mq/ --broker_api=http://guest:guest@mq/api/

@@ -1,16 +1,24 @@
-import React from 'react';
-import Loadable from 'react-loadable';
 import { fromJS } from 'immutable';
-import { renderWithProviders, renderWithRouter } from '../../fixtures/render';
+import { Routes, Route } from 'react-router-dom';
+import { renderWithProviders } from '../../fixtures/render';
 import Experiments from '..';
+import { EXPERIMENTS } from '../../common/routes';
+
+const renderExperiments = (route, initialState) =>
+  renderWithProviders(
+    <Routes>
+      <Route path={`${EXPERIMENTS}/*`} element={<Experiments />} />
+    </Routes>,
+    { initialState, route }
+  );
 
 describe('Experiments', () => {
   it('renders initial state', () => {
-    const { asFragment } = renderWithRouter(<Experiments />);
+    const { asFragment } = renderWithProviders(<Experiments />);
     expect(asFragment()).toMatchSnapshot();
   });
 
-  it('navigates to DetailPageContainer when /experiments/:id', async () => {
+  it('navigates to DetailPageContainer when /experiments/:id', () => {
     const initialState = {
       experiments: fromJS({
         data: {
@@ -22,18 +30,14 @@ describe('Experiments', () => {
       }),
     };
 
-    const { getByTestId } = renderWithProviders(<Experiments />, {
-      initialState,
-      route: '/experiments/123',
-    });
-    await Loadable.preloadAll();
+    const { getByTestId } = renderExperiments('/experiments/123', initialState);
 
     expect(
       getByTestId('experiments-detail-page-container')
     ).toBeInTheDocument();
   });
 
-  it('contains all the required links in the DetailPageContainer', async () => {
+  it('contains all the required links in the DetailPageContainer', () => {
     const initialState = {
       experiments: fromJS({
         data: {
@@ -46,11 +50,7 @@ describe('Experiments', () => {
       }),
     };
 
-    const { getByRole } = renderWithProviders(<Experiments />, {
-      initialState,
-      route: '/experiments/123',
-    });
-    await Loadable.preloadAll();
+    const { getByRole } = renderExperiments('/experiments/123', initialState);
 
     const experimentCollaboration = getByRole('link', {
       name: 'CERN-LHC-ATLAS',
@@ -89,7 +89,7 @@ describe('Experiments', () => {
     );
   });
 
-  it('contains all the required dates in the DetailPageContainer', async () => {
+  it('contains all the required dates in the DetailPageContainer', () => {
     const initialState = {
       experiments: fromJS({
         data: {
@@ -106,11 +106,7 @@ describe('Experiments', () => {
       }),
     };
 
-    const { getByTestId } = renderWithProviders(<Experiments />, {
-      initialState,
-      route: '/experiments/123',
-    });
-    await Loadable.preloadAll();
+    const { getByTestId } = renderExperiments('/experiments/123', initialState);
 
     const experimentDetailPage = getByTestId(
       'experiments-detail-page-container'
@@ -122,11 +118,8 @@ describe('Experiments', () => {
     expect(experimentDetailPage).toHaveTextContent('Completed: Feb 5, 1984');
   });
 
-  it('navigates to SearchPage when /experiments', async () => {
-    const { getByTestId } = renderWithProviders(<Experiments />, {
-      route: '/experiments',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SearchPage when /experiments', () => {
+    const { getByTestId } = renderExperiments('/experiments');
 
     expect(
       getByTestId('experiments-search-page-container')

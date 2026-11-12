@@ -1,4 +1,3 @@
-import React from 'react';
 import { Map } from 'immutable';
 
 import AuthorResult from '../AuthorResult';
@@ -13,9 +12,7 @@ describe('AuthorResult', () => {
       }),
     });
 
-    const { asFragment } = renderWithProviders(
-      <AuthorResult item={authors} page="Page" />
-    );
+    const { asFragment } = renderWithProviders(<AuthorResult item={authors} />);
 
     expect(asFragment()).toMatchSnapshot();
   });
@@ -29,7 +26,7 @@ describe('AuthorResult', () => {
     });
 
     const { getByTestId } = renderWithProviders(
-      <AuthorResult item={authors} page="Page" />
+      <AuthorResult item={authors} />
     );
 
     expect(getByTestId('literature-drawer-radio-1016091')).toBeInTheDocument();
@@ -41,7 +38,7 @@ describe('AuthorResult', () => {
     });
 
     const { getByTestId } = renderWithProviders(
-      <AuthorResult item={authors} page="Page" />
+      <AuthorResult item={authors} />
     );
 
     expect(getByTestId('literature-drawer-radio-undefined')).toHaveAttribute(

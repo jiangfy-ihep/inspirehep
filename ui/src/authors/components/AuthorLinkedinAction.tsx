@@ -1,4 +1,3 @@
-import React from 'react';
 import { LinkedinOutlined } from '@ant-design/icons';
 import { Tooltip } from 'antd';
 
@@ -10,17 +9,17 @@ const AuthorLinkedinAction = ({ linkedin }: { linkedin: string }) => {
   const href = `//linkedin.com/in/${linkedin}`;
   return (
     <UserAction>
-      <Tooltip title="LinkedIn">
-        <EventTracker
-          eventCategory="Author detail"
-          eventAction="Link"
-          eventId="Linkedin"
-        >
-          <LinkWithTargetBlank href={href}>
+      <EventTracker
+        eventCategory="Author detail"
+        eventAction="Link"
+        eventId="Linkedin"
+      >
+        <LinkWithTargetBlank href={href}>
+          <Tooltip title="LinkedIn">
             <LinkedinOutlined />
-          </LinkWithTargetBlank>
-        </EventTracker>
-      </Tooltip>
+          </Tooltip>
+        </LinkWithTargetBlank>
+      </EventTracker>
     </UserAction>
   );
 };

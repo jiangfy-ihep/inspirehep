@@ -1,4 +1,3 @@
-import React from 'react';
 import { fromJS } from 'immutable';
 import { fireEvent, render } from '@testing-library/react';
 
@@ -6,7 +5,9 @@ import MultiSelectAggregation from '../MultiSelectAggregation';
 
 import * as constants from '../constants';
 
-jest.mock('../constants');
+vi.mock('../constants', async () => ({
+  ...(await vi.importActual('../constants')),
+}));
 
 describe('MultiSelectAggregation', () => {
   it('renders', () => {
@@ -75,7 +76,7 @@ describe('MultiSelectAggregation', () => {
     );
 
     fireEvent.mouseDown(screen.getByRole('combobox'));
-    fireEvent.click(screen.getAllByText('bucket1')[1]);
+    fireEvent.click(screen.getByText('bucket1'));
 
     expect(onChange).toHaveBeenCalledWith(['bucket1'], expect.anything());
   });

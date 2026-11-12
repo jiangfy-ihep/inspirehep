@@ -1,10 +1,18 @@
-import React from 'react';
 import { fromJS } from 'immutable';
-import Loadable from 'react-loadable';
+import { Route, Routes } from 'react-router-dom';
 
 import { renderWithProviders } from '../../fixtures/render';
 import { getStore } from '../../fixtures/store';
+import { SUBMISSIONS } from '../../common/routes';
 import Submissions from '..';
+
+const renderSubmissions = (route, store) =>
+  renderWithProviders(
+    <Routes>
+      <Route path={`${SUBMISSIONS}/*`} element={<Submissions />} />
+    </Routes>,
+    { store, route }
+  );
 
 describe('Submissions', () => {
   let element;
@@ -26,51 +34,56 @@ describe('Submissions', () => {
     }),
   });
 
+  const successStore = getStore({
+    submissions: fromJS({
+      successData: {
+        pid_value: 12345,
+        cnum: 'C19-02-01',
+      },
+    }),
+  });
+
   // GENERIC SUBMISSION SUCCESS PAGE
-  it('navigates to SubmissionSuccessPage when /submissions/success', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/success',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SubmissionSuccessPage when /submissions/success', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/success'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('submission-success-page')).toBeInTheDocument();
   });
 
   // AUTHOR SUBMISSION
-  it('navigates to AuthorSubmissionPageContainer when /submissions/authors and renders correctly', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/authors',
-    });
+  it('navigates to AuthorSubmissionPageContainer when /submissions/authors and renders correctly', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/authors'
+    );
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('author-submission-page')).toBeInTheDocument();
   });
 
-  it('navigates to AuthorUpdateSubmissionPageContainer when /submissions/authors/:id and renders correctly', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/authors/1',
-    });
-    await Loadable.preloadAll();
+  it('navigates to AuthorUpdateSubmissionPageContainer when /submissions/authors/:id and renders correctly', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/authors/1'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('author-update-submission-page')).toBeInTheDocument();
   });
 
-  it.only('navigates to SubmissionSuccessPage when /submissions/authors/new/success', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/authors/new/success',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SubmissionSuccessPage when /submissions/authors/new/success', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/authors/new/success'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('submission-success-page')).toBeInTheDocument();
   });
 
-  it('navigates to SubmissionSuccessPage when /submissions/authors/1/success', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/authors/1/success',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SubmissionSuccessPage when /submissions/authors/1/success', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/authors/1/success'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(
@@ -79,74 +92,66 @@ describe('Submissions', () => {
   });
 
   // LITERATURE SUBMISSION
-  it('navigates to LiteratureSubmissionPageContainer when /submissions/literature if whatever user and renders correctly', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/literature',
-      store,
-    });
-    await Loadable.preloadAll();
+  it('navigates to LiteratureSubmissionPageContainer when /submissions/literature if whatever user and renders correctly', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/literature',
+      store
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('literature-submission-page')).toBeInTheDocument();
   });
 
-  it('navigates to SubmissionSuccessPage when /submissions/literature/new/success', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/literature/new/success',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SubmissionSuccessPage when /submissions/literature/new/success', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/literature/new/success'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('submission-success-page')).toBeInTheDocument();
   });
 
   // JOBS SUBMISSION
-  it('navigates to JobSubmissionPageContainer when /submissions/jobs', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/jobs',
-    });
-    await Loadable.preloadAll();
+  it('navigates to JobSubmissionPageContainer when /submissions/jobs', () => {
+    const { asFragment, getByTestId } = renderSubmissions('/submissions/jobs');
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('job-submission-page')).toBeInTheDocument();
   });
 
-  it('navigates to JobUpdateSubmissionPageContainer when /submissions/jobs/:id', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/jobs/1',
-    });
-    await Loadable.preloadAll();
+  it('navigates to JobUpdateSubmissionPageContainer when /submissions/jobs/:id', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/jobs/1'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('job-update-submission-page')).toBeInTheDocument();
   });
 
-  it('navigates to JobUpdateSubmissionSuccessPage when /submissions/jobs/1/success', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/jobs/1/success',
-    });
-    await Loadable.preloadAll();
+  it('navigates to JobUpdateSubmissionSuccessPage when /submissions/jobs/1/success', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/jobs/1/success'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('job-submission-success-page')).toBeInTheDocument();
   });
 
   // CONFERENCE SUBMISSION
-  it('navigates to ConferenceSubmissionPageContainer when /submissions/conferences', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/conferences',
-    });
-    await Loadable.preloadAll();
+  it('navigates to ConferenceSubmissionPageContainer when /submissions/conferences', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/conferences'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('conference-submission-page')).toBeInTheDocument();
   });
 
-  it('navigates to ConferenceSubmissionSuccessPageContainer when /submissions/conferences/new/success', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/conferences/new/success',
-    });
-    await Loadable.preloadAll();
+  it('navigates to ConferenceSubmissionSuccessPageContainer when /submissions/conferences/new/success', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/conferences/new/success',
+      successStore
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(
@@ -155,77 +160,72 @@ describe('Submissions', () => {
   });
 
   // SEMINAR SUBMISSION
-  it('navigates to SeminarSubmissionPageContainer when /submissions/seminars', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/seminars',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SeminarSubmissionPageContainer when /submissions/seminars', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/seminars'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('seminar-submission-page')).toBeInTheDocument();
   });
 
-  it('navigates to SeminarUpdateSubmissionPageContainer when /submissions/seminars/:id', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/seminars/1',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SeminarUpdateSubmissionPageContainer when /submissions/seminars/:id', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/seminars/1'
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('seminar-update-submission-page')).toBeInTheDocument();
   });
 
-  it('navigates to SeminarSubmissionSuccessPageContainer when /submissions/seminars/new/success', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/seminars/new/success',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SeminarSubmissionSuccessPageContainer when /submissions/seminars/new/success', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/seminars/new/success',
+      successStore
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('seminar-submission-success-page')).toBeInTheDocument();
   });
 
-  it('navigates to SeminarSubmissionSuccessPageContainer when /submissions/seminars/1/success', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/seminars/1/success',
-    });
-    await Loadable.preloadAll();
+  it('navigates to SeminarSubmissionSuccessPageContainer when /submissions/seminars/1/success', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/seminars/1/success',
+      successStore
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('seminar-submission-success-page')).toBeInTheDocument();
   });
 
   // EXPERIMENT SUBMISSION
-  it('navigates to ExperimentSubmissionPageContainer when /submissions/experiments', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/experiments',
-      store,
-    });
-    await Loadable.preloadAll();
+  it('navigates to ExperimentSubmissionPageContainer when /submissions/experiments', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/experiments',
+      store
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('experiment-submission-page')).toBeInTheDocument();
   });
 
   // JOURNAL SUBMISSION
-  it('navigates to JournalSubmissionPageContainer when /submissions/journals', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/journals',
-      store,
-    });
-    await Loadable.preloadAll();
+  it('navigates to JournalSubmissionPageContainer when /submissions/journals', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/journals',
+      store
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('journal-submission-page')).toBeInTheDocument();
   });
 
   // INSTITUTION SUBMISSION
-  it('navigates to InstitutuinsSubmissionPageContainer when /submissions/institutions', async () => {
-    const { asFragment, getByTestId } = renderWithProviders(<Submissions />, {
-      route: '/submissions/institutions',
-      store,
-    });
-    await Loadable.preloadAll();
+  it('navigates to InstitutuinsSubmissionPageContainer when /submissions/institutions', () => {
+    const { asFragment, getByTestId } = renderSubmissions(
+      '/submissions/institutions',
+      store
+    );
 
     expect(asFragment()).toMatchSnapshot();
     expect(getByTestId('institution-submission-page')).toBeInTheDocument();

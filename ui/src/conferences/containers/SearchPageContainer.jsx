@@ -1,7 +1,7 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Row, Col } from 'antd';
-import { connect } from 'react-redux';
+import { legacy_connect as connect } from 'react-redux';
 
 import AggregationFiltersContainer from '../../common/containers/AggregationFiltersContainer';
 import PaginationContainer from '../../common/containers/PaginationContainer';
@@ -39,7 +39,7 @@ function ConferenceSearchPage({
   const renderAggregations = useCallback(
     () => (
       <>
-        <ConferenceStartDateFilterContainer switchTitle="Upcoming conferences" />
+        <ConferenceStartDateFilterContainer collection="conferences" />
         <LoadingOrChildren loading={loadingAggregations}>
           <AggregationFiltersContainer
             namespace={CONFERENCES_NS}

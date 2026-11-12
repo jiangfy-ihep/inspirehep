@@ -7,8 +7,10 @@ This repository is the engine room behind inspirehep.net, housing the core servi
 As a monorepo, it currently contains three main services (besides helper services):
 
 - **Inspirehep** - The main inspire service. It serves the website inspirehep.net / inspirebeta.net and calls to the required services.
-- **Backoffice** - A Django app with the goal of fully replacing [inspire-next](https://github.com/inspirehep/inspire-next/) one day with the help of the workflows service
+- **Backoffice** - A Django app where curators can take actions in the active workflows.
 - **Workflows** - An airflow service responsible for running the workflows.
+
+Want to contribute? Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or a pull request.
 
 Okay, so now the question is: **how do we develop on it?**
 
@@ -127,11 +129,11 @@ $ brew install postgresql@14 libmagic openssl@3 openblas python
 
 Please follow the instructions https://github.com/nvm-sh/nvm#installing-and-updating
 
-We're using `v20.0.0` (first version we install is the default)
+We're using `v24.15.0` (first version we install is the default)
 
 ```
-$ nvm install 20.0.0
-$ nvm use global 20.0.0
+$ nvm install 24.15.0
+$ nvm use global 24.15.0
 ```
 
 **Yarn**
@@ -316,10 +318,19 @@ To generate a token locally, so as to call authenticated endpoints for testing, 
 inspirehep tokens create -n wow -u admin@inspirehep.net
 ```
 ---
-## How to test
 
-### Testing Requirements
+## Testing in docker
 
+If you wish to run the tests for a given services here's the way to do it.
+- backoffice: `docker compose exec -it backoffice-worker pytest .`
+- airflow: `docker compose exec -it airflow-worker pytest tests` 
+- backend: `docker compose exec -it hep-worker bash run-tests.sh`
+Alternatively you can exec into the the container and run specific tests on it with `docker exec -it <container_name> /bin/bash` or via Docker Destkop
+
+
+## Testing Locally
+
+### Requirements
 **Yarn**
 
 **Debian / Ubuntu**
@@ -341,15 +352,6 @@ $ curl -sSL https://install.python-poetry.org | python3 -
 ```
 
 
-### Testing (WORK IN PROGRESS)
-
-If you wish to run the tests for a given services here's the way to do it.
-First exect into the container i.e.: `docker exec -it <container_name> /bin/bash` or via Docker Destkop
-Then depending on the service you are testing:
-- backoffice-webserver : `pytest .`
-- airlow-api-server: `pytest .`
-- inspire-hep: ?
-- backend: ?
 
 ### Backend
 
@@ -492,7 +494,6 @@ $ docker compose exec hep-web inspirehep importer demo-records
 Follow the instructions [linked here](https://confluence.cern.ch/display/RCSSIS/Update+Airflow+Base+Image+%28with+classifier+model%29+for+INSPIRE)
 to update the base image version of airflow (e.g. 3.0.3 -> 3.0.5).
 After changing the base image versions change the following files:
-- workflows/Dockerfile.local - update the airflow base version (e.g. 1.0.0 -> 1.0.1)
 - workflows/Dockerfile - update the airflow version (e.g. 1.0.0 -> 1.0.1)
 - requirements.txt - update the airflow version (e.g. 3.0.3 -> 3.0.5) and the constraints
 

@@ -1,11 +1,11 @@
 // Variables to override https://github.com/ant-design/ant-design/blob/master/components/style/themes/default.less
 
-module.exports = {
+export default {
   '@primary-color': '#1890ff',
   '@primary-with-opacity': '#1890FF99',
   '@link-color': '#0050b3',
   '@link-hover-color': '#40a9ff',
-  '@layout-body-background': '#f0f2f5',
+  '@layout-body-background': '#f5f5f5',
   '@success-color': '#52c41a',
   '@secondary-color': 'rgba(0, 0, 0, 0.65)',
   '@text-color': 'rgba(0, 0, 0, 0.8)',
@@ -15,6 +15,7 @@ module.exports = {
   '@screen-lg-max': '1159px',
   '@screen-md-max': '991px',
   '@header-padding': '0 12px',
+  '@header-padding-backoffice': '0 12px 5px',
   '@drawer-body-padding': '24px',
   '@btn-default-bg': '#fff',
   '@btn-height-base': '32px',
@@ -39,4 +40,5 @@ module.exports = {
   '@layout-header-background': '#001529',
   '@modal-mask-bg': 'rgba(0, 0, 0, 0.45)',
   '@disabled-color': 'rgba(0, 0, 0, 0.25)',
+  '@error-color': '#ff4d4f',
 };

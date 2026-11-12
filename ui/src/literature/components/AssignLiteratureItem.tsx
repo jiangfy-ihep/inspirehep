@@ -1,6 +1,6 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { FileDoneOutlined } from '@ant-design/icons';
-import { Button, Menu } from 'antd';
+import { Button } from 'antd';
 
 import DropdownMenu from '../../common/components/DropdownMenu';
 import IconText from '../../common/components/IconText';
@@ -31,7 +31,6 @@ const AssignLiteratureItem = (props: AssignLiteratureItemProps) => {
           eventId="Move to my profile"
         >
           <span
-            data-test-id="assign-literature-item"
             data-testid="assign-literature-item"
             key="assign-literature-item"
             onClick={onAssignLiteratureItem}
@@ -47,10 +46,7 @@ const AssignLiteratureItem = (props: AssignLiteratureItemProps) => {
     <UserAction>
       <DropdownMenu
         title={
-          <Button
-            data-test-id="btn-claiming-literature"
-            data-testid="btn-claiming-literature"
-          >
+          <Button data-testid="btn-claiming-literature">
             <IconText text="claim" icon={<FileDoneOutlined />} />
           </Button>
         }

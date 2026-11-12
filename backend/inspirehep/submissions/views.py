@@ -71,6 +71,12 @@ blueprint = Blueprint("inspirehep_submissions", __name__, url_prefix="/submissio
 
 LOGGER = structlog.getLogger()
 
+AUTHOR_CONFLICT_ERROR_DESCRIPTION = "An author with the same ORCID is currently being processed. Please try again later."
+HEP_CONFLICT_ERROR_DESCRIPTION = (
+    "A HEP record with the same DOI or arXiv ID is currently being processed. "
+    "Please try again later."
+)
+
 
 def get_updated_record_data(record, update_form_data, optional_field_names):
     record_data = dict(record)
@@ -91,7 +97,13 @@ class BaseSubmissionsResource(MethodView):
         return request.get_json()
 
     def send_post_request_to_workflows(
-        self, url, endpoint, data, token, bearer_keyword="Bearer"
+        self,
+        url,
+        endpoint,
+        data,
+        token,
+        bearer_keyword="Bearer",
+        conflict_error_description=None,
     ):
         """Sends a post request to the backoffice/next
 
@@ -124,6 +136,10 @@ class BaseSubmissionsResource(MethodView):
             )
             match response.status_code:
                 case 409:
+                    if conflict_error_description:
+                        exc = WorkflowConflictError()
+                        exc.description = conflict_error_description
+                        raise exc from e
                     raise WorkflowConflictError from e
                 case _:
                     raise WorkflowStartError from e
@@ -229,7 +245,7 @@ class AuthorSubmissionsResource(BaseSubmissionsResource):
 
         :param object record: dict with workflow model variables set
         :param str workflow_type: distinguish between UPDATE and CREATE
-        :return object: inspire next response
+        :return object: inspire backoffice response
         """
         record["acquisition_source"] = self.get_acquisition_source()
         payload = {"data": record, "workflow_type": workflow_type}
@@ -241,6 +257,7 @@ class AuthorSubmissionsResource(BaseSubmissionsResource):
             payload,
             current_app.config["AUTHENTICATION_TOKEN_BACKOFFICE"],
             bearer_keyword="Token",
+            conflict_error_description=AUTHOR_CONFLICT_ERROR_DESCRIPTION,
         )
 
     def create_ticket(self, record, rt_template):
@@ -434,35 +451,19 @@ class LiteratureSubmissionResource(BaseSubmissionsResource):
             "references": request_submission_data.get("references"),
         }
         submission_data["acquisition_source"] = self.get_acquisition_source()
-        payload = {"data": submission_data, "form_data": form_data}
-        backoffice_payload = {
+        payload = {
             "data": submission_data,
             "form_data": form_data,
             "workflow_type": "HEP_SUBMISSION",
         }
 
-        if current_app.config.get("FEATURE_FLAG_ENABLE_SEND_TO_BACKOFFICE"):
-            LOGGER.info(
-                "Sending literature submission to backoffice", data=backoffice_payload
-            )
-            try:
-                self.send_post_request_to_workflows(
-                    current_app.config["INSPIRE_BACKOFFICE_URL"],
-                    "/api/workflows/literature/",
-                    backoffice_payload,
-                    current_app.config["AUTHENTICATION_TOKEN_BACKOFFICE"],
-                    bearer_keyword="Token",
-                )
-            except WorkflowStartError as e:
-                LOGGER.error(
-                    "Failed to start literature workflow in backoffice",
-                    error=str(e),
-                )
         return self.send_post_request_to_workflows(
-            current_app.config["INSPIRE_NEXT_URL"],
-            "/workflows/literature",
+            current_app.config["INSPIRE_BACKOFFICE_URL"],
+            "/api/workflows/literature/",
             payload,
-            current_app.config["AUTHENTICATION_TOKEN"],
+            current_app.config["AUTHENTICATION_TOKEN_BACKOFFICE"],
+            bearer_keyword="Token",
+            conflict_error_description=HEP_CONFLICT_ERROR_DESCRIPTION,
         )
 
 

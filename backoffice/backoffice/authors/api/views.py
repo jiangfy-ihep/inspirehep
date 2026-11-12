@@ -212,8 +212,6 @@ class AuthorWorkflowViewSet(BaseWorkflowViewSet):
         super().perform_destroy(instance)
 
     def create(self, request):
-        logger.info("Creating workflow with data: %s", request.data)
-
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         logger.info("Data passed schema validation, creating workflow.")
@@ -242,8 +240,9 @@ class AuthorWorkflowViewSet(BaseWorkflowViewSet):
             )
         except RequestException as e:
             return handle_request_exception(
-                "Error triggering Airflow DAG",
+                "Error triggering Airflow DAG run with id %s",
                 e,
+                workflow.id,
             )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -264,13 +263,12 @@ class AuthorWorkflowViewSet(BaseWorkflowViewSet):
                 airflow_utils.trigger_airflow_dag(
                     AuthorResolutionDags[serializer.validated_data["value"]].label,
                     pk,
-                    serializer.data,
+                    data=serializer.data,
                     workflow=workflow,
                 )
             except RequestException as e:
                 return handle_request_exception(
-                    "Error triggering Airflow DAG",
-                    e,
+                    "Error triggering Airflow DAG run with id %s", e, workflow.id
                 )
 
             workflow = get_object_or_404(AuthorWorkflow, pk=pk)

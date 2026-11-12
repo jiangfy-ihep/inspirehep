@@ -1,6 +1,6 @@
-import React from 'react';
-import { fireEvent, waitFor } from '@testing-library/react';
+import { waitFor, screen } from '@testing-library/react';
 import { fromJS } from 'immutable';
+import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../../fixtures/render';
 import { getStore, mockActionCreator } from '../../../fixtures/store';
@@ -11,11 +11,11 @@ import { UI_EXCLUDE_SELF_CITATIONS_PARAM } from '../../../literature/containers/
 import { UI_CITATION_SUMMARY_PARAM } from '../../../literature/containers/CitationSummarySwitchContainer';
 import { clearLiteratureSelection } from '../../../actions/literature';
 
-jest.mock('../../../actions/search');
+vi.mock('../../../actions/search');
 mockActionCreator(searchQueryUpdate);
-jest.mock('../../../actions/literature');
+vi.mock('../../../actions/literature');
 mockActionCreator(clearLiteratureSelection);
-jest.mock('../../../actions/router');
+vi.mock('../../../actions/router');
 mockActionCreator(appendQueryToLocationSearch);
 
 describe('SearchBoxContainer', () => {
@@ -31,12 +31,13 @@ describe('SearchBoxContainer', () => {
         },
       }),
     });
-    const screen = renderWithProviders(<SearchBoxContainer />, { store });
+    renderWithProviders(<SearchBoxContainer />, { store });
 
     expect(screen.getAllByRole('combobox')[1]).toHaveValue('test');
   });
 
   it('calls SEARCH_QUERY_UPDATE and LITERATURE_SELECTION_CLEAR on search', async () => {
+    const user = userEvent.setup();
     const searchBoxNamespace = 'literature';
     const store = getStore({
       search: fromJS({
@@ -46,8 +47,8 @@ describe('SearchBoxContainer', () => {
 
     renderWithProviders(<SearchBoxContainer />, { store });
 
-    const search = document.querySelector('.ant-input-search-button');
-    await fireEvent.click(search);
+    const search = screen.getByRole('button');
+    await user.click(search);
 
     const expectedActions = [
       clearLiteratureSelection(),
@@ -57,6 +58,7 @@ describe('SearchBoxContainer', () => {
   });
 
   it('resets the ui query params on Search unless literature namespace', async () => {
+    const user = userEvent.setup();
     const newNamespace = 'authors';
     const store = getStore({
       search: fromJS({
@@ -66,8 +68,8 @@ describe('SearchBoxContainer', () => {
 
     renderWithProviders(<SearchBoxContainer />, { store });
 
-    const search = document.querySelector('.ant-input-search-button');
-    await fireEvent.click(search);
+    const search = screen.getByRole('button');
+    await user.click(search);
 
     const expectedAction = appendQueryToLocationSearch({
       [UI_CITATION_SUMMARY_PARAM]: undefined,
