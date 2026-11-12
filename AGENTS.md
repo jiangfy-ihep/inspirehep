@@ -2,7 +2,6 @@
 
 These instructions apply throughout this repository. Follow more specific
 directory instructions and explicit user instructions where they differ.
-Always respond in English.
 
 Read `README.md`, `CONTRIBUTING.md`, and the affected service's configuration
 before making changes. Package scripts, test scripts, and CI workflows are the
@@ -23,6 +22,8 @@ INSPIRE HEP contains the following applications:
 | `record-editor/` | Angular 4, TypeScript | Legacy record editing application |
 | `renderer/` | Node.js | Rendering service |
 | `e2e/` | Cypress | End-to-end tests |
+
+Root Compose files and `Makefile` orchestrate local development services.
 
 Infrastructure (always via Docker): **OpenSearch**, **PostgreSQL 14**, **Redis**, **RabbitMQ**, **MinIO** (S3-compatible).
 
@@ -156,12 +157,19 @@ git push origin dev
 ```
 
 Merge upstream updates into published `dev`; do not rewrite shared history or
-force-push it. Preserve the Vite proxy override when resolving UI conflicts;
-upstream removed `ui/src/setupProxy.js` during its migration from CRA to Vite.
-Do not assume additional remotes or hard-code proxy settings.
+force-push it. Resolve application conflicts in line with upstream. In
+particular, keep upstream's deletion of `ui/src/setupProxy.js` and its Vite
+configuration; upstream migrated away from CRA. The optional
+`INSPIRE_API_PROXY_TARGET` override supports local development while preserving
+upstream's `http://hep-web:8000` default for Docker. Keep upstream ignore rules
+when resolving `.gitignore` conflicts, including `CLAUDE.md`, alongside local
+`.envrc` exclusions. Do not assume additional remotes or hard-code proxy settings.
 
-Create focused feature, fix, refactor, and chore branches from `master` unless
-the user specifies another base. Use kebab-case names with `feat/`, `fix/`,
+The repository default branch is `master`. Create focused feature, fix,
+refactor, and chore branches from it unless the repository migrates to `main`
+or the user specifies another base. Respect configured remotes and upstreams.
+Keep changes focused; avoid mass formatting and unrelated dependency bumps.
+Use kebab-case names with `feat/`, `fix/`,
 `refactor/`, or `chore/` prefixes. Commit subjects use
 `type: imperative summary`, at most 72 characters, without `Co-authored-by`
 trailers. Preserve unrelated user changes. For upstream contributions, follow
@@ -312,25 +320,57 @@ be present; check that the symlink targets exist before using these commands.
 - `docs/local-setup-almalinux9-cn.md` — Chinese translation of the setup guide
 - `IMPORT.md` — bulk import usage guide (softlink to `../curation_stats/IMPORT.md`)
 
-## Linting and code style
+## Code changes
+
+- Follow the affected service's existing conventions and configured formatters
+  and linters. The root Python pre-commit configuration uses Ruff.
+- Keep functions focused, use meaningful names, and document public APIs.
+- Add type annotations to new Python APIs and use existing TypeScript patterns.
+- Handle external failures explicitly. Use assertions only for internal
+  invariants, never required validation or side effects.
+- Add meaningful regression tests for behavior changes. Preserve portability
+  where supported and avoid unrelated line-ending changes.
+- Coordinate changes across API consumers, schemas, indexing, and workflows
+  when the affected behavior crosses service boundaries.
 
 Root `ruff.toml` applies to the whole repo (Python 3.11 target). Key rules: `E`, `F`, `UP`, `B`, `SIM`, `I`, `TID`, `PT`. Line-length (`E501`) is ignored for `backend/**`. Migration files are excluded in backoffice.
 
-Keep changes focused, follow service formatters, and avoid mass formatting or
-unrelated dependency updates. Use type annotations for new Python APIs and
-existing TypeScript patterns. Document public APIs, handle external failures
-explicitly, and reserve assertions for internal invariants. Add meaningful
-regression tests for behavior changes. Coordinate API, schema, indexing, and
-workflow changes across service boundaries when necessary. Use portable paths
-and preserve repository line endings.
+Use portable paths and preserve repository line endings. Never commit
+credentials or secrets from local environments or recorded test cassettes.
 
-Run `pre-commit run --files <changed-files>` from the root for Python changes;
-the root hooks apply to `backend/`, `backoffice/`, and `workflows/`.
-Inspect other JavaScript services' `package.json` scripts before choosing checks.
-Run relevant suites before completing implementation work and verify the
-affected workflow end to end when feasible. `make run-e2e-test` recreates
-development containers, so account for existing services before running it.
-For documentation-only changes, review the content and run `git diff --check`.
-Report exactly what ran, failures, and unavailable checks; never claim
-unverified success. Never commit credentials or secrets from local environments
-or recorded test cassettes.
+## Validation
+
+Run commands from the stated directory and use an existing configured environment
+or running development containers:
+
+| Area | Command | Directory |
+| --- | --- | --- |
+| Backend | `poetry run ./run-tests.sh` | `backend/` |
+| All backend tests | `poetry run ./run-tests.sh --all` | `backend/` |
+| Backoffice in Docker | `docker compose exec -T backoffice-worker pytest .` | Repository root |
+| Workflows in Docker | `docker compose exec -T airflow-worker pytest tests` | Repository root |
+| UI unit tests | `yarn test:unit` | `ui/` |
+| UI full checks | `yarn test` | `ui/` |
+| Python pre-commit checks | `pre-commit run --files <changed-files>` | Repository root |
+
+- Backend tests use testmon locally. Use `--all` or explicit selection when
+  dependency or fixture changes would otherwise escape selection.
+- For other JavaScript services, inspect their `package.json` scripts before
+  selecting checks.
+- Run relevant tests and required checks before declaring implementation
+  complete, and verify the affected workflow end-to-end when feasible.
+- `make run-e2e-test` recreates development containers. Account for its impact on
+  existing local services before running it.
+- For documentation-only edits, review the content and run `git diff --check`;
+  application test suites are unnecessary.
+- Report exactly what ran and disclose failures or unavailable checks. Do not
+  claim unverified success.
+
+The root pre-commit hooks apply to `backend/`, `backoffice/`, and
+`workflows/`. UI `yarn test` includes lint, types, coverage, and bundle size;
+`yarn test:unit` runs Vitest once.
+
+## Communication
+
+Always respond in English. Summarize what changed, why, how it was validated,
+and any material limitations.

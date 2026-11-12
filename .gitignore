@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 .claude/
-CLAUDE.md
 # Idea software family
 .idea/
 
@@ -90,6 +89,7 @@ workflows/logs/
 
 # Environments
 .env
+.envrc
 .venv
 env/
 venv/
@@ -100,4 +100,4 @@ venv.bak/
 
 # Agent
 ./codex/AGENTS.md
-.envrc
+CLAUDE.md
