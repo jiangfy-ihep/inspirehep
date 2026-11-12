@@ -1,96 +1,105 @@
-# Running the Dev Server
+# Running the development services
 
-## Start
+Complete the [AlmaLinux 10 setup](local-setup-almalinux10.md) first
+([中文](local-setup-almalinux10-cn.md)). These commands use native backend, UI,
+and backoffice processes with Docker infrastructure. They do not start Airflow
+or the complete asynchronous workflow stack. For the full Docker workflow,
+follow the root README and the setup guide's topology notes.
 
-### Step 1 — Infrastructure (Docker)
+Run each terminal's block starting at the repository root. The local `.env`
+files must already contain the settings from the setup guide. Poetry manages
+the Python environments and dependencies; no system Python changes are needed.
+
+## Infrastructure terminal
 
 ```bash
-cd ~/projects/inspirehep
-docker compose -f docker-compose.services.yml -f docker-compose.override.yml up -d es mq db cache s3
+docker compose -f docker-compose.yml -f docker-compose.override.yml \
+  up -d db db-backoffice cache mq backoffice-mq es s3
+docker compose -f docker-compose.yml -f docker-compose.override.yml ps
 ```
 
-### Step 2 — Backend
+Use these same Compose files on every restart. The older `scripts/dev.sh`
+selects a reduced topology that omits host RabbitMQ ports and the separate
+backoffice infrastructure; use the explicit commands here instead.
 
-Open a terminal and run (keep it open):
+## Backend terminal
 
 ```bash
-cd ~/projects/inspirehep/backend
-direnv exec . ./scripts/server
+cd backend
+set -a
+source ./.env
+set +a
+./scripts/server
 ```
 
-### Step 3 — UI
+The script uses Poetry to start Gunicorn on port 8000 and the backend Celery
+worker, both with automatic reload. Keep the terminal open.
 
-Open another terminal and run:
+## UI terminal
 
 ```bash
-cd ~/projects/inspirehep/ui
+nvm use 24.15.0
+cd ui
 INSPIRE_API_PROXY_TARGET=http://localhost:8000 yarn start
 ```
 
-Use Node 24.15.0, matching the UI Dockerfiles. Vite binds to all interfaces on
-port 3000. The proxy override connects to the locally running backend; Docker
-keeps the default `http://hep-web:8000` target. Enable
-`INVENIO_FEATURE_FLAG_ENABLE_LOCAL_LOGIN=True` in the backend's local environment
-if using the local login page.
+Vite listens on port 3000 and binds all interfaces. The override directs `/api`
+requests to the native backend. Docker's default target remains
+`http://hep-web:8000`. Do not set `NODE_OPTIONS=--openssl-legacy-provider` or
+restore the removed CRA `setupProxy.js`.
 
-### All-in-one (recommended)
-
-The tmux script starts infrastructure, backend, UI, and backoffice in one command:
+## Backoffice terminal
 
 ```bash
-cd ~/projects/inspirehep
-./scripts/dev.sh
+cd backoffice
+set -a
+source ./.env
+set +a
+poetry run python manage.py runserver 0.0.0.0:8001
 ```
 
-This creates a tmux session named `inspirehep` with four windows:
-- `backend` — gunicorn + celery worker
-- `ui` — React dev server
-- `backoffice` — Django runserver on :8001
-- `shell` — free shell at project root
+The guide's native environment disables loading the container `.envs` defaults
+and uses the database on port 5434 and broker on port 5673. This starts Django;
+it does not start the backoffice Celery worker or Airflow.
 
-| tmux shortcut | Action |
-|---|---|
-| `Ctrl+B D` | Detach from session (leaves everything running) |
-| `tmux attach -t inspirehep` | Reattach to running session |
-| `Ctrl+B 0/1/2` | Switch between windows |
-
----
-
-## Stop
-
-Kill the tmux session (stops backend and UI):
+## Check the running services
 
 ```bash
-tmux kill-session -t inspirehep
+curl --fail http://localhost:8000/api/literature/
+curl --fail http://localhost:3000/api/literature/
+curl --fail http://localhost:9200/_cluster/health
 ```
 
-Stop infrastructure:
+| Service | Local URL |
+| --- | --- |
+| UI / local login | `http://localhost:3000/user/login/local` |
+| Backend API | `http://localhost:8000/api/literature/` |
+| Backoffice admin | `http://localhost:8001/admin/` |
+| MinIO console | `http://localhost:9001` |
+
+The fixture UI login is `admin@inspirehep.net` / `123456`; backoffice is
+`admin@admin.com` / `admin`. The local override uses MinIO credentials
+`inspirehep` / `inspirehep`. Local UI login requires
+`INVENIO_FEATURE_FLAG_ENABLE_LOCAL_LOGIN=True` in `backend/.env`.
+
+For LAN access, use your actual hostname/IP, update the backend's server/schema
+host settings, and request the administrator's firewall changes from the setup
+guide. This page intentionally does not embed a particular host IP or assume
+firewalld is installed.
+
+## Stop and restart
+
+Use `Ctrl+C` in each application terminal. To stop infrastructure while keeping
+its containers:
 
 ```bash
-cd ~/projects/inspirehep
-docker compose -f docker-compose.services.yml -f docker-compose.override.yml down
+docker compose -f docker-compose.yml -f docker-compose.override.yml stop
 ```
 
-If not using tmux, `Ctrl+C` in each terminal window is enough to stop the backend and UI.
+For persistence details, see the setup guide before using `down` or deleting
+volumes. Do not run `fixtures setup`, index rebuilds, or `make run-e2e-test` as
+daily startup checks; they reset data or recreate services.
 
----
-
-## URLs
-
-Access from other machines on the same intranet (replace IP if your server address changes):
-
-| Service | URL |
-|---|---|
-| UI | http://192.168.219.191:3000 |
-| Backend API | http://192.168.219.191:8000/api/literature/ |
-| Backoffice API | http://192.168.219.191:8001/api/ |
-| Backoffice admin | http://192.168.219.191:8001/admin/ |
-| MinIO console | http://192.168.219.191:9001 |
-| Admin login | admin@inspirehep.net / 123456 |
-| MinIO login | inspirehep / inspirehep |
-
-> Firewall must allow ports 3000 and 8000:
-> ```bash
-> sudo firewall-cmd --permanent --add-port=3000/tcp --add-port=8000/tcp
-> sudo firewall-cmd --reload
-> ```
+You may put these same commands into separate tmux windows. Killing such a
+tmux session stops its applications; detaching with `Ctrl+B`, then `d` leaves
+them running.

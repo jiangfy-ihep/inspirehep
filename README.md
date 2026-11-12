@@ -12,6 +12,10 @@ As a monorepo, it currently contains three main services (besides helper service
 
 Want to contribute? Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or a pull request.
 
+For AlmaLinux 10 host development, see the [setup guide](docs/local-setup-almalinux10.md)
+([中文](docs/local-setup-almalinux10-cn.md)) and [daily startup commands](docs/running-the-dev-server.md).
+These distinguish the native development topology from the full Docker stack below.
+
 Okay, so now the question is: **how do we develop on it?**
 
 ## Table of Contents
@@ -133,7 +137,7 @@ We're using `v24.15.0` (first version we install is the default)
 
 ```
 $ nvm install 24.15.0
-$ nvm use global 24.15.0
+$ nvm use 24.15.0
 ```
 
 **Yarn**
@@ -271,13 +275,12 @@ The record editor should now be availabe and automatically update when changes a
 
 ### General
 
-You can also connect UI to another environment by changing the proxy in `ui/setupProxy.js`
+The Vite development server can connect to a different backend using
+`INSPIRE_API_PROXY_TARGET` (see `ui/vite.config.mts`):
 
-```javascript
-proxy({
-  target: 'http://A_PROXY_SERVER',
-  ...
-});
+```bash
+cd ui
+INSPIRE_API_PROXY_TARGET=http://localhost:8000 yarn start
 ```
 ---
 
@@ -403,11 +406,11 @@ After setting the variables, run the tests, so the cassettes get generated.
 
 ```bash
 $ cd ui
-$ yarn test # runs everything (lint, bundlesize etc.) indentical to CI
-$ yarn test:unit # will open jest on watch mode
+$ yarn test # lint, TypeScript, Vitest coverage, and bundle size
+$ yarn test:unit # runs Vitest once
 ```
 
-Note that `jest` automatically run tests that changed files (unstaged) affect.
+The unit-test script uses `vitest run`; it does not start a watch session.
 
 ### cypress (e2e)
 
