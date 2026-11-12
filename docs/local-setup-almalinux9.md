@@ -13,7 +13,7 @@ and `tmux` to keep services running across terminal sessions.
 - [Installation](#installation)
   - [1. System dependencies](#1-system-dependencies)
   - [2. Python 3.11 via uv](#2-python-311-via-uv)
-  - [3. Node 20 via nvm](#3-node-20-via-nvm)
+  - [3. Node 24 via nvm](#3-node-24-via-nvm)
   - [4. Yarn](#4-yarn)
   - [5. Poetry](#5-poetry)
   - [6. pre-commit](#6-pre-commit)
@@ -182,7 +182,7 @@ docker compose -f docker-compose.services.yml -f docker-compose.override.yml dow
 
 ### Syncing with upstream
 
-Local adaptations live on the `local` branch. `master` is a clean mirror of the
+Local adaptations live on `dev`, which tracks `origin/dev`. `master` tracks the
 official [inspirehep/inspirehep](https://github.com/inspirehep/inspirehep)
 repository and should never be committed to directly.
 
@@ -190,39 +190,26 @@ repository and should never be committed to directly.
 
 | Remote | URL | Role |
 |---|---|---|
-| `upstream` | `git@github.com:inspirehep/inspirehep.git` | official repo (pull only) |
-| `origin` | `git@github.com:jiangfy-ihep/inspirehep.git` | GitHub fork (primary backup) |
-| `origin-gitlab` | `git@code.ihep.ac.cn:jiangfy/inspirehep.git` | IHEP GitLab (secondary backup) |
+| `upstream` | `https://github.com/inspirehep/inspirehep` | official repo (fetch only; pushes disabled) |
+| `origin` | `git@github.com:jiangfy-ihep/inspirehep.git` | GitHub fork (default push destination) |
 
 **Run this whenever upstream publishes new commits:**
 
 ```bash
-export http_proxy=http://192.168.219.196:10810
-export https_proxy=http://192.168.219.196:10810
-
-# 1. Pull new upstream commits into master
-git checkout master
-git pull upstream master
-
-# 2. Push master to both backups
-git push origin master
-git push origin-gitlab master
-
-# 3. Rebase your local adaptations on top of the new master
-git checkout local
-git rebase master
-
-# 4. Back up the local branch to both remotes
-git push origin local --force-with-lease
-git push origin-gitlab local --force-with-lease
+# Start with a clean working tree.
+git fetch upstream
+git switch master
+git merge --ff-only upstream/master
+git switch dev
+git pull --ff-only origin dev
+git merge upstream/master
+# Resolve conflicts and run the affected checks before pushing.
+git push origin dev
 ```
 
-If `rebase` reports a conflict on `ui/src/setupProxy.js`, re-apply the
-`localhost:8000` target and run `git rebase --continue`.
-
-> `origin-gitlab` is on the intranet — no proxy required for those pushes,
-> but the proxy env vars set above do no harm (intranet addresses are in
-> `no_proxy`).
+Merge upstream changes into published `dev` without force-pushing. Preserve the
+`INSPIRE_API_PROXY_TARGET` override in `ui/vite.config.mts`; upstream replaced
+`ui/src/setupProxy.js` with Vite. The old `origin/local` is now `origin/dev`.
 
 ---
 
@@ -293,15 +280,15 @@ uv run --python 3.11 python --version
 
 ---
 
-### 3. Node 20 via nvm
+### 3. Node 24 via nvm
 
-The UI build scripts use `NODE_OPTIONS=--openssl-legacy-provider`, which
-requires Node 20 (Node 22+ dropped support for this flag).
+Use Node 24.15.0, matching the UI Dockerfiles. The UI now uses Vite and does
+not need the old `NODE_OPTIONS=--openssl-legacy-provider` setting.
 
 ```bash
-nvm install 20.0.0
-nvm use 20.0.0
-nvm alias default 20.0.0
+nvm install 24.15.0
+nvm use 24.15.0
+nvm alias default 24.15.0
 ```
 
 ---
@@ -388,6 +375,7 @@ INVENIO_S3_HOSTNAME=http://localhost:9000
 INVENIO_S3_ACCESS_KEY=inspirehep
 INVENIO_S3_SECRET_KEY=inspirehep
 INVENIO_FEATURE_FLAG_ENABLE_FILES=True
+INVENIO_FEATURE_FLAG_ENABLE_LOCAL_LOGIN=True
 INVENIO_SERVER_NAME=<HOST_IP>:8000
 INVENIO_JSONSCHEMAS_HOST=<HOST_IP>:8000
 ```
@@ -495,7 +483,7 @@ direnv exec . poetry run inspirehep files create-buckets
 
 ```bash
 cd ui
-nvm use 20.0.0
+nvm use 24.15.0
 yarn install
 ```
 
@@ -512,12 +500,13 @@ closing the terminal:
 ./scripts/dev.sh
 ```
 
-This creates a tmux session named `inspirehep` with three windows:
+This creates a tmux session named `inspirehep` with four windows:
 
 | Window | Content |
 |---|---|
 | `backend` | Gunicorn (port 8000) + Celery worker with auto-reload |
 | `ui` | React dev server (port 3000) with hot reload |
+| `backoffice` | Django development server (port 8001) |
 | `shell` | Free terminal at project root |
 
 **tmux key reference:**
@@ -631,12 +620,12 @@ Run `py.test` directly with testmon:
 poetry run py.test tests/integration/records --testmon --no-cov
 ```
 
-**UI** (Jest):
+**UI** (Vitest):
 
 ```bash
 cd ui
-yarn test         # lint + unit tests + bundle size check (same as CI)
-yarn test:unit    # unit tests in watch mode
+yarn test         # lint + types + coverage + bundle size check
+yarn test:unit    # unit tests, one run
 ```
 
 **End-to-end** (Cypress):

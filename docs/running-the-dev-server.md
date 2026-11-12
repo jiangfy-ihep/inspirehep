@@ -24,12 +24,18 @@ Open another terminal and run:
 
 ```bash
 cd ~/projects/inspirehep/ui
-HOST=0.0.0.0 NODE_OPTIONS=--openssl-legacy-provider yarn start
+INSPIRE_API_PROXY_TARGET=http://localhost:8000 yarn start
 ```
+
+Use Node 24.15.0, matching the UI Dockerfiles. Vite binds to all interfaces on
+port 3000. The proxy override connects to the locally running backend; Docker
+keeps the default `http://hep-web:8000` target. Enable
+`INVENIO_FEATURE_FLAG_ENABLE_LOCAL_LOGIN=True` in the backend's local environment
+if using the local login page.
 
 ### All-in-one (recommended)
 
-The tmux script starts infra, backend, and UI in one command:
+The tmux script starts infrastructure, backend, UI, and backoffice in one command:
 
 ```bash
 cd ~/projects/inspirehep

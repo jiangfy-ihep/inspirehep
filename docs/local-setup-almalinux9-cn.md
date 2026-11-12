@@ -13,7 +13,7 @@
 - [安装步骤](#安装步骤)
   - [1. 系统依赖](#1-系统依赖)
   - [2. 通过 uv 安装 Python 3.11](#2-通过-uv-安装-python-311)
-  - [3. 通过 nvm 安装 Node 20](#3-通过-nvm-安装-node-20)
+  - [3. 通过 nvm 安装 Node 24](#3-通过-nvm-安装-node-24)
   - [4. Yarn](#4-yarn)
   - [5. Poetry](#5-poetry)
   - [6. pre-commit](#6-pre-commit)
@@ -180,46 +180,35 @@ docker compose -f docker-compose.services.yml -f docker-compose.override.yml dow
 
 ### 与上游同步
 
-本地适配内容位于 `local` 分支上。`master` 是官方
+本地适配内容位于跟踪 `origin/dev` 的 `dev` 分支上。`master` 跟踪官方
 [inspirehep/inspirehep](https://github.com/inspirehep/inspirehep)
-仓库的干净镜像，永远不要直接向其提交。
+仓库的 `upstream/master`，永远不要直接向其提交。
 
 **远程仓库布局：**
 
 | 远程 | URL | 角色 |
 |---|---|---|
-| `upstream` | `git@github.com:inspirehep/inspirehep.git` | 官方仓库（仅拉取） |
-| `origin` | `git@github.com:jiangfy-ihep/inspirehep.git` | GitHub 分支（主备份） |
-| `origin-gitlab` | `git@code.ihep.ac.cn:jiangfy/inspirehep.git` | IHEP GitLab（辅助备份） |
+| `upstream` | `https://github.com/inspirehep/inspirehep` | 官方仓库（仅拉取，禁止推送） |
+| `origin` | `git@github.com:jiangfy-ihep/inspirehep.git` | GitHub 分支（默认推送目标） |
 
 **每当上游发布新提交时执行：**
 
 ```bash
-export http_proxy=http://192.168.219.196:10810
-export https_proxy=http://192.168.219.196:10810
-
-# 1. 拉取新的上游提交到 master
-git checkout master
-git pull upstream master
-
-# 2. 将 master 推送到两个备份远程
-git push origin master
-git push origin-gitlab master
-
-# 3. 将本地适配内容变基到新 master 之上
-git checkout local
-git rebase master
-
-# 4. 将 local 分支备份到两个远程
-git push origin local --force-with-lease
-git push origin-gitlab local --force-with-lease
+# 确保工作区干净。
+git fetch upstream
+git switch master
+git merge --ff-only upstream/master
+git switch dev
+git pull --ff-only origin dev
+git merge upstream/master
+# 解决冲突并运行相关检查后再推送。
+git push origin dev
 ```
 
-如果 `rebase` 在 `ui/src/setupProxy.js` 上报冲突，重新应用
-`localhost:8000` 目标后执行 `git rebase --continue`。
-
-> `origin-gitlab` 位于内网 — 推送时无需代理，
-> 但上述代理环境变量设置也无妨碍（内网地址在 `no_proxy` 中）。
+通过合并将上游更新纳入已发布的 `dev`，不要强制推送。
+上游已用 Vite 替换 `ui/src/setupProxy.js`；解决冲突时保留
+`ui/vite.config.mts` 中的 `INSPIRE_API_PROXY_TARGET` 配置。
+原来的 `origin/local` 已重命名为 `origin/dev`。
 
 ---
 
@@ -290,15 +279,15 @@ uv run --python 3.11 python --version
 
 ---
 
-### 3. 通过 nvm 安装 Node 20
+### 3. 通过 nvm 安装 Node 24
 
-UI 构建脚本使用 `NODE_OPTIONS=--openssl-legacy-provider`，
-需要 Node 20（Node 22+ 已不再支持此选项）。
+使用与 UI Dockerfile 一致的 Node 24.15.0。UI 现已使用 Vite，
+不再需要旧的 `NODE_OPTIONS=--openssl-legacy-provider` 设置。
 
 ```bash
-nvm install 20.0.0
-nvm use 20.0.0
-nvm alias default 20.0.0
+nvm install 24.15.0
+nvm use 24.15.0
+nvm alias default 24.15.0
 ```
 
 ---
@@ -385,6 +374,7 @@ INVENIO_S3_HOSTNAME=http://localhost:9000
 INVENIO_S3_ACCESS_KEY=inspirehep
 INVENIO_S3_SECRET_KEY=inspirehep
 INVENIO_FEATURE_FLAG_ENABLE_FILES=True
+INVENIO_FEATURE_FLAG_ENABLE_LOCAL_LOGIN=True
 INVENIO_SERVER_NAME=<主机IP>:8000
 INVENIO_JSONSCHEMAS_HOST=<主机IP>:8000
 ```
@@ -490,7 +480,7 @@ direnv exec . poetry run inspirehep files create-buckets
 
 ```bash
 cd ui
-nvm use 20.0.0
+nvm use 24.15.0
 yarn install
 ```
 
@@ -506,12 +496,13 @@ tmux 辅助脚本启动所有服务，关闭终端后服务仍保持运行：
 ./scripts/dev.sh
 ```
 
-这将创建名为 `inspirehep` 的 tmux 会话，包含三个窗口：
+这将创建名为 `inspirehep` 的 tmux 会话，包含四个窗口：
 
 | 窗口 | 内容 |
 |---|---|
 | `backend` | Gunicorn（端口 8000）+ Celery worker，自动重载 |
 | `ui` | React 开发服务器（端口 3000），热更新 |
+| `backoffice` | Django 开发服务器（端口 8001） |
 | `shell` | 项目根目录的空闲终端 |
 
 **tmux 按键参考：**
@@ -624,12 +615,12 @@ poetry run ./run-tests.sh --pdb         # 失败时进入调试器
 poetry run py.test tests/integration/records --testmon --no-cov
 ```
 
-**UI**（Jest）：
+**UI**（Vitest）：
 
 ```bash
 cd ui
-yarn test         # lint + 单元测试 + 打包体积检查（与 CI 一致）
-yarn test:unit    # 监测模式下的单元测试
+yarn test         # lint + 类型检查 + 覆盖率 + 打包体积检查
+yarn test:unit    # 运行一次单元测试
 ```
 
 **端到端**（Cypress）：
