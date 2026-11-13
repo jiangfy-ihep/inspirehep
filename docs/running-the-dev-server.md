@@ -28,6 +28,13 @@ guide's container smoke test before treating nested Docker as operational.
 
 ## Infrastructure terminal
 
+First choose a [storage plan](local-setup-almalinux10.md#storage-verified-mounts-rootless-podman-and-persistent-data).
+The default Compose topology is disposable across workspace replacement.
+Persistent service data requires approved storage and explicit bindings before
+initialization. The two `/aifs` paths are NFS `soft` mounts and must not be used
+as PostgreSQL live data directories in their current configuration. Local
+Podman engine storage, if trialed, is a separate concern from service persistence.
+
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.override.yml \
   up -d db db-backoffice cache mq backoffice-mq es s3
@@ -116,6 +123,8 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml stop
 For persistence details, see the setup guide before using `down` or deleting
 volumes. Do not run `fixtures setup`, index rebuilds, or `make run-e2e-test` as
 daily startup checks; they reset data or recreate services.
+Keeping containers stopped or giving their volumes names does not make data on
+the workspace overlay survive container/Pod replacement.
 
 Leave the daemon session running for the next application restart. `Ctrl+C` in
 that session stops the nested engine and affects its workloads. Pod replacement

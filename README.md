@@ -17,6 +17,8 @@ For this AlmaLinux 10 Kubernetes workspace, see the [setup guide](docs/local-set
 The workspace runs without systemd; the guide covers manual nested Docker startup,
 socket permissions, and networking without an active D-Bus/firewalld service.
 It distinguishes the native workspace topology from the full Docker stack below.
+The guide's [storage requirements](docs/local-setup-almalinux10.md#storage-verified-mounts-rootless-podman-and-persistent-data)
+cover the NFS `soft` mounts, local rootless Podman storage, and PVCs for durable service data.
 
 Okay, so now the question is: **how do we develop on it?**
 

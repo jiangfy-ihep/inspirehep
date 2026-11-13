@@ -183,6 +183,94 @@ cgroup、启用全面 privileged 模式或关闭 Docker 防火墙管理作为通
 Compose 绑定挂载属于引擎所在机器，不会自动指向本工作区。后续命令假定工作区
 内的嵌套引擎已经可用。
 
+### 存储：已验证挂载、rootless Podman 与持久化数据
+
+2026-11-13 在代理沙箱外执行了以下存储检查：
+
+```bash
+findmnt -n -o TARGET,FSTYPE,OPTIONS -T /aifs/user/data/jiangfayu
+findmnt -n -o TARGET,FSTYPE,OPTIONS -T /aifs/user/home/jiangfayu
+findmnt -n -o TARGET,FSTYPE,OPTIONS -T /tmp
+findmnt -n -o TARGET,FSTYPE,OPTIONS -T /var/tmp
+df -h /tmp /var/tmp
+```
+
+| 路径 | 已观察的文件系统 | 用途 |
+| --- | --- | --- |
+| `/aifs/user/data/jiangfayu` | 可写 NFSv4，使用 `soft` 挂载 | 共享源文件、导入数据、已验证的备份 |
+| `/aifs/user/home/jiangfayu` | 可写 NFSv4，使用 `soft` 挂载 | 用户文件与配置 |
+| `/tmp`、`/var/tmp` | 同一个挂载在 `/` 的可写 `overlay` 文件系统 | 工作区本地的可丢弃存储 |
+| `/var/lib/docker` | 同一容器 overlay，当前 Docker 数据根目录 | 引擎数据和默认卷，不具备 Pod 级持久化保证 |
+
+检查时 overlay 报告约 766 GiB 可用，这是当时共享文件系统的剩余空间，不是
+用户配额或 Kubernetes 临时存储保证。`/tmp` 与 `/var/tmp` 不是两份独立空间。
+工作区容器/Pod 替换后内容可能消失，在 `/var/tmp` 创建目录不会自动获得持久性。
+
+#### PostgreSQL 与 NFS soft 挂载限制
+
+不要将 PostgreSQL 的运行数据目录放在当前两个 `/aifs` 挂载上。PostgreSQL
+要求 NFS 数据文件系统使用 `hard`；网络故障时 `soft` 可能返回 I/O 错误。
+NFS 并非一概不支持，但用于数据库前必须由管理员验证挂载、服务端导出与 fsync
+持久化行为以及权限。参考
+[PostgreSQL NFS 要求](https://www.postgresql.org/docs/14/creating-cluster.html#CREATING-CLUSTER-NFS)。
+
+挂载或导出修改由存储/集群管理员处理，不要在本工作区重新挂载共享 `/aifs`。
+改为 `hard` 可以解决 PostgreSQL 的这一项要求，但不会让 NFS 变成 rootless
+Podman 可用的容器存储文件系统。
+
+数据库 dump、导入 JSON 和备份可以存放在 NFS，例如拟议目录
+`/aifs/user/data/jiangfayu/inspirehep-data/backups/`。检查备份命令结果并测试恢复，
+使用数据库专用备份工具；复制正在运行的 PostgreSQL 数据目录不能替代正确的
+备份流程。文档更新没有创建该示例目录。
+
+#### Rootless Podman 存储与应用数据是不同问题
+
+Podman 尚未安装或验证，这些发现不会把仓库切换到 Podman。
+默认 rootless 存储 `$HOME/.local/share/containers/storage` 在当前环境位于 NFS。
+Podman 的镜像/容器存储（`graphroot`）应改为受支持的非 NFS 存储；配置文件
+可以留在 NFS home 中。参考
+[Podman rootless 存储限制](https://docs.podman.io/en/latest/markdown/podman.1.html#note-unsupported-file-systems-in-rootless-mode)。
+
+`/var/tmp/jiangfayu-podman/storage` 这样的私有目录是可丢弃引擎存储的候选，
+不是已验证或持久化的配置。试用前先检查已有 `storage.conf`，为无 systemd
+环境准备用户独占、权限为 `0700` 的非 NFS 运行时目录，例如
+`/var/tmp/jiangfayu-podman/run`。没有登录服务管理器时，`XDG_RUNTIME_DIR` 可能
+未设置，需要显式配置并验证，不能依赖 systemd 自动创建路径。
+安装所需 Podman、网络及 FUSE 软件包后再进行试用。
+按需使用 `fuse-overlayfs` 支持 rootless 镜像分层；overlay 底层仍需实际存储和
+容器冒烟测试。不要对有数据的引擎随意更改 graphroot/驱动，也不要只通过
+`alias docker` 就认定服务兼容。
+
+应用数据绑定挂载与引擎存储是不同问题。非 NFS graphroot 不会让 PostgreSQL
+挂载数据自动持久化，也不会修复 NFS `soft` 挂载。Rootless UID/GID 映射必须
+匹配数据目录权限；即使镜像存储放在本地，只读 cgroup 与 Compose 资源限制问题
+仍然需要验证。
+
+#### 持久化服务需要明确存储方案
+
+| 数据 | 建议位置 |
+| --- | --- |
+| 源代码、导入快照、数据库 dump/备份 | 现有 `/aifs/user/data/jiangfayu`，按其保留与备份策略处理 |
+| 可重新下载的镜像、临时容器层 | 私有非 NFS 工作区存储，未另外配置持久化时视为可丢弃 |
+| PostgreSQL 与 OpenSearch 运行数据 | 管理员提供、符合服务要求的持久化文件系统 |
+| 必须跨替换保留的 MinIO 对象、RabbitMQ 队列、Redis 状态 | 显式持久化挂载或托管服务，并配置各服务的持久化选项 |
+
+向管理员申请由合适块存储 StorageClass 提供的文件系统模式 PVC，格式化为
+ext4/XFS 并挂载到工作区，或使用获准的外部数据库/搜索服务。拟议挂载点为
+`/persistent/inspirehep`，它目前不存在，单独 `mkdir` 不会创建持久卷。各服务
+使用独立数据目录，按实际容器 UID/GID 映射设置所有权，初始化前确认文件系统
+及挂载边界。
+
+管理员还需确认容量、Pod 重新调度/访问要求、PVC/PV 删除及回收策略，以及
+备份恢复方案。PVC 可以比 Pod 存活更久，但本身不是备份，也不保证不会被删除。
+参考 [Kubernetes 持久卷](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)。
+
+保存重要数据前，必须将获准存储显式接入 Compose。当前覆盖文件中的
+`minio-data` 是普通命名卷，不是 Kubernetes PVC；PostgreSQL/OpenSearch
+服务没有显式绑定外部持久化数据挂载。Docker/Podman 命名卷的持久性取决于
+引擎底层存储；引擎数据位于工作区 overlay 时，仅有卷名不能防止替换后丢失。
+在实施存储方案并验证恢复前，提供的 Compose 配置应视为可丢弃的开发基础设施。
+
 ### OpenSearch 内核参数
 
 OpenSearch 要求 `vm.max_map_count` 至少为 `262144`，当前共享内核已满足，
@@ -293,6 +381,9 @@ pre-commit install
 ```
 
 ## 4. 启动原生开发所需基础设施
+
+初始化前，按上方存储章节选择可丢弃还是持久化服务数据。下列命令不会创建 PVC
+或添加持久化数据绑定；用于可丢弃开发环境，或先接入管理员批准的持久化配置。
 
 使用主 Compose 文件，它提供 RabbitMQ 主机端口以及独立的 backoffice
 数据库和消息代理。需要运行基础设施命令的每个终端都应在仓库根目录定义：
@@ -498,7 +589,8 @@ UI 使用 Vitest，`test:unit` 只运行一次；`yarn test` 还包括 lint、�
 日常停止时对应用执行 `Ctrl+C`，基础设施使用 `dc stop` 保留容器。
 `dc down` 会删除容器，匿名数据库卷未必会在下一次 `up` 时重新挂载。删除容器或
 卷前先备份；本地覆盖文件只为 MinIO 显式定义了命名卷，不要假定所有服务都有
-同样的持久化配置。
+同样的持久化配置。即使执行 `dc stop`，工作区替换也可能丢失 overlay 上的数据；
+持久化服务应遵循上方的存储方案。
 
 保持 `master` 跟踪 `upstream/master`、`dev` 跟踪 `origin/dev`：
 
@@ -526,12 +618,20 @@ git push origin dev
 - [firewall-cmd 客户端与 D-Bus](https://firewalld.org/documentation/man-pages/firewall-cmd.html)
 - [Kubernetes 容器安全限制](https://kubernetes.io/docs/concepts/security/linux-kernel-security-constraints/)
 - [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+- [PostgreSQL NFS 挂载与导出要求](https://www.postgresql.org/docs/14/creating-cluster.html#CREATING-CLUSTER-NFS)
+- [Podman rootless 存储要求](https://docs.podman.io/en/latest/markdown/podman.1.html#note-unsupported-file-systems-in-rootless-mode)
+- [Kubernetes 持久卷](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
+- [PostgreSQL dump 备份](https://www.postgresql.org/docs/14/backup-dump.html)
 
 2026-11-13 在代理沙箱外检查了工作区 PID 1、用户空间版本、已安装软件包、
 只读 cgroup 挂载、socket 所有权、用户组和内核参数。使用账号已有 Docker
 组成员身份的子 shell 成功执行了只读查询：服务端 29.9.3，存储驱动 `overlayfs`，
 cgroup 驱动 `cgroupfs`，cgroup 版本 2。原长期运行会话仍被拒绝访问 socket。
 firewalld 状态查询返回了上文记录的 D-Bus 错误。
+
+存储检查还确认两个 `/aifs` 挂载均使用 `soft`，`/tmp` 与 `/var/tmp` 共用工作区
+overlay，Docker 的 `/var/lib/docker` 也位于该 overlay。Podman 尚未安装，
+`/persistent/inspirehep` 不存在；没有部署或验证任何候选持久化数据存储。
 
 这些检查未改变守护进程运行状态、防火墙规则、Pod 或节点设置。
 `hello-world` 冒烟测试、Compose 工作负载、应用安装/测试、需要权限的防火墙

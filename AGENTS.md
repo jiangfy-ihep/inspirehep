@@ -97,6 +97,41 @@ interpreter separately, as described in the AlmaLinux setup guides.
 - Report which commands actually ran. The updated guide is not evidence that a
   complete installation or application test suite passed on this host.
 
+### Storage and persistence
+
+- Storage was checked outside the agent sandbox on 2026-11-13. Both
+  `/aifs/user/data/jiangfayu` and `/aifs/user/home/jiangfayu` are writable NFSv4
+  mounts using `soft`; do not assume one is a local disk because its name differs.
+- `/tmp` and `/var/tmp` share the container's writable overlay. The reported
+  free space is shared filesystem capacity, not an allocation or persistence
+  guarantee. Docker's current `/var/lib/docker` is also on that overlay.
+  Container/Pod replacement can discard engine data and its default volumes.
+- PostgreSQL requires `hard` for an NFS live data directory. Do not place live
+  PostgreSQL data on the current soft-mounted `/aifs` directories. Mount/export
+  durability and permissions must be reviewed by the storage/cluster admin;
+  do not remount shared storage from the workspace.
+- Shared NFS can hold source files, import snapshots, database dumps, and
+  verified backups, subject to its retention policy. Check backup results and
+  test restores; copying a running database directory is not a backup plan.
+- Rootless Podman's default image store would be on the NFS home and is not
+  supported there. Keep `graphroot` and runtime storage on supported non-NFS
+  storage. A private `/var/tmp/jiangfayu-podman/` directory is only a disposable
+  candidate requiring storage/container validation. Configuration files can
+  stay on NFS. A `hard` NFS mount does not remove Podman's storage restriction.
+  Podman remains uninstalled/unvalidated; do not silently adopt it or migrate
+  existing engine data as part of a documentation update.
+- Persistent service data needs an approved filesystem and explicit service
+  mounts, preferably a block-backed ext4/XFS filesystem-mode PVC or managed
+  database/search services. Confirm container UID/GID mappings, capacity,
+  rescheduling/access needs, PVC/PV deletion/reclaim policy, and backups.
+  `/persistent/inspirehep` is a proposed path that does not exist; creating a
+  directory alone does not provision persistent storage.
+- The existing Compose files do not bind PostgreSQL/OpenSearch data to an
+  externally persistent mount. The local `minio-data` named volume is not a
+  Kubernetes PVC. A named volume or `compose stop` does not protect engine data
+  on an ephemeral workspace overlay against replacement. Treat the default
+  setup as disposable until storage bindings and recovery are verified.
+
 ### Backend
 
 ```bash

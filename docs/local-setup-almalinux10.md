@@ -206,6 +206,109 @@ A remote engine needs a matching topology: `localhost` ports and Compose bind
 mounts refer to the engine's machine, not automatically to this workspace. The
 commands below assume a working nested engine in this workspace.
 
+### Storage: verified mounts, rootless Podman, and persistent data
+
+The following storage checks were made outside the agent sandbox on 2026-11-13:
+
+```bash
+findmnt -n -o TARGET,FSTYPE,OPTIONS -T /aifs/user/data/jiangfayu
+findmnt -n -o TARGET,FSTYPE,OPTIONS -T /aifs/user/home/jiangfayu
+findmnt -n -o TARGET,FSTYPE,OPTIONS -T /tmp
+findmnt -n -o TARGET,FSTYPE,OPTIONS -T /var/tmp
+df -h /tmp /var/tmp
+```
+
+| Path | Observed filesystem | Storage role |
+| --- | --- | --- |
+| `/aifs/user/data/jiangfayu` | Writable NFSv4, `soft` mount | Shared source files, imports, verified backups |
+| `/aifs/user/home/jiangfayu` | Writable NFSv4, `soft` mount | User files and configuration |
+| `/tmp`, `/var/tmp` | Same writable `overlay` filesystem mounted at `/` | Disposable workspace-local storage |
+| `/var/lib/docker` | Same container overlay; current Docker data root | Engine data and default volumes, without Pod-level persistence |
+
+The overlay reported about 766 GiB available. This is shared filesystem free
+space at the time of the check, not a per-user allocation or a Kubernetes
+ephemeral-storage guarantee. `/tmp` and `/var/tmp` do not provide two separate
+allocations. Contents may disappear when the workspace container/Pod is
+replaced; a directory under `/var/tmp` does not become persistent because of
+its name.
+
+#### PostgreSQL and the NFS soft-mount limitation
+
+Do not place PostgreSQL's live data directory on either current `/aifs` mount.
+PostgreSQL requires an NFS data filesystem to use `hard`; `soft` can return I/O
+errors during network failures. NFS itself is not categorically unsupported,
+but an administrator must validate the mount, server export durability/fsync
+behavior, and permissions before using it for database data. See
+[PostgreSQL's NFS requirements](https://www.postgresql.org/docs/14/creating-cluster.html#CREATING-CLUSTER-NFS).
+
+Ask the storage/cluster administrator about any mount or export changes; do not
+remount the shared `/aifs` filesystems from this workspace. A `hard` mount would
+address that PostgreSQL requirement, but would not make NFS suitable for
+rootless Podman's container storage.
+
+NFS remains a place for database dumps, import JSON, and backups, for example
+under the proposed `/aifs/user/data/jiangfayu/inspirehep-data/backups/`. Check
+backup command results and test restores. Use database-aware backup tools;
+copying a running PostgreSQL data directory is not a substitute for a valid
+backup procedure. This example directory was not created during documentation.
+
+#### Rootless Podman storage is separate from application data
+
+Podman remains an uninstalled, unvalidated alternative; these findings do not
+switch the repository away from Docker. Its default rootless storage location,
+`$HOME/.local/share/containers/storage`, would be on NFS here. Podman's rootless
+image/container store (`graphroot`) must instead use supported non-NFS storage.
+Configuration files may stay in the NFS home while `graphroot` is relocated.
+See [Podman rootless storage limitations](https://docs.podman.io/en/latest/markdown/podman.1.html#note-unsupported-file-systems-in-rootless-mode).
+
+A private directory such as `/var/tmp/jiangfayu-podman/storage` is a candidate
+for disposable engine storage, not a validated or persistent configuration.
+Before a trial, inspect existing `storage.conf`, provide a user-owned private
+non-NFS runtime directory, for example `/var/tmp/jiangfayu-podman/run`, with
+permissions `0700`. Without a login service manager, `XDG_RUNTIME_DIR` may not be
+set; configure and validate it rather than relying on a systemd-created path.
+Have the required Podman, networking, and FUSE packages installed before a trial.
+Where needed, `fuse-overlayfs`
+supports rootless image layering; the workspace's overlay-backed filesystem
+still needs an actual storage/container smoke test. Do not change a populated
+engine's graphroot/driver or assume all services work by aliasing `docker`.
+
+Application bind mounts and engine storage are different concerns. A non-NFS
+graphroot does not make mounted PostgreSQL data durable or correct an NFS
+`soft` mount. Rootless UID/GID mapping also needs to match data-directory
+permissions. The existing read-only cgroup and Compose resource-limit concerns
+still apply even with local image storage.
+
+#### Persistent services require an explicit storage plan
+
+| Data | Suggested storage |
+| --- | --- |
+| Source code, import snapshots, database dumps/backups | Existing `/aifs/user/data/jiangfayu`, subject to its retention and backup policy |
+| Re-downloadable images and scratch container layers | Private non-NFS workspace storage; disposable unless backed separately |
+| Live PostgreSQL and OpenSearch data | Administrator-provided persistent filesystem suitable for the service |
+| MinIO objects, RabbitMQ queues, Redis state that must survive replacement | Explicit persistent mounts or managed services, with service-specific durability settings |
+
+Request a filesystem-mode PVC backed by an appropriate block-storage class,
+formatted with ext4/XFS and mounted into the workspace, or an approved external
+database/search service. A proposed mount is `/persistent/inspirehep`; it does
+not currently exist, and `mkdir` alone would not provision a volume. Use separate
+service data directories and configure ownership for the actual container
+UID/GID mappings. Verify the filesystem and mount boundary before initialization.
+
+The administrator must confirm capacity, Pod rescheduling/access requirements,
+PVC/PV deletion and reclaim policy, and backup/restore arrangements. A PVC can
+outlive a Pod, but it is not itself a backup or a guarantee against deletion.
+See [Kubernetes persistent volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/).
+
+Finally, wire the approved storage into Compose explicitly before storing
+important data. The current override defines `minio-data` as a normal named
+volume, not a Kubernetes PVC. The PostgreSQL/OpenSearch services have no
+explicit bindings to an externally persistent data mount. Docker/Podman named
+volumes persist according to the engine's backing storage: with the engine
+store on this workspace overlay, a volume name alone does not protect against
+workspace replacement. Until a storage plan is implemented and recovery tested,
+treat the supplied Compose setup as disposable development infrastructure.
+
 ### OpenSearch kernel setting, only if too low
 
 OpenSearch requires `vm.max_map_count` of at least `262144`. The current shared
@@ -329,6 +432,11 @@ pre-commit install
 ```
 
 ## 4. Start the native workflow's infrastructure
+
+Choose disposable versus persistent service data using the storage section
+above before initialization. The commands below do not provision a PVC or add
+persistent data bindings; use them for disposable development, or first add
+the administrator-approved storage configuration for durable data.
 
 Use the main Compose file, which publishes RabbitMQ ports and defines the
 separate backoffice database and broker. Define this function in each shell
@@ -563,7 +671,8 @@ to retain the infrastructure containers. `dc down` removes containers;
 anonymous database volumes may not be reattached on the next `up`. Back up data
 before removing containers or volumes. MinIO alone has an explicitly named
 volume in the local override; do not assume all services share that persistence
-configuration.
+configuration. Even `dc stop` does not protect overlay-backed data against
+workspace replacement; follow the storage plan above for durable services.
 
 Keep `master` tracking `upstream/master` and `dev` tracking `origin/dev`:
 
@@ -592,6 +701,10 @@ For application conflicts, preserve upstream's current implementation. Merge
 - [firewall-cmd client and D-Bus](https://firewalld.org/documentation/man-pages/firewall-cmd.html)
 - [Kubernetes container security constraints](https://kubernetes.io/docs/concepts/security/linux-kernel-security-constraints/)
 - [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+- [PostgreSQL NFS mount and export requirements](https://www.postgresql.org/docs/14/creating-cluster.html#CREATING-CLUSTER-NFS)
+- [Podman rootless storage requirements](https://docs.podman.io/en/latest/markdown/podman.1.html#note-unsupported-file-systems-in-rootless-mode)
+- [Kubernetes persistent volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
+- [PostgreSQL dump backups](https://www.postgresql.org/docs/14/backup-dump.html)
 
 On 2026-11-13, checks outside the agent sandbox confirmed the workspace's PID 1,
 userland release, installed packages, read-only cgroup mount, socket ownership,
@@ -600,6 +713,11 @@ using the account's existing Docker group membership succeeded: server 29.9.3,
 storage driver `overlayfs`, cgroup driver `cgroupfs`, cgroup version 2. The
 original long-lived session was denied socket access. The firewalld check
 returned the D-Bus error documented above.
+
+Storage checks also confirmed both `/aifs` mounts use `soft`, `/tmp` and
+`/var/tmp` share the workspace overlay, and Docker's `/var/lib/docker` is on
+that overlay. Podman is not installed and `/persistent/inspirehep` does not
+exist. No storage candidate was provisioned or tested as durable service data.
 
 No daemon lifecycle, firewall rules, Pod settings, or node settings were changed
 by these checks. The `hello-world` smoke test, Compose workloads, application
