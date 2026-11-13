@@ -10,6 +10,22 @@ Run each terminal's block starting at the repository root. The local `.env`
 files must already contain the settings from the setup guide. Poetry manages
 the Python environments and dependencies; no system Python changes are needed.
 
+## Docker daemon prerequisite: no systemd in this workspace
+
+This is an AlmaLinux 10.2 container on Kubernetes. PID 1 is `bash`; `systemctl`
+cannot start its Docker daemon. Before infrastructure commands, check:
+
+```bash
+docker info
+```
+
+The daemon was already running at the latest check. If it is stopped, have the
+user/administrator run `sudo dockerd` in a dedicated terminal or tmux session,
+following the setup guide. Keep that session running. Do not start a second
+daemon for a permission error: refresh an already-granted Docker group with
+`newgrp docker` or a new SSH login. Check both daemon connectivity and the
+guide's container smoke test before treating nested Docker as operational.
+
 ## Infrastructure terminal
 
 ```bash
@@ -82,10 +98,11 @@ The fixture UI login is `admin@inspirehep.net` / `123456`; backoffice is
 `inspirehep` / `inspirehep`. Local UI login requires
 `INVENIO_FEATURE_FLAG_ENABLE_LOCAL_LOGIN=True` in `backend/.env`.
 
-For LAN access, use your actual hostname/IP, update the backend's server/schema
-host settings, and request the administrator's firewall changes from the setup
-guide. This page intentionally does not embed a particular host IP or assume
-firewalld is installed.
+For access from outside the Pod, use its administrator-provided address/route
+and update the backend's server/schema host settings. `firewall-cmd` is installed
+but cannot connect to the missing system D-Bus service. Follow the setup guide's
+listener, iptables/nftables, Docker forwarding, and Kubernetes network checks;
+request targeted administrator changes instead of `firewall-cmd --add-port`.
 
 ## Stop and restart
 
@@ -99,6 +116,11 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml stop
 For persistence details, see the setup guide before using `down` or deleting
 volumes. Do not run `fixtures setup`, index rebuilds, or `make run-e2e-test` as
 daily startup checks; they reset data or recreate services.
+
+Leave the daemon session running for the next application restart. `Ctrl+C` in
+that session stops the nested engine and affects its workloads. Pod replacement
+also loses unsupervised processes; recovery requires the configured workspace
+startup mechanism rather than systemd enablement inside the container.
 
 You may put these same commands into separate tmux windows. Killing such a
 tmux session stops its applications; detaching with `Ctrl+B`, then `d` leaves

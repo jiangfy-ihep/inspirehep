@@ -1,8 +1,8 @@
 # AlmaLinux setup guide moved
 
-The maintained guide now targets AlmaLinux 10.x; the current host reports
-AlmaLinux 10.2. The former AlmaLinux 9 instructions no longer describe the
-current checkout.
+The maintained guide covers the current AlmaLinux 10.2 Kubernetes container,
+which runs without systemd. The former AlmaLinux 9 instructions no longer
+describe the current checkout or workspace.
 
 - [AlmaLinux 10 setup guide](local-setup-almalinux10.md)
 - [Chinese guide](local-setup-almalinux10-cn.md)

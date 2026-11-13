@@ -41,11 +41,14 @@ constraints and lockfile. Do not replace Poetry with uv, use `pip install`, or
 regenerate lockfiles without a dependency change. uv may manage the Python
 interpreter separately, as described in the AlmaLinux setup guides.
 
-### AlmaLinux host setup
+### AlmaLinux Kubernetes workspace setup
 
-- The current host reports AlmaLinux 10.2 (checked 2026-11-12). Read
-  `/etc/os-release` when revisiting setup; do not assume AlmaLinux 9 or promise
-  compatibility with later major releases without checking.
+- The current workspace is a Kubernetes-managed container with AlmaLinux 10.2
+  userland (checked outside the agent sandbox on 2026-11-13). PID 1 is `bash`,
+  virtualization detection reports `docker`, and systemd is not running.
+  `/etc/os-release` describes userland, not a full VM or the node's kernel.
+  Recheck these facts after redeployment. Inspect process names/status rather
+  than full bootstrap command lines, which can include credentials.
 - Use `docs/local-setup-almalinux10.md` and its Chinese translation. The old
   AlmaLinux 9 filenames only point to the maintained guides.
 - Keep Poetry for Python environments and packages. Both project lockfiles
@@ -56,6 +59,31 @@ interpreter separately, as described in the AlmaLinux setup guides.
   changes on their behalf. Continue independent documentation work while
   waiting. Never prescribe flushing firewall rules or disabling SELinux as a
   routine setup step.
+- Do not use `systemctl`/`journalctl` as the workspace service-management path.
+  The user starts a stopped nested Docker daemon with `sudo dockerd` in a
+  dedicated foreground terminal or tmux session. First check for an existing
+  daemon/socket. Keep it running across application restarts; tmux does not
+  provide recovery after Pod replacement. Automatic startup belongs in an
+  administrator-approved supervisor/workspace configuration.
+- Distinguish a missing Docker socket from permission denied. The checked
+  socket is `root:docker`, mode `660`; the account is a Docker group member,
+  but existing processes can retain old groups. Use a new login or
+  `newgrp docker` for a fresh shell; do not start duplicate daemons or use
+  world-writable socket permissions. A read-only query in a child shell with
+  existing group membership succeeded; workload startup remains unverified.
+- cgroup v2 is mounted read-only in the workspace. A running daemon and available
+  capabilities do not prove nested containers can create cgroups, mounts, or
+  networks. Pod security/capabilities, cgroup delegation, node kernel settings,
+  persistent storage, and external networking require the cluster administrator.
+  `sudo` inside the workspace does not confer node administration. Do not remount
+  node cgroups, enable blanket privileged mode, or disable Docker firewall
+  management as generic workarounds.
+- `firewall-cmd`/firewalld are installed, but no firewalld process or system
+  D-Bus socket is present; the state query fails with `DBUS_ERROR`. Do not
+  prescribe `firewall-cmd --add-port`/`--reload` for this workspace. Check app
+  listeners, workspace iptables/nftables rules, nested Docker NAT/forwarding,
+  and cluster CNI/NetworkPolicy/routing separately. Ask the user/admin for
+  privileged rule listings and targeted changes; preserve SSH and Docker rules.
 - The native workflow uses `docker-compose.yml` plus the local override. It
   needs the separate backoffice database and broker and published RabbitMQ
   ports. The older `scripts/dev.sh` uses a reduced topology and is not the
@@ -282,13 +310,13 @@ the legacy Angular application with its own scripts and dependencies.
 `axios-hooks`. The Vite dev proxy forwards `/api` requests to the target
 described in the UI commands above.
 
-**Intranet access**: Vite's `server.host: true` binds it to all interfaces.
+**Intranet access**: Vite's `server.host: true` binds it to all workspace interfaces.
 Set `INVENIO_SERVER_NAME` and `INVENIO_JSONSCHEMAS_HOST` to the hostname/IP
-reachable by clients, including port 8000. Ask the user/administrator to inspect
-the actual firewall and interface zone before opening ports 3000/8000, and
-8001 only if backoffice access is needed. Local access does not require LAN
-firewall changes. Docker-published infrastructure ports have their own exposure
-rules; follow the setup guide rather than assuming firewalld protects them.
+reachable by clients, including the externally reachable API port. Have the
+user/administrator inspect workspace rules and cluster routing/NetworkPolicy
+for native ports 3000/8000 and 8001 if backoffice access is needed. No system
+D-Bus/firewalld service is available here. Inner Docker port publishing does
+not create a Kubernetes endpoint; use the setup guide's network-layer checks.
 
 ---
 

@@ -1,11 +1,17 @@
-# Local development on AlmaLinux 10
+# Local development in an AlmaLinux 10 Kubernetes container
 
 [中文](local-setup-almalinux10-cn.md) · [Daily startup](running-the-dev-server.md)
 
-This guide targets AlmaLinux **10.x**, on x86_64. The current host reports
-**AlmaLinux 10.2** in `/etc/os-release` (checked 2026-11-12). This identifies the
-host; it does not certify a complete installation. Recheck these instructions
-for later major OS releases instead of assuming compatibility.
+This workspace is a **Kubernetes-managed container**, with AlmaLinux **10.2**
+userland on x86_64. It does not run systemd: PID 1 is `bash`, and
+`systemd-detect-virt` reports `docker` (checked outside the agent sandbox on
+2026-11-13). The kernel belongs to the outer host; `/etc/os-release` describes
+the workspace userland. Recheck these facts after redeployment rather than
+treating the workspace as a full virtual machine.
+
+Docker runs as a nested daemon in this container. A running daemon and a
+successful container workload are separate validation steps; neither installing
+Docker packages nor identifying the OS certifies a complete installation.
 
 The application versions below come from this checkout, not the OS defaults.
 
@@ -20,8 +26,10 @@ The application versions below come from this checkout, not the OS defaults.
 | Workflows | Airflow 3.4.0 base image; run in the repository's containers |
 
 The recommended upstream workflow runs applications in Docker. This guide also
-covers native backend, UI, and backoffice development with infrastructure in
-Docker. The latter does not start Airflow or the complete curation workflow.
+covers backend, UI, and backoffice processes running directly in the workspace,
+with infrastructure in nested Docker. Here, "native" means a workspace process,
+not a process on the Kubernetes node. This does not start Airflow or the complete
+curation workflow.
 
 ## 1. Inspect the host and choose a workflow
 
@@ -30,13 +38,18 @@ Run from the repository root unless a step explicitly changes directory:
 ```bash
 cat /etc/os-release
 uname -m
+cat /proc/1/comm
+systemd-detect-virt
+findmnt -n -o FSTYPE,OPTIONS /sys/fs/cgroup
 git status --short --branch
 command -v docker poetry node yarn tmux
 sysctl vm.max_map_count
 ```
 
 Reuse existing project environments and Docker installations. The full stack
-needs about 18 GB RAM; see the root README. Do not replace the system Python.
+needs about 18 GB RAM; the outer Pod's resource limits must accommodate it.
+Do not replace the system Python. Inspect PID 1 by process name rather than
+dumping its command line, which can contain bootstrap credentials.
 
 For a full container setup, use the root README and `Makefile`. This fork has a
 local `docker-compose.override.yml` that changes S3 credentials and storage.
@@ -49,17 +62,20 @@ setup guide does not provision the complete Airflow environment. Then run:
 COMPOSE_FILE=docker-compose.yml make run
 ```
 
-That command starts and initializes services; run it only for the intended
+First complete the Docker checks in section 2. That command starts and
+initializes services; run it only for the intended
 development instance. The native workflow below explicitly uses the local
 override and its `inspirehep` S3 credentials. Do not mix these two configurations
 against the same running containers.
 
 ## 2. Administrator tasks: user runs these commands
 
-Package installation, Docker daemon access, kernel settings, and firewall
-changes may need `sudo`. Ask the administrator/user to run the applicable
-commands and report the results. Everything after this section runs as the
-normal development user.
+Package installation, Docker startup/access, and firewall inspection may need
+`sudo`. Ask the user/administrator to run those commands and report results.
+Changes to Pod capabilities, cgroup delegation, node kernel settings, and cluster
+networking require the cluster administrator; `sudo` inside this workspace does
+not grant control of the Kubernetes node. Everything after this section runs
+as the normal development user.
 
 ### Native build and runtime prerequisites
 
@@ -82,78 +98,179 @@ if a source build specifically requires it. Likewise, request any additional
 native headers named by a build error; do not work around it by changing locked
 Python dependency versions.
 
-### Docker Engine and Compose, if absent
+### Install Docker packages only if absent
 
 Use the [Docker RHEL installation instructions](https://docs.docker.com/engine/install/rhel/)
-as the administrator's reference for this RHEL-compatible distribution. Check
-existing container runtimes first; do not remove an existing installation as a
-routine setup step.
+as the package reference. Inspect existing installations first:
 
 ```bash
 sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
 sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable --now docker
 ```
 
-The developer needs Docker daemon access. If the administrator chooses Docker
-group access, run this as the developer's login account, then log out and in:
+The workspace currently has Docker Engine/CLI 29.9.3 and Compose 5.7.1.
+Reinstallation does not fix daemon or socket-access errors. There is no systemd
+service manager here: `systemctl enable --now docker` cannot start the daemon,
+and creating an enablement symlink does not arrange startup after Pod restart.
+
+### Check daemon state and socket access before starting anything
+
+```bash
+docker context show
+ls -l /var/run/docker.sock
+id -nG
+getent group docker
+docker info
+```
+
+On 2026-11-13, `dockerd` and `containerd` were running and the socket existed
+with mode `660`, owned by `root:docker`. The checked session was denied access:
+the account was listed in the Docker group database, but its existing process
+had not acquired the supplementary group. This differs from the earlier
+missing-socket error. Do not start a second daemon to fix a permission error.
+
+If group membership has not been granted, the user/administrator can run this
+as the developer's login account:
 
 ```bash
 sudo usermod -aG docker "$(id -un)"
 ```
 
-Docker group access grants control equivalent to root. Use the site's approved
-alternative if that access is unsuitable. Verify as the normal user:
+If the account is already listed, refresh the current terminal instead of
+adding it again:
+
+```bash
+newgrp docker
+id -nG
+docker info
+```
+
+`newgrp` starts a subshell. A new SSH login also loads updated groups; existing
+shells, tmux servers, and other long-lived processes retain their old groups.
+Docker group access grants control equivalent to root; use the site's approved
+alternative if unsuitable. Do not make the socket world-writable.
+
+### Start the nested daemon manually when it is not running
+
+After confirming no daemon is running, have the user/administrator start it in
+a dedicated terminal, following
+[Docker's manual startup instructions](https://docs.docker.com/engine/daemon/start/):
+
+```bash
+sudo dockerd
+```
+
+This runs in the foreground and prints logs to that terminal. Keep it open.
+To survive an SSH disconnect, first create a dedicated tmux session with
+`tmux new-session -s inspirehep-docker`, then run the same command there and
+detach with `Ctrl+B`, then `d`. Reattach with
+`tmux attach-session -t inspirehep-docker`. Run one daemon using the site's
+approved configuration; do not start a new one on each application restart.
+
+In another terminal with socket access, verify the server and test a container:
 
 ```bash
 docker version
 docker compose version
+docker info
 docker info --format '{{.DockerRootDir}}'
+docker run --rm hello-world
 ```
 
-Do not assume Docker stores data in `/data/docker`, and do not move its data
-root during application setup. A `docker` executable provided by Podman is not
-evidence that this repository's Docker Compose workflow has been validated.
+The last command downloads and runs an image; it was not executed during the
+documentation checks. Success verifies a basic workload, not the full Compose
+stack. `Ctrl+C` in the daemon terminal stops Docker. For automatic recovery
+after Pod replacement, the cluster administrator must configure an approved
+startup/supervision mechanism; tmux survives a disconnect, not Pod replacement.
+
+### Nested Docker prerequisites and failures
+
+The current `/sys/fs/cgroup` mount is cgroup v2 and read-only. PID 1 has
+`CAP_SYS_ADMIN` and `CAP_NET_ADMIN` in its capability set, but that alone does
+not prove all inner-container operations work. A daemon can start while
+workloads fail when creating cgroups, mounts, or bridge networking.
+
+If startup or the smoke test fails, report the first error to the cluster
+administrator. They must check the approved nested-container capability and
+security profile, cgroup access/delegation, storage driver/filesystem, and
+networking. Do not remount node cgroups, enable blanket privileged mode, or
+disable Docker firewall management as generic fixes. Workspace user-group
+permissions cannot fix those cluster-level constraints.
+
+Do not assume Docker stores data in `/data/docker`, point its data root at the
+shared project directory, or change storage drivers against existing Docker
+data. The administrator should provide suitable storage and a persistence plan;
+the workspace writable layer may be replaced with the Pod. If nested Docker is
+unsupported, use an administrator-provided engine or Kubernetes infrastructure.
+A remote engine needs a matching topology: `localhost` ports and Compose bind
+mounts refer to the engine's machine, not automatically to this workspace. The
+commands below assume a working nested engine in this workspace.
 
 ### OpenSearch kernel setting, only if too low
 
-OpenSearch requires `vm.max_map_count` of at least `262144`. The current host
-already reports `262144`, so no change is needed here. On a different host with
-a lower value, ask the administrator to apply:
+OpenSearch requires `vm.max_map_count` of at least `262144`. The current shared
+kernel already reports that value, so no change is needed:
 
 ```bash
-printf '%s\n' 'vm.max_map_count=262144' | sudo tee /etc/sysctl.d/99-inspirehep.conf
-sudo sysctl -p /etc/sysctl.d/99-inspirehep.conf
+sysctl vm.max_map_count
 ```
 
-### Network access, only if needed
+If too low after rescheduling, ask the cluster administrator to configure the
+relevant node's kernel setting and persistence. Writing a sysctl file inside
+this container does not configure node boot or create a systemd service.
 
-Local browser access does not require opening application ports to the LAN.
-For remote access to native applications, have the administrator inspect the
-active firewall and interface zone first:
+### Check firewall-cmd and the actual network layers
+
+The following read-only checks were performed on 2026-11-13:
 
 ```bash
-sudo firewall-cmd --state
-sudo firewall-cmd --get-active-zones
+command -v firewall-cmd
+firewall-cmd --state
+ls -l /run/dbus/system_bus_socket
+ss -ltn
 ```
 
-If firewalld is already active, set `INTRANET_ZONE` to the actual zone serving
-the intended clients; do not assume that the zone is `public`:
+`firewall-cmd` and firewalld 2.4.3 are installed, but firewalld is not running
+and the system D-Bus socket does not exist. The state query returns:
+
+```text
+Error: DBUS_ERROR: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+```
+
+`firewall-cmd` communicates with firewalld over D-Bus. Installing its CLI does
+not supply a running service. `--add-port` and `--reload` are not the applicable
+port-opening procedure here. Do not start D-Bus/firewalld merely to run those
+commands, or use `firewall-offline-cmd` expecting a live change; offline
+configuration alone does not apply runtime rules.
+
+Distinguish these network layers:
+
+1. The app must listen on the intended address/port in the workspace network
+   namespace; inspect `ss -ltn` and test with `curl` inside the workspace.
+2. Workspace iptables/nftables input rules may come from its bootstrap
+   configuration. Absence of firewalld does not mean those rules are absent.
+   Nested Docker also creates forwarding/NAT rules for inner containers.
+3. Kubernetes CNI routing, NetworkPolicy, and the cluster's Service/Ingress or
+   other workspace access mechanism determine reachability from outside the
+   Pod. An inner `docker -p` publishes in the workspace namespace; it does not
+   automatically create an external Kubernetes endpoint.
+
+For a blocked port, ask the user/administrator for these read-only rule listings,
+then request a targeted change in the correct layer:
 
 ```bash
-INTRANET_ZONE=replace-with-the-actual-zone
-sudo firewall-cmd --zone="$INTRANET_ZONE" --permanent --add-port=3000/tcp
-sudo firewall-cmd --zone="$INTRANET_ZONE" --permanent --add-port=8000/tcp
-sudo firewall-cmd --zone="$INTRANET_ZONE" --permanent --add-port=8001/tcp
-sudo firewall-cmd --reload
+sudo iptables -S
+sudo iptables -t nat -S
+sudo nft list ruleset
 ```
 
-Omit port 8001 if backoffice access is unnecessary. If firewalld is absent,
-report that and use the host's existing firewall policy; installing or enabling
-a new firewall is a separate administrator task. Do not flush iptables/nftables
-or disable SELinux to start the application. Docker manages its own bridge
-network rules; published container ports also need an administrator review
-under [Docker's firewall model](https://docs.docker.com/engine/network/packet-filtering-firewalls/).
+These privileged rule listings were not run during the documentation checks.
+Native UI/API/backoffice may need ports 3000/8000/8001 respectively; Docker's
+infrastructure publishing needs separate review. Preserve SSH and Docker rules;
+do not flush tables or insert blanket accept rules. Persistent changes belong
+in administrator-managed workspace/cluster configuration. See
+[Docker networking](https://docs.docker.com/engine/network/packet-filtering-firewalls/)
+and [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/).
 
 ## 3. User tools and project environments
 
@@ -232,7 +349,7 @@ Compose may warn about an unset `FERNET_KEY` while reading the main file even
 though this command does not start Airflow. Configure it before starting any
 workflow services.
 
-| Host endpoint | Service |
+| Workspace endpoint | Service |
 | --- | --- |
 | `localhost:5432` | Backend PostgreSQL (`inspirehep` database) |
 | `localhost:5434` | Backoffice PostgreSQL (`backoffice` database) |
@@ -242,7 +359,7 @@ workflow services.
 | `localhost:9200` | OpenSearch |
 | `localhost:9000`, `localhost:9001` | S3 API, MinIO console |
 
-These development Compose files publish infrastructure ports on all host
+These development Compose files publish infrastructure ports on all workspace
 interfaces; the table is not a guarantee of loopback-only binding. Ask the
 administrator to restrict exposure on a shared host. Service names such as
 `db`, `es`, and `hep-web` are Docker DNS names; native applications use the host
@@ -471,10 +588,21 @@ For application conflicts, preserve upstream's current implementation. Merge
 - [RHEL 10 package manifest, including libpq-devel](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/pdf/package_manifest/Red_Hat_Enterprise_Linux-10-Package_manifest-en-US.pdf)
 - [Docker Engine on RHEL](https://docs.docker.com/engine/install/rhel/)
 - [OpenSearch Docker prerequisites](https://docs.opensearch.org/3.9/install-and-configure/install-opensearch/docker/)
-- [firewalld port configuration](https://firewalld.org/documentation/howto/open-a-port-or-service)
+- [Docker manual daemon startup](https://docs.docker.com/engine/daemon/start/)
+- [firewall-cmd client and D-Bus](https://firewalld.org/documentation/man-pages/firewall-cmd.html)
+- [Kubernetes container security constraints](https://kubernetes.io/docs/concepts/security/linux-kernel-security-constraints/)
+- [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 
-The guide was checked against the repository's configuration and the host's OS,
-package inventory, and kernel setting. A complete install, container startup,
-and application tests have not been run on this host. Request the administrator
-steps first if prerequisites are missing, then record real startup/test results
-instead of treating these instructions as an end-to-end certification.
+On 2026-11-13, checks outside the agent sandbox confirmed the workspace's PID 1,
+userland release, installed packages, read-only cgroup mount, socket ownership,
+group membership, and kernel setting. A read-only Docker query in a child shell
+using the account's existing Docker group membership succeeded: server 29.9.3,
+storage driver `overlayfs`, cgroup driver `cgroupfs`, cgroup version 2. The
+original long-lived session was denied socket access. The firewalld check
+returned the D-Bus error documented above.
+
+No daemon lifecycle, firewall rules, Pod settings, or node settings were changed
+by these checks. The `hello-world` smoke test, Compose workloads, application
+installation/tests, privileged firewall rule listings, and external cluster
+reachability remain unverified. Request the relevant user/administrator actions
+and record their results before claiming end-to-end readiness.

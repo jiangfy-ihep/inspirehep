@@ -1,10 +1,15 @@
-# AlmaLinux 10 本地开发环境搭建
+# Kubernetes 中 AlmaLinux 10 容器的开发环境搭建
 
 [English](local-setup-almalinux10.md) · [日常启动](running-the-dev-server.md)
 
-本指南适用于 **AlmaLinux 10.x / x86_64**。2026-11-12 检查时，当前主机的
-`/etc/os-release` 显示 **AlmaLinux 10.2**。这只确认主机版本，不代表已完成
-安装验证；未来升级到其他主版本时，需要重新核对步骤。
+当前工作区是 **Kubernetes 管理的容器**，用户空间为
+**AlmaLinux 10.2 / x86_64**，没有运行 systemd。2026-11-13 在代理沙箱外检查：
+PID 1 为 `bash`，`systemd-detect-virt` 返回 `docker`。
+`/etc/os-release` 描述容器用户空间，内核由外层主机提供。重新部署后应重新检查，
+不能按完整虚拟机处理。
+
+Docker 以嵌套守护进程运行。守护进程可连接与实际容器工作负载可运行是两个
+验证步骤；安装 Docker 软件包或确认 OS 版本，不代表整套安装验证成功。
 
 版本以当前仓库配置为准：
 
@@ -18,9 +23,9 @@
 | 其他基础设施 | Redis 8、RabbitMQ 4.2、S3 兼容存储 |
 | 工作流 | Airflow 3.4.0 基础镜像，通过仓库容器运行 |
 
-上游推荐完整 Docker 工作流。本指南也介绍在主机上运行后端、UI 和
-backoffice、通过 Docker 运行基础设施的方式；后者不会启动 Airflow，
-也不等于完整的编目工作流。
+上游推荐完整 Docker 工作流。本指南也介绍在工作区内直接运行后端、UI 和
+backoffice、通过嵌套 Docker 运行基础设施的方式。这里的原生进程属于工作区，
+不是 Kubernetes 节点上的进程；该方式不会启动 Airflow，也不是完整编目工作流。
 
 ## 1. 检查主机并选择工作流
 
@@ -29,13 +34,17 @@ backoffice、通过 Docker 运行基础设施的方式；后者不会启动 Airf
 ```bash
 cat /etc/os-release
 uname -m
+cat /proc/1/comm
+systemd-detect-virt
+findmnt -n -o FSTYPE,OPTIONS /sys/fs/cgroup
 git status --short --branch
 command -v docker poetry node yarn tmux
 sysctl vm.max_map_count
 ```
 
 优先复用已有环境与 Docker 安装，不要替换系统 Python。完整栈约需
-18 GB 内存，具体要求见根目录 README。
+18 GB 内存，外层 Pod 的资源限制必须满足要求。检查 PID 1 时读取进程名称，
+不要输出完整启动命令，因为其中可能包含初始化凭据。
 
 完整 Docker 环境按 README 和 Makefile 操作。本分支的
 `docker-compose.override.yml` 会修改 S3 凭据和存储配置；要使用不加载该
@@ -49,13 +58,16 @@ sysctl vm.max_map_count
 COMPOSE_FILE=docker-compose.yml make run
 ```
 
-该命令会启动并初始化开发服务。下面的原生开发流程显式使用覆盖文件及其
+先完成第 2 节的 Docker 检查。该命令会启动并初始化开发服务。
+下面的原生开发流程显式使用覆盖文件及其
 `inspirehep` S3 凭据。不要交替使用两种配置去重建同一组运行中的容器。
 
 ## 2. 需要管理员执行的步骤
 
-软件安装、Docker 服务和访问授权、内核参数、防火墙修改可能需要 `sudo`。
-请由用户或管理员执行适用的命令并反馈结果；后续步骤使用普通开发账号。
+软件安装、Docker 启动/访问授权、防火墙检查可能需要 `sudo`，请由用户或
+管理员执行并反馈结果。Pod 能力、cgroup 委派、节点内核参数和集群网络由集群
+管理员管理；工作区内的 `sudo` 不代表拥有 Kubernetes 节点控制权。
+后续应用步骤使用普通开发账号。
 
 ### 编译与运行依赖
 
@@ -75,70 +87,160 @@ backoffice 的 `psycopg[c]`；`file-libs` 提供 `python-magic` 加载的运行�
 NumPy 通常使用二进制 wheel。只有实际源码编译报错需要时，才安装
 `openblas-devel` 或其他明确缺失的头文件，不要随意升级锁定的 Python 依赖。
 
-### 未安装 Docker 时
+### 仅在没有 Docker 软件包时安装
 
-参考 [Docker 的 RHEL 安装文档](https://docs.docker.com/engine/install/rhel/)。
-先检查已有容器运行时，不要把卸载已有软件作为常规步骤：
+以 [Docker RHEL 安装文档](https://docs.docker.com/engine/install/rhel/)
+作为软件包安装参考，先检查已有安装：
 
 ```bash
 sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
 sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable --now docker
 ```
 
-如果管理员选择通过 Docker 用户组授权，在开发账号下执行以下命令后重新登录：
+当前工作区已经安装 Docker Engine/CLI 29.9.3 和 Compose 5.7.1。
+重新安装不能解决守护进程或 socket 权限问题。这里没有 systemd 服务管理器，
+`systemctl enable --now docker` 无法启动守护进程；创建启用链接也不能让 Pod
+重启后自动启动 Docker。
+
+### 启动前先检查守护进程与 socket 权限
+
+```bash
+docker context show
+ls -l /var/run/docker.sock
+id -nG
+getent group docker
+docker info
+```
+
+2026-11-13 检查时，`dockerd` 和 `containerd` 已运行，socket 权限为 `660`，
+所有者为 `root:docker`。被检查会话访问被拒绝：账号已经出现在 Docker 用户组
+数据库中，但已有进程尚未取得该附加组。这与之前 socket 不存在的错误不同。
+不要为解决权限错误而启动第二个守护进程。
+
+如果尚未授予组成员身份，由用户/管理员在开发账号下运行：
 
 ```bash
 sudo usermod -aG docker "$(id -un)"
 ```
 
-该组具有相当于 root 的控制能力；如不符合站点策略，应使用管理员批准的方案。
-以普通用户确认访问：
+如果账号已经列在组内，刷新当前终端即可，不必重复添加：
+
+```bash
+newgrp docker
+id -nG
+docker info
+```
+
+`newgrp` 启动子 shell；新的 SSH 登录也会加载更新后的用户组。已有 shell、
+tmux 服务进程和其他长期运行进程仍保留旧组列表。Docker 用户组具有相当于 root
+的控制能力，如不符合站点策略应采用获准方案。不要把 socket 改成所有人可写。
+
+### 仅在守护进程未运行时手动启动
+
+确认没有守护进程后，请用户/管理员在独立终端中按
+[Docker 手动启动说明](https://docs.docker.com/engine/daemon/start/)运行：
+
+```bash
+sudo dockerd
+```
+
+它以前台方式运行，日志直接输出到该终端，请保持终端打开。需要断开 SSH 后继续
+运行时，先用 `tmux new-session -s inspirehep-docker` 创建专用会话，再在其中
+运行同一命令。按 `Ctrl+B`、再按 `d` 分离，用
+`tmux attach-session -t inspirehep-docker` 重新连接。保持单个使用站点批准配置的
+守护进程，不要每次启动应用都启动新的 Docker。
+
+在另一个具有 socket 访问权限的终端验证服务端，再测试实际容器：
 
 ```bash
 docker version
 docker compose version
+docker info
 docker info --format '{{.DockerRootDir}}'
+docker run --rm hello-world
 ```
 
-不要假定 Docker 数据根目录是 `/data/docker`，也不要在应用安装过程中迁移它。
-Podman 提供的 `docker` 命令不代表已验证本仓库的 Docker Compose 工作流。
+最后一条命令会下载并运行镜像，文档检查时没有执行。通过后只能证明基础容器
+工作负载可运行，不能代替完整 Compose 验证。在守护进程终端按 `Ctrl+C` 会停止
+Docker。Pod 替换后的自动恢复需要集群管理员配置获准的启动/进程管理机制；
+tmux 可应对 SSH 断开，不能跨 Pod 替换存活。
+
+### 嵌套 Docker 的前置条件与错误处理
+
+当前 `/sys/fs/cgroup` 是只读的 cgroup v2 挂载。PID 1 的能力集中包含
+`CAP_SYS_ADMIN` 与 `CAP_NET_ADMIN`，但这不证明所有内部容器操作可用。
+守护进程可能成功启动，而工作负载在创建 cgroup、挂载或桥接网络时失败。
+
+如启动或冒烟测试失败，将首个错误交给集群管理员，检查获准的嵌套容器能力与
+安全配置、cgroup 访问/委派、存储驱动/文件系统以及网络。不要把重新挂载节点
+cgroup、启用全面 privileged 模式或关闭 Docker 防火墙管理作为通用修复。
+工作区内调整用户组不能解决这些集群层面的限制。
+
+不要假定 Docker 数据目录是 `/data/docker`，不要把它放进共享项目目录，也不要
+直接对已有 Docker 数据切换存储驱动。合适的存储及持久化方案由管理员提供；
+工作区可写层可能随 Pod 替换而消失。如不支持嵌套 Docker，应使用管理员提供的
+引擎或 Kubernetes 基础设施。远程引擎需要匹配的拓扑：`localhost` 端口及
+Compose 绑定挂载属于引擎所在机器，不会自动指向本工作区。后续命令假定工作区
+内的嵌套引擎已经可用。
 
 ### OpenSearch 内核参数
 
-`vm.max_map_count` 至少应为 `262144`。当前主机已经是该值，无需修改。
-仅在其他主机的值过低时，请管理员执行：
+OpenSearch 要求 `vm.max_map_count` 至少为 `262144`，当前共享内核已满足，
+无需修改：
 
 ```bash
-printf '%s\n' 'vm.max_map_count=262144' | sudo tee /etc/sysctl.d/99-inspirehep.conf
-sudo sysctl -p /etc/sysctl.d/99-inspirehep.conf
+sysctl vm.max_map_count
 ```
 
-### 按需开放网络访问
+重新调度后如值过低，应请集群管理员配置相关节点的内核参数和持久化方式。
+在本容器写 sysctl 文件不等于配置节点启动，也不会创建 systemd 服务。
 
-仅通过本机浏览器访问时，不需要向局域网开放应用端口。需要远程访问时，
-先由管理员检查实际防火墙和网卡所属区域：
+### 检查 firewall-cmd 与实际网络层次
+
+2026-11-13 执行了以下只读检查：
 
 ```bash
-sudo firewall-cmd --state
-sudo firewall-cmd --get-active-zones
+command -v firewall-cmd
+firewall-cmd --state
+ls -l /run/dbus/system_bus_socket
+ss -ltn
 ```
 
-若 firewalld 已启用，将下面变量改成实际服务目标客户端的区域：
+`firewall-cmd` 和 firewalld 2.4.3 已安装，但 firewalld 未运行，系统 D-Bus
+socket 不存在。状态查询返回：
+
+```text
+Error: DBUS_ERROR: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+```
+
+`firewall-cmd` 通过 D-Bus 与 firewalld 通信，仅安装 CLI 不会启动服务。
+因此 `--add-port`、`--reload` 不是本工作区适用的开放端口方式。不要仅为执行
+这些命令就启动 D-Bus/firewalld，也不要以为 `firewall-offline-cmd` 会实时
+修改规则；离线配置本身不会应用运行时规则。
+
+需要区分以下层次：
+
+1. 应用必须在工作区网络命名空间中监听所需地址和端口，通过 `ss -ltn` 检查，
+   并先在工作区内用 `curl` 验证。
+2. 工作区可能已经有初始化配置创建的 iptables/nftables 输入规则。没有
+   firewalld 不等于没有这些规则；嵌套 Docker 还会建立内部容器转发/NAT 规则。
+3. Kubernetes CNI 路由、NetworkPolicy，以及集群的 Service/Ingress 或其他
+   工作区接入机制决定 Pod 外部访问。内部 `docker -p` 在工作区命名空间发布
+   端口，不会自动创建外部 Kubernetes 访问端点。
+
+端口不通时，请用户/管理员提供下面的只读规则列表，再在正确层次请求精确修改：
 
 ```bash
-INTRANET_ZONE=replace-with-the-actual-zone
-sudo firewall-cmd --zone="$INTRANET_ZONE" --permanent --add-port=3000/tcp
-sudo firewall-cmd --zone="$INTRANET_ZONE" --permanent --add-port=8000/tcp
-sudo firewall-cmd --zone="$INTRANET_ZONE" --permanent --add-port=8001/tcp
-sudo firewall-cmd --reload
+sudo iptables -S
+sudo iptables -t nat -S
+sudo nft list ruleset
 ```
 
-不需要远程 backoffice 时省略 8001。若没有 firewalld，应反馈情况，按主机原有
-防火墙策略处理，不要直接安装并启用新的防火墙。不要清空 iptables/nftables
-或关闭 SELinux。Docker 自己管理桥接网络规则，容器发布端口还应由管理员根据
-[Docker 防火墙模型](https://docs.docker.com/engine/network/packet-filtering-firewalls/)
-检查访问范围。
+这些需要权限的规则查询在文档检查时没有执行。原生 UI/API/backoffice 分别可能
+需要 3000/8000/8001，Docker 基础设施端口应另外检查。保留 SSH 和 Docker 规则，
+不要清空规则表或插入无条件放行规则。持久化修改应由管理员纳入工作区/集群配置。
+参考 [Docker 网络规则](https://docs.docker.com/engine/network/packet-filtering-firewalls/)
+及 [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)。
 
 ## 3. 用户工具与项目环境
 
@@ -208,7 +310,7 @@ dc ps
 读取主配置时可能出现未设置 `FERNET_KEY` 的提示，即使该命令并不启动 Airflow。
 启动任何工作流服务前，应先完成对应配置。
 
-| 主机端点 | 服务 |
+| 工作区端点 | 服务 |
 | --- | --- |
 | `localhost:5432` | 后端 PostgreSQL，数据库 `inspirehep` |
 | `localhost:5434` | backoffice PostgreSQL，数据库 `backoffice` |
@@ -218,7 +320,7 @@ dc ps
 | `localhost:9200` | OpenSearch |
 | `localhost:9000`、`localhost:9001` | S3 API 与 MinIO 控制台 |
 
-Compose 中这些基础设施端口默认绑定所有主机网卡，表格并不表示仅限本机。
+Compose 中这些基础设施端口默认绑定所有工作区网卡，表格并不表示仅限本机。
 共享主机应由管理员限制暴露范围。`db`、`es`、`hep-web` 等是容器 DNS 名称，
 主机上的应用应使用表格中的主机端点。
 
@@ -420,8 +522,18 @@ git push origin dev
 - [RHEL 10 包清单（含 libpq-devel）](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/pdf/package_manifest/Red_Hat_Enterprise_Linux-10-Package_manifest-en-US.pdf)
 - [Docker RHEL 安装文档](https://docs.docker.com/engine/install/rhel/)
 - [OpenSearch Docker 前置条件](https://docs.opensearch.org/3.9/install-and-configure/install-opensearch/docker/)
-- [firewalld 端口配置](https://firewalld.org/documentation/howto/open-a-port-or-service)
+- [Docker 手动启动](https://docs.docker.com/engine/daemon/start/)
+- [firewall-cmd 客户端与 D-Bus](https://firewalld.org/documentation/man-pages/firewall-cmd.html)
+- [Kubernetes 容器安全限制](https://kubernetes.io/docs/concepts/security/linux-kernel-security-constraints/)
+- [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 
-已核对仓库配置、当前 OS、软件包清单和内核参数；尚未在此主机完成整套安装、
-容器启动及应用测试。缺少前置依赖时，请先让管理员执行对应步骤，再根据实际
-启动与测试结果记录验证状态，不能把本指南当作端到端安装成功的证明。
+2026-11-13 在代理沙箱外检查了工作区 PID 1、用户空间版本、已安装软件包、
+只读 cgroup 挂载、socket 所有权、用户组和内核参数。使用账号已有 Docker
+组成员身份的子 shell 成功执行了只读查询：服务端 29.9.3，存储驱动 `overlayfs`，
+cgroup 驱动 `cgroupfs`，cgroup 版本 2。原长期运行会话仍被拒绝访问 socket。
+firewalld 状态查询返回了上文记录的 D-Bus 错误。
+
+这些检查未改变守护进程运行状态、防火墙规则、Pod 或节点设置。
+`hello-world` 冒烟测试、Compose 工作负载、应用安装/测试、需要权限的防火墙
+规则列表和集群外部访问仍未验证。请让用户/管理员执行相关操作并记录结果后，
+再判断端到端环境是否就绪。

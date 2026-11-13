@@ -12,9 +12,11 @@ As a monorepo, it currently contains three main services (besides helper service
 
 Want to contribute? Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or a pull request.
 
-For AlmaLinux 10 host development, see the [setup guide](docs/local-setup-almalinux10.md)
+For this AlmaLinux 10 Kubernetes workspace, see the [setup guide](docs/local-setup-almalinux10.md)
 ([中文](docs/local-setup-almalinux10-cn.md)) and [daily startup commands](docs/running-the-dev-server.md).
-These distinguish the native development topology from the full Docker stack below.
+The workspace runs without systemd; the guide covers manual nested Docker startup,
+socket permissions, and networking without an active D-Bus/firewalld service.
+It distinguishes the native workspace topology from the full Docker stack below.
 
 Okay, so now the question is: **how do we develop on it?**
 
