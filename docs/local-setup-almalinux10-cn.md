@@ -2,14 +2,20 @@
 
 [English](local-setup-almalinux10.md) · [日常启动](running-the-dev-server.md)
 
+> **用户于 2026-11-16 要求停止测试，将改用其他机器。** 本 Pod 的 rootless
+> Docker 启动失败，独立的嵌套 overlay 存储检查也失败，没有启动本地 INSPIRE。
+> [第 9 节](#9-实际测试结果与阻碍2026-11-16)记录结果与阻碍。以下步骤保留为
+> 尝试过的配置说明，不代表可用安装；没有新请求不要恢复运行测试或软件/集群变更。
+
 当前工作区是 **Kubernetes 管理的容器**，用户空间为
 **AlmaLinux 10.2 / x86_64**，没有运行 systemd。2026-11-13 在代理沙箱外检查：
 PID 1 为 `bash`，`systemd-detect-virt` 返回 `docker`。
 `/etc/os-release` 描述容器用户空间，内核由外层主机提供。重新部署后应重新检查，
 不能按完整虚拟机处理。
 
-Docker 以嵌套守护进程运行。守护进程可连接与实际容器工作负载可运行是两个
-验证步骤；安装 Docker 软件包或确认 OS 版本，不代表整套安装验证成功。
+本次尝试采用无需 systemd 的 rootless Docker 嵌套守护进程。守护进程可连接与
+实际容器工作负载可运行是两个验证步骤；安装 Docker 软件包或确认 OS 版本，
+不代表整套安装验证成功。
 
 版本以当前仓库配置为准：
 
@@ -64,8 +70,8 @@ COMPOSE_FILE=docker-compose.yml make run
 
 ## 2. 需要管理员执行的步骤
 
-软件安装、Docker 启动/访问授权、防火墙检查可能需要 `sudo`，请由用户或
-管理员执行并反馈结果。Pod 能力、cgroup 委派、节点内核参数和集群网络由集群
+软件安装、初始运行时/数据目录准备、防火墙检查可能需要 `sudo`，请由用户或
+管理员执行并反馈结果。Rootless Docker 本身启动无需 sudo。Pod 能力、cgroup 委派、节点内核参数和集群网络由集群
 管理员管理；工作区内的 `sudo` 不代表拥有 Kubernetes 节点控制权。
 后续应用步骤使用普通开发账号。
 
@@ -102,74 +108,130 @@ sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 `systemctl enable --now docker` 无法启动守护进程；创建启用链接也不能让 Pod
 重启后自动启动 Docker。
 
-### 启动前先检查守护进程与 socket 权限
+### Rootless Docker：一次性管理员准备
+
+本次配置尝试使用 rootless Docker：守护进程和容器应运行在开发账号的用户
+命名空间中。Docker 用户组仅允许访问 root 守护进程，访问此 rootless socket 不需要该组。
+参考 [Docker rootless 前置条件](https://docs.docker.com/engine/security/rootless/)。
+
+Systemd 已经安装，但不是 PID 1；再次安装不会启动服务管理器。要在容器内运行
+systemd，需要管理员批准修改 Pod 启动方式和 cgroup 委派，而非安装软件包。
+本流程不使用 `systemctl --user` 或 `loginctl`，直接运行 `dockerd-rootless.sh`。
+
+为其他账号配置前，先检查账号 ID 和 subordinate 范围：
 
 ```bash
-docker context show
-ls -l /var/run/docker.sock
-id -nG
-getent group docker
-docker info
+id
+command -v dockerd-rootless.sh rootlesskit newuidmap newgidmap slirp4netns
+awk -F: -v account="$(id -un)" '$1 == account' /etc/subuid /etc/subgid
 ```
 
-2026-11-13 检查时，`dockerd` 和 `containerd` 已运行，socket 权限为 `660`，
-所有者为 `root:docker`。被检查会话访问被拒绝：账号已经出现在 Docker 用户组
-数据库中，但已有进程尚未取得该附加组。这与之前 socket 不存在的错误不同。
-不要为解决权限错误而启动第二个守护进程。
+已检查账号为 `jiangfayu`，UID `23739`、GID `1072`，subuid/subgid 均为
+`524288:65536`。基础检查 `unshare --user --map-root-user true` 通过，后续
+RootlessKit 检查也确认命名空间 ID 0 映射到账号，ID 1–65536 映射到 subordinate
+范围，但没有运行工作负载。缺少 rootless 脚本时，请管理员
+安装 `docker-ce-rootless-extras`；缺失 UID/GID 工具、范围或用户命名空间被阻止
+也需要管理员检查，不要分配相互重叠的 ID。
 
-如果尚未授予组成员身份，由用户/管理员在开发账号下运行：
+用户已完成以下准备；2026-11-16 的检查确认 `slirp4netns` 1.3.3 已安装，两个
+目录所有者均为 `23739:1072`，权限均为 `0700`。数字 ID 仅适用于当前账号：
 
 ```bash
-sudo usermod -aG docker "$(id -un)"
+sudo dnf install slirp4netns
+
+sudo install -d -m 0700 -o 23739 -g 1072 \
+  /run/user/23739 \
+  /var/tmp/jiangfayu-docker-rootless
 ```
 
-如果账号已经列在组内，刷新当前终端即可，不必重复添加：
+无需每次启动应用都重复准备。工作区替换后，如目录缺失，请管理员重新创建并
+核对账号 ID。运行时目录必须为用户独占、非 NFS，工作区关闭/替换时应删除并
+重新创建，不要放在 `/tmp` 下。这里 `/run/user/23739` 位于工作区 overlay，
+并非 systemd 管理的 tmpfs；获准的工作区启动/清理机制需要管理其生命周期。
+`/var/tmp` 数据目录也位于该 overlay，属于可丢弃存储。
+
+### 不用 sudo 或 systemd 启动 rootless Docker
+
+启动前检查已有守护进程与两种可能的 socket：
 
 ```bash
-newgrp docker
-id -nG
-docker info
+ps -C dockerd -o pid=,comm=
+ls -ld /run/user/23739 /var/tmp/jiangfayu-docker-rootless
+ls -l /run/user/23739/docker.sock /var/run/docker.sock
 ```
 
-`newgrp` 启动子 shell；新的 SSH 登录也会加载更新后的用户组。已有 shell、
-tmux 服务进程和其他长期运行进程仍保留旧组列表。Docker 用户组具有相当于 root
-的控制能力，如不符合站点策略应采用获准方案。不要把 socket 改成所有人可写。
+停止时没有 socket 属于预期情况。2026-11-16 检查时没有运行中的 `dockerd`，
+root socket 也不存在。如果已有守护进程，先确定其端点，不要直接启动另一个。
+Rootless 引擎的镜像、容器和卷与此前 root 引擎的 `/var/lib/docker` 相互独立。
+不要复制或迁移旧存储、删除 socket，也不要为权限错误启动重复守护进程。
 
-### 仅在守护进程未运行时手动启动
-
-确认没有守护进程后，请用户/管理员在独立终端中按
-[Docker 手动启动说明](https://docs.docker.com/engine/daemon/start/)运行：
+以下命令曾以 `jiangfayu` 身份运行，在网络初始化阶段失败。保留为记录，
+当前测试已停止：
 
 ```bash
-sudo dockerd
+export XDG_RUNTIME_DIR=/run/user/23739
+
+dockerd-rootless.sh \
+  --data-root=/var/tmp/jiangfayu-docker-rootless
 ```
 
-它以前台方式运行，日志直接输出到该终端，请保持终端打开。需要断开 SSH 后继续
-运行时，先用 `tmux new-session -s inspirehep-docker` 创建专用会话，再在其中
-运行同一命令。按 `Ctrl+B`、再按 `d` 分离，用
-`tmux attach-session -t inspirehep-docker` 重新连接。保持单个使用站点批准配置的
-守护进程，不要每次启动应用都启动新的 Docker。
+命令以前台方式输出日志。显式数据根目录避免默认
+`$HOME/.local/share/docker` 落到 NFS 上。先检查已有
+`${XDG_CONFIG_HOME:-$HOME/.config}/docker/daemon.json`，不要在配置文件和
+命令行重复设置 `data-root`。不要对已有数据随意切换存储驱动，也不要自动改回
+`sudo dockerd`。参考
+[Docker 无 systemd 启动说明](https://docs.docker.com/engine/security/rootless/tips/)。
 
-在另一个具有 socket 访问权限的终端验证服务端，再测试实际容器：
+如需断开 SSH 后继续运行，先创建 `tmux new-session -s inspirehep-docker`，
+在其中运行守护进程命令。按 `Ctrl+B`、再按 `d` 分离，用
+`tmux attach-session -t inspirehep-docker` 重新连接。应用重启时保持守护进程运行。
+Tmux 不能跨工作区替换存活，自动恢复需管理员批准的工作区启动/进程管理配置。
+
+### 每个客户端终端显式选择 rootless socket
+
+每个运行 Docker、Compose 或 Make 的终端/tmux 窗口都先执行以下配置；
+前台守护进程不会替其他 shell 设置环境变量：
 
 ```bash
+unset DOCKER_CONTEXT
+export XDG_RUNTIME_DIR=/run/user/23739
+export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/docker.sock"
+
 docker version
 docker compose version
 docker info
 docker info --format '{{.DockerRootDir}}'
+docker info --format '{{json .SecurityOptions}}'
+```
+
+预期 Docker Root Dir 为 `/var/tmp/jiangfayu-docker-rootless`，Security Options
+含 `rootless`。清除 `DOCKER_CONTEXT`，避免它覆盖 `DOCKER_HOST`。本流程不依赖
+默认 root socket `/var/run/docker.sock` 或 `newgrp docker`。Rootless socket
+不存在时检查启动是否成功、端点是否正确；权限错误时检查目录/socket 所有权及
+当前账号。不要将 socket 改成所有人可写。
+
+守护进程可连接后，测试基础容器：
+
+```bash
 docker run --rm hello-world
 ```
 
-最后一条命令会下载并运行镜像，文档检查时没有执行。通过后只能证明基础容器
-工作负载可运行，不能代替完整 Compose 验证。在守护进程终端按 `Ctrl+C` 会停止
-Docker。Pod 替换后的自动恢复需要集群管理员配置获准的启动/进程管理机制；
-tmux 可应对 SSH 断开，不能跨 Pod 替换存活。
+该命令会下载并运行镜像，文档更新时没有执行。通过只能证明基础工作负载可用，
+不能证明镜像构建、绑定挂载、端口发布或完整 Compose 栈可用，导入数据前应分别
+验证。在守护进程终端按 `Ctrl+C` 会停止引擎并影响工作负载。
 
 ### 嵌套 Docker 的前置条件与错误处理
 
 当前 `/sys/fs/cgroup` 是只读的 cgroup v2 挂载。PID 1 的能力集中包含
 `CAP_SYS_ADMIN` 与 `CAP_NET_ADMIN`，但这不证明所有内部容器操作可用。
 守护进程可能成功启动，而工作负载在创建 cgroup、挂载或桥接网络时失败。
+
+没有 systemd 及 cgroup 委派时，rootless Docker 不提供通常的 `--cpus`、
+`--memory`、`--pids-limit` cgroup 限制，不能假定 Compose 资源限制生效；
+外层 Pod 的限制仍约束工作区。Slirp4netns/RootlessKit 提供用户态网络，应从原生
+应用及 Pod 外部分别检查发布端口。Rootless 不会创建 Kubernetes Service，也
+不会绕过 NetworkPolicy。参考
+[Docker rootless 资源限制](https://docs.docker.com/engine/security/rootless/tips/#limiting-resources)。
 
 如启动或冒烟测试失败，将首个错误交给集群管理员，检查获准的嵌套容器能力与
 安全配置、cgroup 访问/委派、存储驱动/文件系统以及网络。不要把重新挂载节点
@@ -183,7 +245,7 @@ cgroup、启用全面 privileged 模式或关闭 Docker 防火墙管理作为通
 Compose 绑定挂载属于引擎所在机器，不会自动指向本工作区。后续命令假定工作区
 内的嵌套引擎已经可用。
 
-### 存储：已验证挂载、rootless Podman 与持久化数据
+### 存储：已验证挂载、rootless 引擎与持久化数据
 
 2026-11-13 在代理沙箱外执行了以下存储检查：
 
@@ -200,7 +262,10 @@ df -h /tmp /var/tmp
 | `/aifs/user/data/jiangfayu` | 可写 NFSv4，使用 `soft` 挂载 | 共享源文件、导入数据、已验证的备份 |
 | `/aifs/user/home/jiangfayu` | 可写 NFSv4，使用 `soft` 挂载 | 用户文件与配置 |
 | `/tmp`、`/var/tmp` | 同一个挂载在 `/` 的可写 `overlay` 文件系统 | 工作区本地的可丢弃存储 |
-| `/var/lib/docker` | 同一容器 overlay，当前 Docker 数据根目录 | 引擎数据和默认卷，不具备 Pod 级持久化保证 |
+| `/run/user/23739` | 容器 overlay，私有运行时目录 | Rootless Docker socket 与运行时状态，替换后需重新创建 |
+| `/var/tmp/jiangfayu-docker-rootless` | 同一容器 overlay，选定的 rootless 数据根目录 | 可丢弃引擎数据与默认卷 |
+| `/var/lib/docker` | 同一容器 overlay，原 root 引擎存储 | 与 rootless Docker 独立，无 Pod 级持久化保证 |
+| `/gfs`、`/gfs/jiangfayu` | 上次检查为容器 overlay，无独立挂载 | 不提供额外容量或持久化，配置挂载后应重新检查 |
 
 检查时 overlay 报告约 766 GiB 可用，这是当时共享文件系统的剩余空间，不是
 用户配额或 Kubernetes 临时存储保证。`/tmp` 与 `/var/tmp` 不是两份独立空间。
@@ -216,12 +281,27 @@ NFS 并非一概不支持，但用于数据库前必须由管理员验证挂载�
 
 挂载或导出修改由存储/集群管理员处理，不要在本工作区重新挂载共享 `/aifs`。
 改为 `hard` 可以解决 PostgreSQL 的这一项要求，但不会让 NFS 变成 rootless
-Podman 可用的容器存储文件系统。
+Docker 或 Podman 可用的引擎存储文件系统。
 
 数据库 dump、导入 JSON 和备份可以存放在 NFS，例如拟议目录
 `/aifs/user/data/jiangfayu/inspirehep-data/backups/`。检查备份命令结果并测试恢复，
 使用数据库专用备份工具；复制正在运行的 PostgreSQL 数据目录不能替代正确的
 备份流程。文档更新没有创建该示例目录。
+
+#### Rootless Docker 存储与应用数据是不同问题
+
+引擎数据根目录不能使用 NFS，包括当前 NFS home。选定的
+`/var/tmp/jiangfayu-docker-rootless` 是私有非 NFS 路径，但 2026-11-16 的
+内核 overlay 检查表明它不能用作嵌套 overlay upper 目录。`fuse-overlayfs` 未
+安装；开发账号能打开 `/dev/fuse`，但没有测试 FUSE 挂载或引擎。安装建议提出后
+用户决定停止测试，不能把该方案写成已验证修复。Docker 客户端/守护
+进程配置可留在 NFS home，容器层、镜像和默认卷不能使用 NFS 默认数据根目录。
+
+本地引擎存储不等于应用数据持久化，内部命名卷会随数据根目录丢失；服务绑定
+挂载需要独立、获准的持久化文件系统，PostgreSQL 的 NFS `soft` 限制仍适用。
+容器 UID 0 映射到开发账号，其他容器 UID 映射到 subordinate ID，需按实际镜像
+用户及 PVC 检查权限。NFS 源码绑定挂载可能遇到 UID/GID 不匹配或所有权限制，
+尤其是完整 Docker 应用工作流；不要通过递归 chown 共享源码目录来绕过问题。
 
 #### Rootless Podman 存储与应用数据是不同问题
 
@@ -311,7 +391,8 @@ Error: DBUS_ERROR: Failed to connect to socket /run/dbus/system_bus_socket: No s
 1. 应用必须在工作区网络命名空间中监听所需地址和端口，通过 `ss -ltn` 检查，
    并先在工作区内用 `curl` 验证。
 2. 工作区可能已经有初始化配置创建的 iptables/nftables 输入规则。没有
-   firewalld 不等于没有这些规则；嵌套 Docker 还会建立内部容器转发/NAT 规则。
+   firewalld 不等于没有这些规则。RootlessKit/slirp4netns 负责 rootless 端口
+   发布与用户态网络，需要单独检查；此前 root 引擎也可能设置了转发/NAT 规则。
 3. Kubernetes CNI 路由、NetworkPolicy，以及集群的 Service/Ingress 或其他
    工作区接入机制决定 Pod 外部访问。内部 `docker -p` 在工作区命名空间发布
    端口，不会自动创建外部 Kubernetes 访问端点。
@@ -608,13 +689,88 @@ git push origin dev
 先确保工作区干净，不强制推送已发布历史。应用冲突按上游当前实现处理；
 `.gitignore` 合并双方规则并去重。
 
+## 9. 实际测试结果与阻碍（2026-11-16）
+
+以下为代理沙箱外真实工作区的检查结果，不代表安装成功。用户已要求停止后续
+测试，将改用其他机器。测试没有留下运行中的 Docker 或 INSPIRE 服务，没有
+初始化数据库、重置 fixtures、上传到发布商/INSPIRE、发送邮件或启用采集计划。
+代理没有修改系统软件包或 Pod/节点设置。
+
+| 检查 | 结果与含义 |
+| --- | --- |
+| Pod 实际资源 | `cpu.max=1600000 100000`，即 16 CPU 配额；`memory.max=34359738368`，即 32 GiB。约 8 GiB 已使用，未记录 OOM。主机可见 256 CPU / 约 503 GiB 并非 Pod 配额。容量适合初期小规模测试的判断，不等于完整栈基准测试或浏览器/索引并发保证。 |
+| 内核与用户命名空间 | `vm.max_map_count=262144`；RootlessKit 3.3.0 成功建立配置的 UID/GID 映射。Systemd 已安装但 PID 1 仍为 `bash`，cgroup v2 只读。 |
+| Rootless Docker 启动 | 文档中的 `dockerd-rootless.sh --data-root=...` 以退出码 `1` 失败：slirp4netns 创建 `tap0` 时返回 `open: No such file or directory`。`/dev/net` 和 `/dev/net/tun` 不存在；`/proc/misc` 和 `/sys/class/misc/tun/dev` 中未看到 TUN 注册。节点驱动及 Pod 设备访问需管理员检查，未产生可用 daemon/socket。 |
+| 嵌套 overlay 存储 | 独立 RootlessKit `--net=none` 检查在准备目录下尝试临时 overlay 挂载，退出码 `32`，错误为 `overlay: filesystem on .../upper not supported as upperdir`。这是已测试内核 overlay 配置的独立存储阻碍，不能推广为所有驱动都失败。临时检查文件已清理。 |
+| FUSE 候选 | 开发账号成功打开 `/dev/fuse`，但 `fuse-overlayfs` 未安装，也没有测试。软件包可安装并不证明容器兼容或持久化。 |
+| Podman | 未安装或运行。无守护进程设计不能证明当前网络、存储、cgroup 或 Compose 兼容性；既不宣称成功，也不宣称必然失败。 |
+| Compose 配置 | `docker compose -f docker-compose.yml -f docker-compose.override.yml config --quiet` 退出 `0`，提示 `FERNET_KEY` 与 `AIRFLOW_UID` 未设置。解析配置不代表容器或 Airflow 就绪。 |
+| 本地 INSPIRE | `127.0.0.1` 的 3000、8000、8001、8080、5432、5434、5672、6379、9200、9000 端口检查均关闭。所查位置/PATH 中缺少 backend/backoffice `.venv`、`.env`、UI `node_modules`、Poetry、Node 和 Yarn。没有可供采集测试的运行中本地实例。 |
+| 存储 | 两个 `/aifs` 仍为 NFSv4 `soft`；`/gfs` 仍为工作区 overlay，没有独立挂载。overlay 当时约 786 GiB 可用，数据 NFS 约 1.95 TiB 可用，属于共享、动态容量，不是配额或持久性保证。没有配置持久化服务卷。 |
+| 调度 | 未发现 `cron`/`crond` 进程，未启用或修改计划。 |
+
+### 已迁移采集脚本
+
+已阅读关联会话 **Check migration status** 和
+`../ihep-harvest-scripts/docs/IHEP-DEPLOYMENT.md`。该项目继续使用已有 uv / Python
+3.14 环境，与本仓库的 Poetry / Python 3.11 分开。以下命令已在其目录运行：
+
+```bash
+cd ../ihep-harvest-scripts
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/inspire-ihep-readiness-uv-cache \
+  sh scripts/run-job.sh --check
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/inspire-ihep-readiness-uv-cache \
+  uv run --locked --extra retinspire --no-sync pytest -q \
+  -p no:cacheprovider --basetemp=/tmp/inspire-ihep-pytest
+```
+
+就绪检查退出 `1`，仅报告缺少 `external/bibclassify/bibclassify_cli.py`。
+离线套件 **70 个测试及 4 个子测试通过**，11 条警告，耗时 7.20 秒。覆盖解析、
+转换/schema 验证，以及模拟的 API/邮件/feed 交互，不证明发布商到本地 INSPIRE
+的真实集成。检查后关联仓库没有已跟踪文件变更。
+
+源码检查还发现引擎启动以外的集成工作：
+
+- `lib/inspirelabslib3.py` 仍将查询 API 固定为生产
+  `https://inspirehep.net/api`；真实测试前需明确选择本地端点和本地认证，不能
+  假设已有生产 token 适用于本地实例。
+- `lib/start_retinspire3json.py` 仍打印指向 DESY 命名 CERN S3 桶的上传交接命令。
+  没有执行这些命令；本地输入/输出桶与上传交接尚未实现或验证。
+- 本仓库 `workflows/dags/literature/desy_harvest.py` 通过 S3 消费 JSONL/PDF，
+  创建 backoffice `HEP_PUBLISHER_CREATE` 工作流，再由 backoffice 初始化触发
+  Airflow。验证该发布商路径需要 backoffice worker、Airflow、本地连接及桶，
+  超出原生 UI/API 启动范围。还需验证所选拓扑的 `host.docker.internal` 路由和
+  其他工作流依赖。
+- 受控元数据导入及索引/搜索/PDF 检查可覆盖较小路径，但不能替代发布商摄取
+  验证；本次没有执行导入或生产提交。
+
+### 测试与未来备份适用性
+
+从资源容量判断，当前 CPU/RAM 可以尝试初期有限规模部署，但本工作区**尚未
+就绪**：网络与已测存储配置阻止 rootless Docker，应用未安装/运行，采集集成
+未完成，Podman 未测试。用户已选择其他机器，不要为了记录结果继续处理此前
+管理员请求。
+
+未来机器需具备可用引擎、受支持的非 NFS 引擎存储、明确持久化服务挂载，以及
+受管理的启动/调度机制。在 Kubernetes 中需集群管理员配置设备和持久卷等资源；
+普通机器也需验证自身服务/存储环境。不要直接复制本 Pod 的数字账号 ID 或假设
+目录布局相同。
+
+运行副本本身不是备份。应保留原始 JSONL/XML、PDF、去重状态、数据库 dump 及
+恢复所需配置，具备独立保留副本并验证恢复。现有采集清理包含 PDF 180 天策略，
+将工作目录视为档案前需调整。NFS 可按站点策略保存经验证的导出/备份文件，
+但当前 `soft` 挂载不能承载 PostgreSQL 运行数据。可丢弃 overlay 卷不应作为
+唯一保留副本。没有记录/PDF 规模、增长、保留及恢复要求，不能证明完整镜像容量
+足够。本次未测试备份或恢复。
+
 ## 参考与验证范围
 
 - [AlmaLinux 仓库与 CRB](https://wiki.almalinux.org/repos/AlmaLinux)
 - [RHEL 10 包清单（含 libpq-devel）](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/pdf/package_manifest/Red_Hat_Enterprise_Linux-10-Package_manifest-en-US.pdf)
 - [Docker RHEL 安装文档](https://docs.docker.com/engine/install/rhel/)
 - [OpenSearch Docker 前置条件](https://docs.opensearch.org/3.9/install-and-configure/install-opensearch/docker/)
-- [Docker 手动启动](https://docs.docker.com/engine/daemon/start/)
+- [Docker rootless 前置条件](https://docs.docker.com/engine/security/rootless/)
+- [Rootless Docker 无 systemd 启动、存储与资源限制](https://docs.docker.com/engine/security/rootless/tips/)
 - [firewall-cmd 客户端与 D-Bus](https://firewalld.org/documentation/man-pages/firewall-cmd.html)
 - [Kubernetes 容器安全限制](https://kubernetes.io/docs/concepts/security/linux-kernel-security-constraints/)
 - [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
@@ -633,7 +789,12 @@ firewalld 状态查询返回了上文记录的 D-Bus 错误。
 overlay，Docker 的 `/var/lib/docker` 也位于该 overlay。Podman 尚未安装，
 `/persistent/inspirehep` 不存在；没有部署或验证任何候选持久化数据存储。
 
-这些检查未改变守护进程运行状态、防火墙规则、Pod 或节点设置。
-`hello-world` 冒烟测试、Compose 工作负载、应用安装/测试、需要权限的防火墙
-规则列表和集群外部访问仍未验证。请让用户/管理员执行相关操作并记录结果后，
-再判断端到端环境是否就绪。
+2026-11-16 的只读检查确认用户已完成 rootless 准备：`slirp4netns` 已安装，
+两个准备目录的所有权及权限正确。当时没有运行中的 Docker 守护进程。
+Systemd 已安装，但 PID 1 仍为 `bash`，cgroup v2 仍只读；当前启动状态以上述
+结果为准，而非此前 root 守护进程运行中的历史观察。
+
+后续实际启动尝试及存储检查见第 9 节。Rootless 守护进程启动失败；
+`hello-world`、Compose 工作负载、应用安装/测试、需要权限的防火墙规则列表、
+集群外部访问及备份恢复仍未验证。采集离线套件通过和 Compose 配置解析成功
+不能证明真实集成，运行测试已按用户要求停止。

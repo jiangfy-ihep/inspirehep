@@ -14,11 +14,16 @@ Want to contribute? Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an is
 
 For this AlmaLinux 10 Kubernetes workspace, see the [setup guide](docs/local-setup-almalinux10.md)
 ([中文](docs/local-setup-almalinux10-cn.md)) and [daily startup commands](docs/running-the-dev-server.md).
-The workspace runs without systemd; the guide covers manual nested Docker startup,
-socket permissions, and networking without an active D-Bus/firewalld service.
+The guide records the attempted rootless Docker setup without systemd, including one-time
+sudo preparation, normal-user daemon startup, per-terminal socket selection,
+and networking without an active D-Bus/firewalld service.
 It distinguishes the native workspace topology from the full Docker stack below.
-The guide's [storage requirements](docs/local-setup-almalinux10.md#storage-verified-mounts-rootless-podman-and-persistent-data)
-cover the NFS `soft` mounts, local rootless Podman storage, and PVCs for durable service data.
+The guide's [storage requirements](docs/local-setup-almalinux10.md#storage-verified-mounts-rootless-engines-and-persistent-data)
+cover NFS `soft` mounts, disposable local rootless Docker storage, and PVCs for durable service data.
+Runtime testing here was stopped on 2026-11-16; the user will try another machine.
+The [recorded results](docs/local-setup-almalinux10.md#9-recorded-tests-and-blockers-2026-11-16)
+include failed Docker networking and nested overlay probes, passing harvesting
+offline tests, and the remaining local-ingestion and backup-storage requirements.
 
 Okay, so now the question is: **how do we develop on it?**
 

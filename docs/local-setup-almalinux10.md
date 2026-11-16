@@ -2,6 +2,13 @@
 
 [中文](local-setup-almalinux10-cn.md) · [Daily startup](running-the-dev-server.md)
 
+> **Testing stopped on 2026-11-16 at the user's request; another machine will
+> be tried.** Rootless Docker startup failed on this Pod, and a separate nested
+> overlay storage probe failed. No local INSPIRE instance was brought up.
+> See [the recorded results and blockers](#9-recorded-tests-and-blockers-2026-11-16).
+> The startup steps below describe the attempted setup, not a working installation.
+> Do not resume runtime tests or package/cluster changes without a new request.
+
 This workspace is a **Kubernetes-managed container**, with AlmaLinux **10.2**
 userland on x86_64. It does not run systemd: PID 1 is `bash`, and
 `systemd-detect-virt` reports `docker` (checked outside the agent sandbox on
@@ -9,9 +16,10 @@ userland on x86_64. It does not run systemd: PID 1 is `bash`, and
 the workspace userland. Recheck these facts after redeployment rather than
 treating the workspace as a full virtual machine.
 
-Docker runs as a nested daemon in this container. A running daemon and a
-successful container workload are separate validation steps; neither installing
-Docker packages nor identifying the OS certifies a complete installation.
+The attempted setup uses rootless Docker as a nested daemon without systemd. A running
+daemon and a successful container workload are separate validation steps;
+neither installing Docker packages nor identifying the OS certifies a complete
+installation.
 
 The application versions below come from this checkout, not the OS defaults.
 
@@ -70,8 +78,9 @@ against the same running containers.
 
 ## 2. Administrator tasks: user runs these commands
 
-Package installation, Docker startup/access, and firewall inspection may need
-`sudo`. Ask the user/administrator to run those commands and report results.
+Package installation, initial runtime/data directory provisioning, and firewall
+inspection may need `sudo`. Rootless Docker startup itself uses no sudo. Ask the
+user/administrator to run privileged commands and report results.
 Changes to Pod capabilities, cgroup delegation, node kernel settings, and cluster
 networking require the cluster administrator; `sudo` inside this workspace does
 not grant control of the Kubernetes node. Everything after this section runs
@@ -113,75 +122,129 @@ Reinstallation does not fix daemon or socket-access errors. There is no systemd
 service manager here: `systemctl enable --now docker` cannot start the daemon,
 and creating an enablement symlink does not arrange startup after Pod restart.
 
-### Check daemon state and socket access before starting anything
+### Rootless Docker: one-time administrator preparation
+
+The attempted configuration uses rootless Docker: both the daemon and
+containers would run under the development account's user namespace. Docker group membership only
+allows access to a root-owned daemon; it is not needed for this rootless socket.
+Follow [Docker's rootless prerequisites](https://docs.docker.com/engine/security/rootless/).
+
+Systemd is already installed, but it is not PID 1. Installing it again does not
+start a service manager. Running systemd in this container would require an
+administrator-approved change to the Pod startup and cgroup delegation, rather
+than a package installation. This workflow uses neither `systemctl --user` nor
+`loginctl`; start `dockerd-rootless.sh` directly.
+
+Before provisioning a different account, check its IDs and subordinate ranges:
 
 ```bash
-docker context show
-ls -l /var/run/docker.sock
-id -nG
-getent group docker
-docker info
+id
+command -v dockerd-rootless.sh rootlesskit newuidmap newgidmap slirp4netns
+awk -F: -v account="$(id -un)" '$1 == account' /etc/subuid /etc/subgid
 ```
 
-On 2026-11-13, `dockerd` and `containerd` were running and the socket existed
-with mode `660`, owned by `root:docker`. The checked session was denied access:
-the account was listed in the Docker group database, but its existing process
-had not acquired the supplementary group. This differs from the earlier
-missing-socket error. Do not start a second daemon to fix a permission error.
+The checked account is `jiangfayu`, UID `23739`, GID `1072`. Each subordinate
+range is `524288:65536`; a basic `unshare --user --map-root-user true` check
+passed. A later RootlessKit probe also confirmed mappings of namespace ID 0
+to the account and IDs 1–65536 to its subordinate ranges; workloads did not run.
+If the rootless scripts are absent, ask the administrator to install
+`docker-ce-rootless-extras`. Missing UID/GID helpers, ranges, or blocked user
+namespaces also require administrator review; do not allocate overlapping IDs.
 
-If group membership has not been granted, the user/administrator can run this
-as the developer's login account:
+The user completed the following preparation; checks on 2026-11-16 confirmed
+`slirp4netns` 1.3.3 and both directories owned by `23739:1072`, mode `0700`.
+These commands are for the current account, not arbitrary copied numeric IDs:
 
 ```bash
-sudo usermod -aG docker "$(id -un)"
+sudo dnf install slirp4netns
+
+sudo install -d -m 0700 -o 23739 -g 1072 \
+  /run/user/23739 \
+  /var/tmp/jiangfayu-docker-rootless
 ```
 
-If the account is already listed, refresh the current terminal instead of
-adding it again:
+Do not repeat completed preparation on every application restart. Have the
+administrator recreate missing directories after workspace replacement and
+recheck the account IDs. The runtime directory must be private, non-NFS, and
+removed/recreated across workspace shutdown/replacement; do not put it under
+`/tmp`. Here `/run/user/23739` is on the workspace overlay, not a systemd-managed
+tmpfs. The approved workspace startup/cleanup must manage its lifecycle.
+The data directory under `/var/tmp` is also on that overlay and is disposable.
+
+### Start rootless Docker without sudo or systemd
+
+Check for an existing daemon and both possible sockets before starting one:
 
 ```bash
-newgrp docker
-id -nG
-docker info
+ps -C dockerd -o pid=,comm=
+ls -ld /run/user/23739 /var/tmp/jiangfayu-docker-rootless
+ls -l /run/user/23739/docker.sock /var/run/docker.sock
 ```
 
-`newgrp` starts a subshell. A new SSH login also loads updated groups; existing
-shells, tmux servers, and other long-lived processes retain their old groups.
-Docker group access grants control equivalent to root; use the site's approved
-alternative if unsuitable. Do not make the socket world-writable.
+Missing sockets are expected when stopped. At the 2026-11-16 check no `dockerd`
+was running; the root-owned socket was absent. If a daemon exists, identify its
+endpoint before starting anything else. A rootless engine has separate images,
+containers, and volumes from the previous root-owned `/var/lib/docker` engine.
+Do not copy or migrate that store, delete sockets, or start a duplicate daemon
+to fix a permission error.
 
-### Start the nested daemon manually when it is not running
-
-After confirming no daemon is running, have the user/administrator start it in
-a dedicated terminal, following
-[Docker's manual startup instructions](https://docs.docker.com/engine/daemon/start/):
+The following command was attempted as `jiangfayu` and failed during network
+setup. It is retained for reference; testing is stopped:
 
 ```bash
-sudo dockerd
+export XDG_RUNTIME_DIR=/run/user/23739
+
+dockerd-rootless.sh \
+  --data-root=/var/tmp/jiangfayu-docker-rootless
 ```
 
-This runs in the foreground and prints logs to that terminal. Keep it open.
-To survive an SSH disconnect, first create a dedicated tmux session with
-`tmux new-session -s inspirehep-docker`, then run the same command there and
-detach with `Ctrl+B`, then `d`. Reattach with
-`tmux attach-session -t inspirehep-docker`. Run one daemon using the site's
-approved configuration; do not start a new one on each application restart.
+This runs in the foreground and logs to that terminal. The explicit data root
+avoids the NFS-backed default `$HOME/.local/share/docker`. Check any existing
+`${XDG_CONFIG_HOME:-$HOME/.config}/docker/daemon.json` first: do not duplicate
+`data-root` in both the file and command-line flag. Do not switch storage drivers
+against populated data or silently fall back to `sudo dockerd`.
+See [Docker's instructions without systemd](https://docs.docker.com/engine/security/rootless/tips/).
 
-In another terminal with socket access, verify the server and test a container:
+For SSH disconnects, first create `tmux new-session -s inspirehep-docker`, then
+run the daemon block inside it. Detach with `Ctrl+B`, then `d`; reattach with
+`tmux attach-session -t inspirehep-docker`. Keep it running across application
+restarts. Tmux does not survive workspace replacement. Automatic recovery needs
+an administrator-approved workspace startup/supervisor configuration.
+
+### Select the rootless socket in every client terminal
+
+Run this before Docker, Compose, or Make commands in each relevant terminal or
+tmux window; the foreground daemon does not configure other shells:
 
 ```bash
+unset DOCKER_CONTEXT
+export XDG_RUNTIME_DIR=/run/user/23739
+export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/docker.sock"
+
 docker version
 docker compose version
 docker info
 docker info --format '{{.DockerRootDir}}'
+docker info --format '{{json .SecurityOptions}}'
+```
+
+Expect Docker Root Dir `/var/tmp/jiangfayu-docker-rootless` and `rootless` in
+Security Options. Clearing `DOCKER_CONTEXT` prevents it overriding `DOCKER_HOST`.
+The default root-owned socket `/var/run/docker.sock` and `newgrp docker` are not
+part of this workflow. A missing rootless socket means startup has not succeeded
+or the endpoint is wrong; permission denied requires checking directory/socket
+ownership and the active account. Never make a socket world-writable.
+
+Once the daemon connects, test a basic container:
+
+```bash
 docker run --rm hello-world
 ```
 
-The last command downloads and runs an image; it was not executed during the
-documentation checks. Success verifies a basic workload, not the full Compose
-stack. `Ctrl+C` in the daemon terminal stops Docker. For automatic recovery
-after Pod replacement, the cluster administrator must configure an approved
-startup/supervision mechanism; tmux survives a disconnect, not Pod replacement.
+This downloads and runs an image. It has not been run during the documentation
+update. Success proves a basic workload, not image builds, bind mounts, port
+publishing, or the full Compose stack. Verify those separately before importing
+data. `Ctrl+C` in the daemon terminal stops the engine and affects workloads.
 
 ### Nested Docker prerequisites and failures
 
@@ -189,6 +252,14 @@ The current `/sys/fs/cgroup` mount is cgroup v2 and read-only. PID 1 has
 `CAP_SYS_ADMIN` and `CAP_NET_ADMIN` in its capability set, but that alone does
 not prove all inner-container operations work. A daemon can start while
 workloads fail when creating cgroups, mounts, or bridge networking.
+
+Without systemd and delegated cgroups, rootless Docker does not provide the
+usual cgroup-based `--cpus`, `--memory`, or `--pids-limit` enforcement; do not
+assume Compose limits are effective. The outer Pod's limits still bound the
+workspace. Slirp4netns/RootlessKit provide user-space networking; verify each
+published port from native applications and from outside the Pod. Rootless mode
+does not create Kubernetes Services or bypass NetworkPolicy. See
+[Docker's rootless resource limits](https://docs.docker.com/engine/security/rootless/tips/#limiting-resources).
 
 If startup or the smoke test fails, report the first error to the cluster
 administrator. They must check the approved nested-container capability and
@@ -206,7 +277,7 @@ A remote engine needs a matching topology: `localhost` ports and Compose bind
 mounts refer to the engine's machine, not automatically to this workspace. The
 commands below assume a working nested engine in this workspace.
 
-### Storage: verified mounts, rootless Podman, and persistent data
+### Storage: verified mounts, rootless engines, and persistent data
 
 The following storage checks were made outside the agent sandbox on 2026-11-13:
 
@@ -223,7 +294,10 @@ df -h /tmp /var/tmp
 | `/aifs/user/data/jiangfayu` | Writable NFSv4, `soft` mount | Shared source files, imports, verified backups |
 | `/aifs/user/home/jiangfayu` | Writable NFSv4, `soft` mount | User files and configuration |
 | `/tmp`, `/var/tmp` | Same writable `overlay` filesystem mounted at `/` | Disposable workspace-local storage |
-| `/var/lib/docker` | Same container overlay; current Docker data root | Engine data and default volumes, without Pod-level persistence |
+| `/run/user/23739` | Container overlay; private runtime directory | Rootless Docker socket and runtime state; recreate after replacement |
+| `/var/tmp/jiangfayu-docker-rootless` | Same container overlay; selected rootless data root | Disposable engine data and default volumes |
+| `/var/lib/docker` | Same container overlay; previous root-owned engine store | Separate from rootless Docker; no Pod-level persistence |
+| `/gfs`, `/gfs/jiangfayu` | Container overlay at the last mount check; no separate mount | No additional capacity or persistence; recheck if a mount is provisioned |
 
 The overlay reported about 766 GiB available. This is shared filesystem free
 space at the time of the check, not a per-user allocation or a Kubernetes
@@ -244,13 +318,33 @@ behavior, and permissions before using it for database data. See
 Ask the storage/cluster administrator about any mount or export changes; do not
 remount the shared `/aifs` filesystems from this workspace. A `hard` mount would
 address that PostgreSQL requirement, but would not make NFS suitable for
-rootless Podman's container storage.
+rootless Docker or Podman engine storage.
 
 NFS remains a place for database dumps, import JSON, and backups, for example
 under the proposed `/aifs/user/data/jiangfayu/inspirehep-data/backups/`. Check
 backup command results and test restores. Use database-aware backup tools;
 copying a running PostgreSQL data directory is not a substitute for a valid
 backup procedure. This example directory was not created during documentation.
+
+#### Rootless Docker storage is separate from application data
+
+Keep the engine's data root off NFS, including the NFS home. The selected
+`/var/tmp/jiangfayu-docker-rootless` is a private non-NFS location, but its
+underlying overlay failed the 2026-11-16 kernel overlay upper-directory probe.
+`fuse-overlayfs` is not installed; `/dev/fuse` could be opened by the developer,
+but a FUSE mount or engine was not tested. Installing the package was proposed,
+then declined when the user stopped testing. Do not treat it as a verified fix.
+Docker client/daemon configuration files can remain in the NFS home; engine
+layers, images, and default volumes must not use the NFS default data root.
+
+Using a local engine store does not make application data persistent. Named
+volumes under this data root are lost with it; explicit service bind mounts need
+a separate approved durable filesystem. PostgreSQL's NFS `soft` restriction
+still applies. Container UID 0 maps to the development account, while other
+container UIDs map into subordinate IDs; validate permissions for actual image
+users and PVCs. Source bind mounts on NFS may encounter unmapped UID/GID or
+ownership restrictions, especially for the full Docker application workflow.
+Do not recursively chown shared source directories to work around this.
 
 #### Rootless Podman storage is separate from application data
 
@@ -352,7 +446,9 @@ Distinguish these network layers:
    namespace; inspect `ss -ltn` and test with `curl` inside the workspace.
 2. Workspace iptables/nftables input rules may come from its bootstrap
    configuration. Absence of firewalld does not mean those rules are absent.
-   Nested Docker also creates forwarding/NAT rules for inner containers.
+   RootlessKit/slirp4netns handle rootless port publishing and user-space
+   networking; check those separately. A previous root-owned engine may also
+   have installed forwarding/NAT rules.
 3. Kubernetes CNI routing, NetworkPolicy, and the cluster's Service/Ingress or
    other workspace access mechanism determine reachability from outside the
    Pod. An inner `docker -p` publishes in the workspace namespace; it does not
@@ -691,13 +787,104 @@ Start with a clean working tree. Merge published history without force-pushing.
 For application conflicts, preserve upstream's current implementation. Merge
 `.gitignore` rules from both branches and remove duplicate rules.
 
+## 9. Recorded tests and blockers (2026-11-16)
+
+These are results from the actual workspace outside the agent sandbox, not a
+successful installation report. The user stopped further tests and will try
+another machine. No Docker daemon or INSPIRE services were left running by the
+tests; no database initialization, fixture reset, publisher upload, email, or
+harvesting schedule was performed. System packages and Pod/node settings were
+not changed by the agent.
+
+| Check | Result and implication |
+| --- | --- |
+| Effective Pod resources | `cpu.max=1600000 100000` (16 CPU quota), `memory.max=34359738368` (32 GiB). About 8 GiB was in use; no OOM events were recorded. Host-visible 256 CPUs and about 503 GiB RAM are not the Pod allocation. This suggests room for initial tests, not a full-stack benchmark or a guarantee when browsers and indexing share it. |
+| Kernel/user namespaces | `vm.max_map_count=262144`; RootlessKit 3.3.0 successfully established the configured UID/GID mappings. Systemd is installed but PID 1 remains `bash`; cgroup v2 is read-only. |
+| Rootless Docker startup | The documented `dockerd-rootless.sh --data-root=...` attempt exited `1` during slirp4netns setup of `tap0`, with `open: No such file or directory`. `/dev/net` and `/dev/net/tun` are absent. No TUN registration was visible in `/proc/misc` or `/sys/class/misc/tun/dev`; node driver availability and Pod device access require administrator review. No daemon/socket became available. |
+| Nested overlay storage | A separate RootlessKit probe with `--net=none` attempted a temporary overlay mount under the prepared data root and exited `32`: `overlay: filesystem on .../upper not supported as upperdir`. This is an independent storage blocker for the tested kernel overlay arrangement, not evidence that every driver must fail. Temporary probe files were removed. |
+| FUSE alternative | Opening `/dev/fuse` as the developer succeeded. `fuse-overlayfs` was absent and was not installed or tested. Package availability alone would not establish container compatibility or persistence. |
+| Podman | Not installed or run. Daemonless operation does not establish working networking, storage, cgroup behavior, or Compose compatibility here. No Podman success or universal failure is claimed. |
+| Compose configuration | `docker compose -f docker-compose.yml -f docker-compose.override.yml config --quiet` exited `0`, with unset `FERNET_KEY` and `AIRFLOW_UID` warnings. Configuration parsing does not test containers or Airflow readiness. |
+| Local INSPIRE availability | TCP probes to `127.0.0.1` ports 3000, 8000, 8001, 8080, 5432, 5434, 5672, 6379, 9200, and 9000 were closed. Backend/backoffice `.venv` and `.env`, UI `node_modules`, Poetry, Node, and Yarn were absent from the inspected locations/PATH. There is no running local instance for the harvesting tests. |
+| Storage | Both `/aifs` paths still use NFSv4 `soft`. `/gfs` is still the workspace overlay, not a separate mount. The overlay reported about 786 GiB free and the data NFS about 1.95 TiB free; these are shared, changing capacities, not allocations or durability guarantees. No persistent service volume was provisioned. |
+| Scheduling | No `cron`/`crond` process was found. No schedule was enabled or changed. |
+
+### Migrated harvesting scripts
+
+The related chat **Check migration status** and
+`../ihep-harvest-scripts/docs/IHEP-DEPLOYMENT.md` were reviewed. That project
+keeps its existing uv/Python 3.14 environment, separately from this repository's
+Poetry/Python 3.11 environments. The following commands ran from its checkout:
+
+```bash
+cd ../ihep-harvest-scripts
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/inspire-ihep-readiness-uv-cache \
+  sh scripts/run-job.sh --check
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR=/tmp/inspire-ihep-readiness-uv-cache \
+  uv run --locked --extra retinspire --no-sync pytest -q \
+  -p no:cacheprovider --basetemp=/tmp/inspire-ihep-pytest
+```
+
+The readiness command exited `1`, reporting only the missing
+`external/bibclassify/bibclassify_cli.py`. The offline suite passed **70 tests
+and 4 subtests**, with 11 warnings, in 7.20 seconds. It tests parsing,
+conversion/schema validation, and mocked API/mail/feed interactions; it does
+not demonstrate a live publisher-to-local-INSPIRE workflow. The related checkout
+had no tracked changes after the checks.
+
+Source inspection found integration work beyond starting an engine:
+
+- `lib/inspirelabslib3.py` still sets the search API endpoint to production
+  `https://inspirehep.net/api`. A local-test endpoint and appropriate local
+  authentication must be selected explicitly before live tests; do not assume
+  the existing production token belongs to a local instance.
+- `lib/start_retinspire3json.py` still prints an upload handoff targeting the
+  DESY-named CERN S3 buckets. Those printed commands were not executed. A local
+  input/output bucket and uploader handoff have not been implemented or verified.
+- This checkout's `workflows/dags/literature/desy_harvest.py` consumes staged
+  JSONL/PDFs through S3 and creates backoffice `HEP_PUBLISHER_CREATE` workflows.
+  Backoffice initialization then triggers Airflow. Testing that publisher path
+  needs backoffice workers, Airflow, and local connections/buckets, beyond the
+  native UI/API startup. `host.docker.internal` routes and other workflow
+  dependencies must also be verified for the chosen topology.
+- A controlled metadata import followed by indexing/search/PDF checks can test
+  a smaller path, but it does not replace publisher ingestion validation.
+  No import or production submission was attempted.
+
+### Suitability for tests and future backup
+
+The measured CPU/RAM can support an initial, bounded test deployment as a sizing
+judgment. The current workspace is **not ready**: networking and the tested
+storage arrangement block rootless Docker, applications are not installed or
+running, and harvesting integration remains incomplete. Podman is untested.
+The user chose another machine; do not pursue the outstanding administrator
+requests as part of documenting these findings.
+
+For a future deployment, select a working engine, supported non-NFS engine
+storage, explicit durable service mounts, and a supervised startup/scheduling
+model. On Kubernetes these need the cluster administrator, including device
+access and any persistent volumes; a conventional machine needs its own
+validated service/storage setup. Do not copy this Pod's numeric account IDs or
+assume its filesystem layout applies elsewhere.
+
+A running replica is not by itself a backup. Preserve source JSONL/XML, PDFs,
+deduplication state, database dumps, and the configuration needed to restore,
+with independent retained copies and a tested recovery procedure. Existing
+harvesting cleanup includes a 180-day PDF policy; review it before treating the
+working PDF directory as an archive. Current NFS can hold verified export/backup
+files subject to site policy, but its `soft` mounts must not host live PostgreSQL
+data. Disposable overlay volumes are unsuitable as the sole retained copy.
+Full-mirror capacity cannot be certified without record/PDF volume, growth,
+retention, and recovery requirements. No backup or restore was tested.
+
 ## References and validation status
 
 - [AlmaLinux repositories and CRB](https://wiki.almalinux.org/repos/AlmaLinux)
 - [RHEL 10 package manifest, including libpq-devel](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/pdf/package_manifest/Red_Hat_Enterprise_Linux-10-Package_manifest-en-US.pdf)
 - [Docker Engine on RHEL](https://docs.docker.com/engine/install/rhel/)
 - [OpenSearch Docker prerequisites](https://docs.opensearch.org/3.9/install-and-configure/install-opensearch/docker/)
-- [Docker manual daemon startup](https://docs.docker.com/engine/daemon/start/)
+- [Docker rootless prerequisites](https://docs.docker.com/engine/security/rootless/)
+- [Rootless Docker without systemd, storage, and resource limits](https://docs.docker.com/engine/security/rootless/tips/)
 - [firewall-cmd client and D-Bus](https://firewalld.org/documentation/man-pages/firewall-cmd.html)
 - [Kubernetes container security constraints](https://kubernetes.io/docs/concepts/security/linux-kernel-security-constraints/)
 - [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
@@ -719,8 +906,15 @@ Storage checks also confirmed both `/aifs` mounts use `soft`, `/tmp` and
 that overlay. Podman is not installed and `/persistent/inspirehep` does not
 exist. No storage candidate was provisioned or tested as durable service data.
 
-No daemon lifecycle, firewall rules, Pod settings, or node settings were changed
-by these checks. The `hello-world` smoke test, Compose workloads, application
-installation/tests, privileged firewall rule listings, and external cluster
-reachability remain unverified. Request the relevant user/administrator actions
-and record their results before claiming end-to-end readiness.
+On 2026-11-16, read-only checks confirmed the user's completed rootless
+preparation: `slirp4netns` is installed, and both prepared directories have the
+expected ownership and mode. No Docker daemon was running. Systemd is installed
+but PID 1 remains `bash`; cgroup v2 is still mounted read-only. This supersedes
+the earlier running root-owned daemon observation as the current startup state.
+
+The subsequent startup attempt and storage probe are recorded in section 9.
+Rootless daemon startup failed; `hello-world`, Compose workloads, application
+installation/tests, privileged firewall rule listings, external cluster
+reachability, and backup/restore remain unverified. The passing harvesting
+offline suite and Compose configuration check do not establish live integration.
+Runtime testing is stopped at the user's request.

@@ -1,5 +1,12 @@
 # Running the development services
 
+> **Current workspace: testing stopped on 2026-11-16.** Rootless Docker failed
+> during network setup because `/dev/net/tun` is absent; a separate nested
+> overlay mount probe also failed. No local INSPIRE services were started.
+> The user will try another machine. These commands remain a reference for a
+> future validated setup, not an instruction to resume testing on this host.
+> See the [actual test results](local-setup-almalinux10.md#9-recorded-tests-and-blockers-2026-11-16).
+
 Complete the [AlmaLinux 10 setup](local-setup-almalinux10.md) first
 ([中文](local-setup-almalinux10-cn.md)). These commands use native backend, UI,
 and backoffice processes with Docker infrastructure. They do not start Airflow
@@ -10,30 +17,55 @@ Run each terminal's block starting at the repository root. The local `.env`
 files must already contain the settings from the setup guide. Poetry manages
 the Python environments and dependencies; no system Python changes are needed.
 
-## Docker daemon prerequisite: no systemd in this workspace
+## Rootless Docker prerequisite: no systemd in this workspace
 
-This is an AlmaLinux 10.2 container on Kubernetes. PID 1 is `bash`; `systemctl`
-cannot start its Docker daemon. Before infrastructure commands, check:
+This is an AlmaLinux 10.2 container on Kubernetes. Systemd is installed but PID 1
+is `bash`. The user has completed the setup guide's one-time sudo preparation
+for slirp4netns and private runtime/data directories (verified 2026-11-16).
+Rootless Docker startup itself needs no sudo, but the actual attempt failed.
+Only if runtime testing is explicitly resumed, first follow the setup guide's
+[daemon and socket checks](local-setup-almalinux10.md#start-rootless-docker-without-sudo-or-systemd)
+to avoid duplicates. If stopped, run this as the development account in a
+dedicated terminal or tmux session:
 
 ```bash
-docker info
+export XDG_RUNTIME_DIR=/run/user/23739
+dockerd-rootless.sh --data-root=/var/tmp/jiangfayu-docker-rootless
 ```
 
-The daemon was already running at the latest check. If it is stopped, have the
-user/administrator run `sudo dockerd` in a dedicated terminal or tmux session,
-following the setup guide. Keep that session running. Do not start a second
-daemon for a permission error: refresh an already-granted Docker group with
-`newgrp docker` or a new SSH login. Check both daemon connectivity and the
-guide's container smoke test before treating nested Docker as operational.
+Keep the daemon session running. Do not use `sudo dockerd`,
+`newgrp docker`, or systemd commands for this rootless setup.
+
+In **every terminal running Docker, Compose, or Make**, select the rootless
+socket before any infrastructure command:
+
+```bash
+unset DOCKER_CONTEXT
+export XDG_RUNTIME_DIR=/run/user/23739
+export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/docker.sock"
+
+docker info
+docker info --format '{{.DockerRootDir}}'
+docker info --format '{{json .SecurityOptions}}'
+```
+
+Expect the selected data root above and `rootless` in Security Options. Check the
+setup guide's container smoke test too. No containers ran in the stopped tests.
+After workspace replacement, have the administrator recreate missing private
+directories and recheck account IDs. The runtime directory needs lifecycle
+cleanup; tmux does not provide recovery after replacement.
 
 ## Infrastructure terminal
 
-First choose a [storage plan](local-setup-almalinux10.md#storage-verified-mounts-rootless-podman-and-persistent-data).
+First choose a [storage plan](local-setup-almalinux10.md#storage-verified-mounts-rootless-engines-and-persistent-data).
 The default Compose topology is disposable across workspace replacement.
 Persistent service data requires approved storage and explicit bindings before
 initialization. The two `/aifs` paths are NFS `soft` mounts and must not be used
 as PostgreSQL live data directories in their current configuration. Local
-Podman engine storage, if trialed, is a separate concern from service persistence.
+rootless Docker engine storage is a separate concern from service persistence.
+Its default volumes are on the disposable data root. Rootless UID/GID mappings
+and published ports need actual workload checks; normal cgroup-based Compose
+resource limits are unavailable without systemd/delegation here.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.override.yml \

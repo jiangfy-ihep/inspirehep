@@ -43,6 +43,11 @@ interpreter separately, as described in the AlmaLinux setup guides.
 
 ### AlmaLinux Kubernetes workspace setup
 
+- Runtime testing on this host was stopped at the user's request on 2026-11-16;
+  they will try another machine. Documentation/commit/push requests do not
+  authorize resuming daemon, storage, package, or cluster experiments. Retain
+  the attempted rootless configuration as a record, not a working installation.
+  The actual results and migration blockers are in section 9 of both setup guides.
 - The current workspace is a Kubernetes-managed container with AlmaLinux 10.2
   userland (checked outside the agent sandbox on 2026-11-13). PID 1 is `bash`,
   virtualization detection reports `docker`, and systemd is not running.
@@ -59,18 +64,31 @@ interpreter separately, as described in the AlmaLinux setup guides.
   changes on their behalf. Continue independent documentation work while
   waiting. Never prescribe flushing firewall rules or disabling SELinux as a
   routine setup step.
-- Do not use `systemctl`/`journalctl` as the workspace service-management path.
-  The user starts a stopped nested Docker daemon with `sudo dockerd` in a
-  dedicated foreground terminal or tmux session. First check for an existing
-  daemon/socket. Keep it running across application restarts; tmux does not
-  provide recovery after Pod replacement. Automatic startup belongs in an
-  administrator-approved supervisor/workspace configuration.
-- Distinguish a missing Docker socket from permission denied. The checked
-  socket is `root:docker`, mode `660`; the account is a Docker group member,
-  but existing processes can retain old groups. Use a new login or
-  `newgrp docker` for a fresh shell; do not start duplicate daemons or use
-  world-writable socket permissions. A read-only query in a child shell with
-  existing group membership succeeded; workload startup remains unverified.
+- The attempted configuration uses rootless Docker without systemd. Systemd is installed
+  but is not PID 1; reinstalling it does not start a service manager. Do not use
+  `systemctl`, `systemctl --user`, or `loginctl` for this setup. Running systemd
+  would require administrator-approved Pod startup and cgroup changes.
+- One-time sudo preparation was completed by the user and verified on
+  2026-11-16: `slirp4netns` 1.3.3 is installed; `/run/user/23739` and
+  `/var/tmp/jiangfayu-docker-rootless` are owned by UID 23739/GID 1072 with mode
+  `0700`. Subuid/subgid ranges are each `524288:65536`; a basic user namespace
+  test passed. Recheck IDs and prerequisites after redeployment. Ask the
+  user/admin to recreate missing directories; do not run sudo preparation.
+- If runtime work is explicitly resumed, the attempted startup command was
+  `XDG_RUNTIME_DIR=/run/user/23739 dockerd-rootless.sh --data-root=/var/tmp/jiangfayu-docker-rootless`
+  in a foreground terminal or tmux session. Inspect existing daemon configuration
+  before supplying duplicate flags. Keep it running across application restarts.
+  Do not silently fall back to `sudo dockerd` or start duplicate daemons. Tmux
+  survives SSH disconnects, not Pod replacement; automatic recovery and runtime
+  directory cleanup belong in approved workspace configuration.
+- Every Docker/Compose/Make client shell must unset `DOCKER_CONTEXT`, set
+  `XDG_RUNTIME_DIR=/run/user/23739`, and export
+  `DOCKER_HOST=unix:///run/user/23739/docker.sock`. Confirm `rootless` in Security
+  Options and the selected Docker Root Dir before starting services. The old
+  `/var/run/docker.sock` and Docker group access are unrelated to this endpoint.
+  Distinguish missing socket from permission denied; never make it world-writable.
+  The rootless engine has separate images/containers/volumes from the previous
+  root-owned engine; do not migrate engine data during documentation changes.
 - cgroup v2 is mounted read-only in the workspace. A running daemon and available
   capabilities do not prove nested containers can create cgroups, mounts, or
   networks. Pod security/capabilities, cgroup delegation, node kernel settings,
@@ -78,12 +96,26 @@ interpreter separately, as described in the AlmaLinux setup guides.
   `sudo` inside the workspace does not confer node administration. Do not remount
   node cgroups, enable blanket privileged mode, or disable Docker firewall
   management as generic workarounds.
+- Rootless Docker without systemd/delegated cgroups does not provide the usual
+  cgroup resource-limit enforcement; do not assume Compose CPU/memory/PID limits
+  work. Outer Pod limits still apply. Validate RootlessKit/slirp4netns published
+  ports, bind-mount UID/GID mappings, and actual workloads separately. Rootless
+  daemon startup failed at network setup: `/dev/net/tun` is absent and
+  slirp4netns could not create `tap0`. No TUN registration was visible in the
+  inspected kernel interfaces; node driver/device access needs admin review.
+  Container smoke tests and Compose workloads did not run. Podman remains
+  uninstalled/untested; do not claim that changing engines resolves these limits.
+- The effective Pod limits checked on 2026-11-16 were 16 CPU cores of quota
+  (`cpu.max=1600000 100000`) and 32 GiB RAM, with about 8 GiB then in use.
+  Host-visible CPU/RAM totals are not the allocation. Capacity looks suitable
+  for bounded initial tests, not a measured full-stack or full-mirror guarantee.
 - `firewall-cmd`/firewalld are installed, but no firewalld process or system
   D-Bus socket is present; the state query fails with `DBUS_ERROR`. Do not
   prescribe `firewall-cmd --add-port`/`--reload` for this workspace. Check app
-  listeners, workspace iptables/nftables rules, nested Docker NAT/forwarding,
-  and cluster CNI/NetworkPolicy/routing separately. Ask the user/admin for
-  privileged rule listings and targeted changes; preserve SSH and Docker rules.
+  listeners, workspace iptables/nftables rules (including previous root-owned
+  engine NAT/forwarding), rootless user-space networking, and cluster
+  CNI/NetworkPolicy/routing separately. Ask the user/admin for privileged rule
+  listings and targeted changes; preserve SSH and Docker rules.
 - The native workflow uses `docker-compose.yml` plus the local override. It
   needs the separate backoffice database and broker and published RabbitMQ
   ports. The older `scripts/dev.sh` uses a reduced topology and is not the
@@ -104,8 +136,23 @@ interpreter separately, as described in the AlmaLinux setup guides.
   mounts using `soft`; do not assume one is a local disk because its name differs.
 - `/tmp` and `/var/tmp` share the container's writable overlay. The reported
   free space is shared filesystem capacity, not an allocation or persistence
-  guarantee. Docker's current `/var/lib/docker` is also on that overlay.
-  Container/Pod replacement can discard engine data and its default volumes.
+  guarantee. Both the selected rootless data root
+  `/var/tmp/jiangfayu-docker-rootless` and the previous root-owned store
+  `/var/lib/docker` are on that overlay. Container/Pod replacement can discard
+  engine data and default volumes. `/gfs` and `/gfs/jiangfayu` also resolved to
+  the overlay with no separate mount; recheck before treating them as storage.
+- Rootless Docker's default `$HOME/.local/share/docker` would be on NFS and
+  must not be used. Keep the explicit non-NFS data root; configuration files may
+  remain on NFS. The prepared runtime directory is private overlay storage,
+  not a systemd-managed tmpfs; recreate/clean it across workspace lifecycles.
+  A separate RootlessKit probe confirmed UID/GID mappings but failed a kernel
+  overlay mount with `upper not supported as upperdir` (exit 32). The account
+  could open `/dev/fuse`; `fuse-overlayfs` was absent and no FUSE alternative
+  was tested. Installing it was proposed before the user stopped the work;
+  do not treat that proposal as completed or a verified fix. Local engine
+  storage does not provision durable application data. Validate image
+  user/subordinate UID/GID mappings before binding service data or NFS source;
+  do not recursively chown shared source trees as a workaround.
 - PostgreSQL requires `hard` for an NFS live data directory. Do not place live
   PostgreSQL data on the current soft-mounted `/aifs` directories. Mount/export
   durability and permissions must be reviewed by the storage/cluster admin;
@@ -131,6 +178,31 @@ interpreter separately, as described in the AlmaLinux setup guides.
   Kubernetes PVC. A named volume or `compose stop` does not protect engine data
   on an ephemeral workspace overlay against replacement. Treat the default
   setup as disposable until storage bindings and recovery are verified.
+- A running replica is not a backup. Retain independently stored source
+  JSONL/XML/PDFs, deduplication state, database dumps, and restore configuration;
+  verify retention and restores before claiming backup readiness. The harvesting
+  project's PDF cleanup includes a 180-day policy. No backup/restore was tested.
+
+### Harvesting integration assessment (2026-11-16)
+
+- The related project is `../ihep-harvest-scripts`; its chat is titled
+  `Check migration status`. Keep its existing uv/Python 3.14 workflow separate
+  from this repository's Poetry/Python 3.11 environments.
+- Its existing offline suite passed 70 tests and 4 subtests, with 11 warnings.
+  `sh scripts/run-job.sh --check` exited 1, reporting missing
+  `external/bibclassify/bibclassify_cli.py`. Publisher access, mail delivery,
+  historical-state migration, and local ingestion remain unverified.
+- The harvesting API helper still points at production INSPIRE, and the
+  converter still prints handoff commands for DESY-named CERN S3 buckets.
+  No upload was executed. A local endpoint, local credentials, and local
+  bucket/uploader handoff need explicit integration work before live tests.
+- The DESY publisher DAG consumes S3 JSONL/PDFs and creates backoffice
+  `HEP_PUBLISHER_CREATE` workflows, whose initialization triggers Airflow.
+  Native UI/API startup alone does not test this path; backoffice workers,
+  Airflow, connections, buckets, routes, and workflow dependencies are needed.
+- No local INSPIRE listeners or native application environments were found.
+  Compose `config --quiet` passed with unset `FERNET_KEY`/`AIRFLOW_UID` warnings;
+  no workload, import, database reset, or end-to-end validation followed.
 
 ### Backend
 
@@ -207,9 +279,14 @@ docker compose exec -T airflow-worker pytest tests/test_hep_tasks.py -k test_arx
 
 ### Infrastructure
 
-For native development, run from the repository root:
+For a future validated native setup, run from the repository root after
+selecting the intended engine. The current host's runtime tests are stopped:
 
 ```bash
+unset DOCKER_CONTEXT
+export XDG_RUNTIME_DIR=/run/user/23739
+export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/docker.sock"
+
 docker compose -f docker-compose.yml -f docker-compose.override.yml \
   up -d db db-backoffice cache mq backoffice-mq es s3
 docker compose -f docker-compose.yml -f docker-compose.override.yml ps
